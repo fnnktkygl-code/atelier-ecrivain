@@ -1,34 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# L'Atelier de l'Écrivain
 
-## Getting Started
+Bienvenue sur le dépôt de **L'Atelier de l'Écrivain** !
 
-First, run the development server:
+Ce projet est une application web (liseuse et éditeur) permettant de lire, structurer et travailler sur des œuvres littéraires telles que le roman *Les dieux à l'image des hommes*.
 
+## 🌍 Accéder à l'application web
+
+L'application est déployée et accessible en ligne :
+👉 **[Lien vers l'application web (Vercel)](https://liseuse-dieux.vercel.app)** 
+
+*(Note : l'URL peut contenir l'ancien nom de projet "liseuse-dieux")*
+
+---
+
+## 🛠 Déploiement et Développement Local
+
+Ce projet est construit avec [Next.js](https://nextjs.org/) et stylisé avec Tailwind CSS.
+
+### Lancer le projet en local
+
+1. Clonez le dépôt :
+```bash
+git clone https://github.com/fnnktkygl-code/atelier-ecrivain.git
+```
+2. Installez les dépendances :
+```bash
+npm install
+```
+3. Lancez le serveur de développement :
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur pour voir le résultat.
