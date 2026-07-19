@@ -13,7 +13,7 @@
         "oAuthBrandDisplayName": "Atelier d'Écrivain",
         "supportEmail": "lunneko.njm@gmail.com",
         "authorizedRedirectUris": [
-          "https://liseuse-dieux.vercel.app/__/auth/handler"
+          "https://atelier-ecrivain.vercel.app/__/auth/handler"
         ]
       }
     }
