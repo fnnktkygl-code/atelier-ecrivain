@@ -1,0 +1,21 @@
+{
+  "hosting": {
+    "public": "out",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Atelier d'Écrivain",
+        "supportEmail": "lunneko.njm@gmail.com",
+        "authorizedRedirectUris": [
+          "https://liseuse-dieux.vercel.app/__/auth/handler"
+        ]
+      }
+    }
+  }
+}
