@@ -821,7 +821,7 @@ export default function LiseusePage() {
 
       <div className="liseuse-wrap">
         <div className="liseuse-topbar">
-          <div className="brand" style={{ cursor: 'pointer' }} onClick={() => setShowToc(true)}>☰ Les dieux à l&apos;image des hommes</div>
+          <div className="brand" style={{ cursor: 'pointer' }} onClick={() => setShowToc(true)}>☰ L&apos;Atelier de l&apos;Écrivain</div>
           <div className="controls">
             {/* Font size quick controls */}
             <div className="font-controls">

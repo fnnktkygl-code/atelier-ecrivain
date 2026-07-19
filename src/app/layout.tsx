@@ -5,13 +5,13 @@ import AuthProvider from "@/components/Auth/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Atelier d'Écrivain — Les dieux à l'image des hommes",
+  title: "L'Atelier de l'Écrivain",
   description:
     "Atelier d'écriture numérique avec dictée vocale intelligente, structuration IA et liseuse intégrée.",
   keywords: ["écrivain", "manuscrit", "liseuse", "dictée", "IA", "Gemini"],
   authors: [{ name: "Richard" }],
   openGraph: {
-    title: "Atelier d'Écrivain — Les dieux à l'image des hommes",
+    title: "L'Atelier de l'Écrivain",
     description:
       "Dictez votre manuscrit, l'IA transcrit, structure, et vérifie vos citations.",
     type: "website",

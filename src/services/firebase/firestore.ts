@@ -116,7 +116,7 @@ export async function migrateStaticData(uid: string): Promise<string> {
 
   // Manuscript meta
   batch.set(mRef, {
-    title: "Les dieux à l'image des hommes",
+    title: "Mon Premier Manuscrit",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

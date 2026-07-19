@@ -2,7 +2,7 @@
 
 Bienvenue sur le dépôt de **L'Atelier de l'Écrivain** !
 
-Ce projet est une application web (liseuse et éditeur) permettant de lire, structurer et travailler sur des œuvres littéraires telles que le roman *Les dieux à l'image des hommes*.
+Ce projet est une application web (liseuse et éditeur) permettant de lire, structurer et travailler sur des œuvres littéraires.
 
 ## 🌍 Accéder à l'application web
 
