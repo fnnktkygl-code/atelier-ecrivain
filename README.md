@@ -7,9 +7,9 @@ Ce projet est une application web (liseuse et éditeur) permettant de lire, stru
 ## 🌍 Accéder à l'application web
 
 L'application est déployée et accessible en ligne :
-👉 **[Lien vers l'application web (Vercel)](https://liseuse-dieux.vercel.app)** 
+👉 **[Lien vers l'application web (Vercel)](https://atelier-ecrivain.vercel.app)** 
 
-*(Note : l'URL peut contenir l'ancien nom de projet "liseuse-dieux")*
+*(Le domaine a été mis à jour vers atelier-ecrivain)*
 
 ---
 
