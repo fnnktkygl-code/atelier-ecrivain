@@ -103,6 +103,15 @@ export default function Dashboard() {
           letter-spacing: .16em; text-transform: uppercase;
           color: var(--accent); margin: 0 0 10px;
         }
+        
+        @media (max-width: 768px) {
+          .home-sub { font-size: 16px; }
+          .home-manuscript-badge { font-size: 14px; padding: 8px 18px; }
+          .home-action-title { font-size: 18px; }
+          .home-action-desc { font-size: 14px; }
+          .home-tip-title { font-size: 13px; }
+          .home-tip-text { font-size: 15px !important; line-height: 1.6; }
+        }
         .home-tip-text {
           font-size: 13px; color: var(--text-soft);
           line-height: 1.65; margin: 0;
