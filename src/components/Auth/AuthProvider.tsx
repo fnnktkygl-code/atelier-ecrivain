@@ -102,8 +102,17 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async () => {
     try {
       await signInWithGoogle();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Sign-in error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        alert('La fenêtre de connexion a été fermée avant la fin.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        alert("Erreur: Ce domaine n'est pas autorisé dans la configuration Firebase (Authorized domains).");
+      } else if (err.code === 'auth/web-storage-unsupported') {
+        alert("Erreur: Les cookies tiers sont bloqués (fréquent en navigation privée). Veuillez les autoriser pour vous connecter.");
+      } else {
+        alert(`Erreur de connexion: ${err.message || 'Erreur inconnue'}`);
+      }
     }
   };
 
