@@ -18,9 +18,10 @@ interface ChapterListProps {
   chapters: EditableChapter[];
   activeIndex: number;
   dispatch: React.Dispatch<ManuscriptAction>;
+  onCloseSidebar?: () => void;
 }
 
-export default function ChapterList({ chapters, activeIndex, dispatch }: ChapterListProps) {
+export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar }: ChapterListProps) {
   const [renamingIndex, setRenamingIndex] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
@@ -31,8 +32,11 @@ export default function ChapterList({ chapters, activeIndex, dispatch }: Chapter
   const handleSelect = useCallback(
     (index: number) => {
       dispatch({ type: 'SET_ACTIVE_CHAPTER', index });
+      if (onCloseSidebar) {
+        onCloseSidebar();
+      }
     },
-    [dispatch]
+    [dispatch, onCloseSidebar]
   );
 
   const handleStartRename = useCallback((index: number, currentTitle: string) => {
@@ -82,7 +86,7 @@ export default function ChapterList({ chapters, activeIndex, dispatch }: Chapter
 
   return (
     <div className="chapter-list">
-      <div className="chapter-list-header">
+      <div className="chapter-list-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3
           style={{
             fontFamily: "'Cormorant Garamond', serif",
@@ -95,6 +99,13 @@ export default function ChapterList({ chapters, activeIndex, dispatch }: Chapter
         >
           Chapitres
         </h3>
+        <button 
+          className="mobile-only-toggle" 
+          onClick={onCloseSidebar}
+          style={{ padding: 4, cursor: 'pointer', fontSize: 18 }}
+        >
+          ✕
+        </button>
       </div>
 
       <div style={{ padding: '0 16px 12px' }}>

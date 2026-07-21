@@ -1668,9 +1668,13 @@ body.night .bottom-sheet {
 .atelier-sidebar.mobile-open {
   display: flex !important;
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
   z-index: 45;
-  width: 100%;
+  width: 85%;
+  max-width: 340px;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.2);
 }
 
 @media (max-width: 768px) {

@@ -144,13 +144,26 @@ export default function AtelierPage() {
       <div className="atelier-content">
         {/* ── Sidebar ── */}
         {!isFocusMode && (
-          <div
-            className={`atelier-sidebar ${showMobileSidebar ? 'mobile-open' : ''}`}
-          >
+          <>
+            {showMobileSidebar && (
+              <div 
+                onClick={() => setShowMobileSidebar(false)}
+                style={{
+                  position: 'fixed',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  zIndex: 40
+                }}
+              />
+            )}
+            <div
+              className={`atelier-sidebar ${showMobileSidebar ? 'mobile-open' : ''}`}
+            >
             <ChapterList
               chapters={ms.chapters}
               activeIndex={ms.activeChapterIndex}
               dispatch={dispatch}
+              onCloseSidebar={() => setShowMobileSidebar(false)}
             />
 
             {/* Record area at bottom */}
@@ -196,6 +209,7 @@ export default function AtelierPage() {
               )}
             </div>
           </div>
+          </>
         )}
 
         {/* ── Main editor area ── */}
