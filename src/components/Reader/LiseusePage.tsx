@@ -167,21 +167,35 @@ export default function LiseusePage() {
   useEffect(() => {
     setHighlights(loadHighlights());
     setSettings(loadSettings());
-    try {
-      const stored = localStorage.getItem('atelier-manuscrit-v1');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.chapters && Array.isArray(parsed.chapters) && parsed.chapters.length > 0) {
-          const formatted = parsed.chapters.map((ch: any) => ({
-            title: ch.title || 'Chapitre sans titre',
-            paragraphs: ch.blocks ? ch.blocks.map((b: any) => b.content) : [],
-          }));
-          setChapters(formatted);
+    
+    const loadManuscript = () => {
+      try {
+        const stored = localStorage.getItem('atelier-manuscrit-v1');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.chapters && Array.isArray(parsed.chapters) && parsed.chapters.length > 0) {
+            const formatted = parsed.chapters.map((ch: any) => ({
+              title: ch.title || 'Chapitre sans titre',
+              paragraphs: ch.blocks ? ch.blocks.map((b: any) => b.content) : [],
+            }));
+            setChapters(formatted);
+          }
         }
+      } catch (e) {
+        console.error('Error loading manuscript:', e);
       }
-    } catch (e) {
-      console.error('Error loading manuscript:', e);
-    }
+    };
+
+    loadManuscript();
+
+    // Listen for storage events (e.g. from other tabs or if the hook saves)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'atelier-manuscrit-v1') {
+        loadManuscript();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const updateSettings = (patch: Partial<ReaderSettings>) => {

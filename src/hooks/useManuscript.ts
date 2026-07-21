@@ -396,6 +396,9 @@ export function useManuscript() {
       // Ignore — start fresh
     }
   }, []);
+  // Keep a ref to the latest state for unmount saving
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Auto-save to localStorage (debounced)
   useEffect(() => {
@@ -416,6 +419,16 @@ export function useManuscript() {
     };
   }, [state]);
 
+  // Force save on unmount
+  useEffect(() => {
+    return () => {
+      if (stateRef.current.isDirty) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+        } catch {}
+      }
+    };
+  }, []);
   // ── Convenience methods ──
 
   const activeChapter = state.chapters[state.activeChapterIndex] || state.chapters[0];
