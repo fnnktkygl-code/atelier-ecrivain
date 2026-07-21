@@ -1546,9 +1546,8 @@ body.night .bottom-sheet {
   outline: none;
 }
 
-.chapter-delete-btn {
+.chapter-action-btn {
   position: absolute;
-  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   width: 20px;
@@ -1556,7 +1555,7 @@ body.night .bottom-sheet {
   border: none;
   background: none;
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--transition-fast), color var(--transition-fast);
@@ -1564,13 +1563,19 @@ body.night .bottom-sheet {
   align-items: center;
   justify-content: center;
 }
-.chapter-list-item:hover .chapter-delete-btn {
+.chapter-list-item:hover .chapter-action-btn,
+.chapter-list-item.active .chapter-action-btn {
   opacity: 0.5;
 }
-.chapter-delete-btn:hover {
+.chapter-action-btn:hover {
   opacity: 1 !important;
-  color: #c0392b;
+  color: var(--text);
 }
+
+.chapter-delete-btn { right: 8px; }
+.chapter-delete-btn:hover { color: #c0392b !important; }
+
+.chapter-edit-btn { right: 30px; }
 
 .chapter-delete-confirm {
   display: flex;
@@ -1753,3 +1758,4 @@ body.night .bottom-sheet {
   button { min-height: 44px; }
   .btn-primary, .btn-secondary, .btn-ghost { font-size: 16px; padding: 12px 20px; }
 }
+  /* Mobile Sidebar Buttons always visible */

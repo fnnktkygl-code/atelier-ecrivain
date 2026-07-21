@@ -174,15 +174,24 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                 </button>
               </div>
             ) : (
-              chapters.length > 1 && (
+              <>
                 <button
-                  className="chapter-delete-btn"
-                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteIndex(i); }}
-                  title="Supprimer"
+                  className="chapter-action-btn chapter-edit-btn"
+                  onClick={(e) => { e.stopPropagation(); handleStartRename(i, ch.title); }}
+                  title="Renommer"
                 >
-                  ✕
+                  ✎
                 </button>
-              )
+                {chapters.length > 1 && (
+                  <button
+                    className="chapter-action-btn chapter-delete-btn"
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteIndex(i); }}
+                    title="Supprimer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </>
             )}
           </div>
         ))}
