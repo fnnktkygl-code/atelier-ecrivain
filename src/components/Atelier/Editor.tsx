@@ -18,9 +18,20 @@ interface EditorProps {
   dispatch: React.Dispatch<ManuscriptAction>;
   searchQuery?: string;
   focusMode?: boolean;
+  onStartDictation?: () => void;
+  dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
 }
 
-export default function Editor({ chapter, chapterIndex, insertionPoint, dispatch, searchQuery = '', focusMode = false }: EditorProps) {
+export default function Editor({ 
+  chapter, 
+  chapterIndex, 
+  insertionPoint, 
+  dispatch, 
+  searchQuery = '', 
+  focusMode = false,
+  onStartDictation,
+  dictationPhase = 'idle'
+}: EditorProps) {
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -91,7 +102,7 @@ export default function Editor({ chapter, chapterIndex, insertionPoint, dispatch
     setDragOverIndex(null);
   }, [dragFromIndex, dragOverIndex, chapterIndex, dispatch]);
 
-  if (!chapter || chapter.blocks.length === 0) {
+  if (!chapter || chapter.blocks.length === 0 || (chapter.blocks.length === 1 && chapter.blocks[0].content === '')) {
     return (
       <div className="editor-empty">
         <div className="empty-state">
@@ -99,12 +110,32 @@ export default function Editor({ chapter, chapterIndex, insertionPoint, dispatch
           <div className="empty-state-text">
             Ce chapitre est vide. Commencez à écrire ou utilisez la dictée vocale.
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => dispatch({ type: 'ADD_BLOCK', chapterIndex, afterBlockId: null })}
-          >
-            Commencer à écrire
-          </button>
+          <div style={{ display: 'flex', gap: 16, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                if (chapter.blocks.length === 0) {
+                  dispatch({ type: 'ADD_BLOCK', chapterIndex });
+                }
+                setTimeout(() => {
+                  const firstBlock = document.querySelector('.editor-block textarea') as HTMLTextAreaElement;
+                  if (firstBlock) firstBlock.focus();
+                }, 100);
+              }}
+            >
+              Écrire
+            </button>
+            {onStartDictation && (
+              <button
+                className="btn-secondary"
+                onClick={onStartDictation}
+                disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <span>🎙️</span> Dicter
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -127,6 +158,7 @@ export default function Editor({ chapter, chapterIndex, insertionPoint, dispatch
           onMergeWithPrevious={handleMergeWithPrevious}
           onInsertAfter={handleInsertAfter}
           onSetInsertionPoint={handleSetInsertionPoint}
+          onStartDictation={onStartDictation}
           onFocus={handleFocus}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}

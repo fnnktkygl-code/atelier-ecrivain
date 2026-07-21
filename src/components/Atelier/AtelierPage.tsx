@@ -142,14 +142,6 @@ export default function AtelierPage() {
   return (
     <div className={`atelier ${isFocusMode ? 'focus-mode' : ''}`}>
       <div className="atelier-content">
-        {/* Mobile sidebar toggle */}
-        <button
-          className="btn-icon mobile-sidebar-toggle"
-          onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-        >
-          ☰
-        </button>
-
         {/* ── Sidebar ── */}
         {!isFocusMode && (
           <div
@@ -227,7 +219,37 @@ export default function AtelierPage() {
             onToggleReview={handleToggleReview}
             onToggleNotes={handleToggleNotes}
             onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+            onStartDictation={dictation.startRecording}
+            dictationPhase={ds.phase}
+            onToggleSidebar={() => setShowMobileSidebar(!showMobileSidebar)}
           />
+
+          {/* Dictation Status Bar (Always visible during recording/processing) */}
+          {ds.phase !== 'idle' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '8px 20px',
+              background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
+              fontFamily: "'Cormorant Garamond', serif", fontSize: 14, color: 'var(--accent)',
+            }}>
+              {ds.phase === 'recording' && (
+                <>
+                  <span style={{ fontWeight: 600 }}>🔴 Enregistrement… {dictation.formatTime(ds.duration)}</span>
+                  <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto' }}>
+                    ⏹ Terminer
+                  </button>
+                </>
+              )}
+              {ds.phase === 'paused' && (
+                <>
+                  <span style={{ fontWeight: 600 }}>⏸ En pause</span>
+                  <button className="btn btn-ghost" onClick={dictation.resumeRecording} style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto' }}>▶️ Reprendre</button>
+                  <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px' }}>⏹ Terminer</button>
+                </>
+              )}
+              {ds.phase === 'processing' && <span style={{ fontWeight: 600 }}>⚙️ Gemini analyse la dictée…</span>}
+              {ds.phase === 'error' && <span style={{ fontWeight: 600, color: '#c0392b' }}>❌ {ds.error}</span>}
+            </div>
+          )}
 
           {/* Search bar */}
           {showSearch && (
@@ -270,6 +292,8 @@ export default function AtelierPage() {
                 dispatch={dispatch}
                 searchQuery={searchQuery}
                 focusMode={isFocusMode}
+                onStartDictation={dictation.startRecording}
+                dictationPhase={ds.phase}
               />
             )}
           </div>

@@ -28,6 +28,7 @@ interface EditorBlockProps {
   onMergeWithPrevious: (blockId: string) => void;
   onInsertAfter: (blockId: string) => void;
   onSetInsertionPoint: (index: number | null) => void;
+  onStartDictation?: () => void;
   onFocus: (blockId: string) => void;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
@@ -47,6 +48,7 @@ export default function EditorBlock({
   onMergeWithPrevious,
   onInsertAfter,
   onSetInsertionPoint,
+  onStartDictation,
   onFocus,
   onDragStart,
   onDragOver,
@@ -125,9 +127,12 @@ export default function EditorBlock({
 
   const handleInsertionClick = useCallback(() => {
     onSetInsertionPoint(isInsertionPoint ? null : index);
-  }, [index, isInsertionPoint, onSetInsertionPoint]);
+    if (!isInsertionPoint && onStartDictation) {
+      onStartDictation();
+    }
+  }, [isInsertionPoint, index, onSetInsertionPoint, onStartDictation]);
 
-  const sourceIndicator = block.source === 'dictation' ? '🎙️' : block.source === 'original' ? '' : '';
+  const sourceIndicator = block.source === 'dictation' ? '🎙️ Dictée' : null;
   const hasSearchMatch = searchQuery && block.content.toLowerCase().includes(searchQuery.toLowerCase());
 
   return (

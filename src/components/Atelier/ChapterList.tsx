@@ -95,13 +95,16 @@ export default function ChapterList({ chapters, activeIndex, dispatch }: Chapter
         >
           Chapitres
         </h3>
+      </div>
+
+      <div style={{ padding: '0 16px 12px' }}>
         <button
-          className="btn-icon"
+          className="btn-primary"
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', padding: '8px' }}
           onClick={handleAdd}
-          style={{ width: 28, height: 28, fontSize: 14 }}
           title="Ajouter un chapitre"
         >
-          ＋
+          <span>+</span> Nouveau chapitre
         </button>
       </div>
 

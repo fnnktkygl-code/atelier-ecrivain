@@ -34,6 +34,9 @@ interface EditorToolbarProps {
   onToggleReview: () => void;
   onToggleNotes: () => void;
   onToggleFocus: () => void;
+  onStartDictation?: () => void;
+  dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
+  onToggleSidebar?: () => void;
 }
 
 export default function EditorToolbar({
@@ -55,6 +58,9 @@ export default function EditorToolbar({
   onToggleReview,
   onToggleNotes,
   onToggleFocus,
+  onStartDictation,
+  dictationPhase = 'idle',
+  onToggleSidebar,
 }: EditorToolbarProps) {
   const formatSaveTime = (ts: number | null) => {
     if (!ts) return '';
@@ -65,12 +71,42 @@ export default function EditorToolbar({
   return (
     <div className="editor-toolbar">
       {/* Left: Chapter title */}
-      <div className="editor-toolbar-left">
+      <div className="editor-toolbar-left" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {onToggleSidebar && (
+          <button
+            className="btn-icon mobile-only-toggle"
+            onClick={onToggleSidebar}
+            title="Afficher les chapitres"
+            style={{ width: 36, height: 36, fontSize: 20 }}
+          >
+            ☰
+          </button>
+        )}
         <span className="editor-toolbar-title">{chapterTitle}</span>
       </div>
 
       {/* Center: Actions */}
       <div className="editor-toolbar-center">
+        {onStartDictation && (
+          <>
+            <Tooltip content="Dicter un passage (Audio)" shortcut="🎙️">
+              <button
+                className="btn-icon"
+                onClick={onStartDictation}
+                disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
+                style={{
+                  width: 32, height: 32, fontSize: 16,
+                  color: (dictationPhase === 'recording' || dictationPhase === 'processing') ? 'var(--accent)' : 'inherit',
+                  animation: dictationPhase === 'recording' ? 'pulse 2s infinite' : 'none',
+                }}
+              >
+                {dictationPhase === 'recording' || dictationPhase === 'processing' ? '🔴' : '🎙️'}
+              </button>
+            </Tooltip>
+            <div className="editor-toolbar-divider" />
+          </>
+        )}
+
         <Tooltip content="Annuler la dernière action" shortcut="⌘Z">
           <button
             className="btn-icon"

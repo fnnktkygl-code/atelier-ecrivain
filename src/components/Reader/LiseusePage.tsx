@@ -66,11 +66,11 @@ function applyHighlights(html: string, highlights: Highlight[]): string {
   return result;
 }
 
-function buildAllHTML(highlights: Highlight[]): string {
-  let html = CHAPTERS.map((ch, ci) => {
+function buildAllHTML(chapters: any[], highlights: Highlight[]): string {
+  let html = chapters.map((ch, ci) => {
     const shortTitle = ch.title.replace(/^Chapitre \d+ — /, '');
     const eyebrow = ch.title.split('—')[0]?.trim() || '';
-    const parasHTML = ch.paragraphs.map((p) => `<p>${linkNotes(p)}</p>`).join('');
+    const parasHTML = ch.paragraphs.map((p: string) => `<p>${linkNotes(p)}</p>`).join('');
     return `
       <div class="col-chapter" data-chapter="${ci}">
         <div class="col-chapter-header">
@@ -161,10 +161,27 @@ export default function LiseusePage() {
   const colWidthRef = useRef(0);
   const [, forceUpdate] = useState(0);
 
+  const [chapters, setChapters] = useState<any[]>(CHAPTERS);
+
   // Load from localStorage
   useEffect(() => {
     setHighlights(loadHighlights());
     setSettings(loadSettings());
+    try {
+      const stored = localStorage.getItem('atelier-manuscrit-v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.chapters && Array.isArray(parsed.chapters) && parsed.chapters.length > 0) {
+          const formatted = parsed.chapters.map((ch: any) => ({
+            title: ch.title || 'Chapitre sans titre',
+            paragraphs: ch.blocks ? ch.blocks.map((b: any) => b.content) : [],
+          }));
+          setChapters(formatted);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading manuscript:', e);
+    }
   }, []);
 
   const updateSettings = (patch: Partial<ReaderSettings>) => {
@@ -176,7 +193,7 @@ export default function LiseusePage() {
   };
 
   // Build HTML with highlights applied
-  const allHTML = buildAllHTML(highlights);
+  const allHTML = buildAllHTML(chapters, highlights);
 
   // ── Measure column width and total pages synchronously ──
   const measurePages = useCallback(() => {
@@ -412,6 +429,7 @@ export default function LiseusePage() {
           display:flex; align-items:center; justify-content:space-between; gap:12px;
           padding:8px 18px; font-family:'Cormorant Garamond', serif; z-index:20;
           color:var(--text-soft); flex-shrink:0; transition: opacity .3s ease;
+          flex-wrap: wrap; /* Prevent overflow */
         }
         .liseuse-topbar .brand { font-size:13px; letter-spacing:.06em; text-transform:uppercase; opacity:.7; }
         .liseuse-topbar .controls { display:flex; gap:6px; align-items:center; }
