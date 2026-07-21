@@ -115,7 +115,7 @@ export default function Editor({
               className="btn-primary"
               onClick={() => {
                 if (chapter.blocks.length === 0) {
-                  dispatch({ type: 'ADD_BLOCK', chapterIndex });
+                  dispatch({ type: 'ADD_BLOCK', chapterIndex, afterBlockId: null });
                 }
                 setTimeout(() => {
                   const firstBlock = document.querySelector('.editor-block textarea') as HTMLTextAreaElement;
