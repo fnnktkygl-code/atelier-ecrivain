@@ -115,31 +115,35 @@ export default function RecordButton({
       )}
 
       {/* Status text — contextual and pedagogical */}
-      <div className={`record-status ${isActive ? 'active' : ''}`}>
+      <div className={`record-status ${isActive ? 'active' : ''}`} style={{ fontFamily: 'var(--font-sans)', fontSize: 14 }}>
         {phase === 'idle' && (
-          <span>
-            Appuyez sur le micro pour dicter
-            <span style={{ display: 'block', fontSize: 11, marginTop: 4, opacity: .6 }}>
+          <div style={{ textAlign: 'center' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14.5 }}>Appuyez sur le micro pour dicter</span>
+            <span style={{ display: 'block', fontSize: 13, marginTop: 4, color: 'var(--text-soft)', fontWeight: 500 }}>
               Parlez naturellement — l&apos;IA détectera vos ratures et reformulations
             </span>
-          </span>
+          </div>
         )}
         {phase === 'recording' && (
-          <span>
-            🔴 Enregistrement en cours…
-            <span style={{ display: 'block', fontSize: 11, marginTop: 4, opacity: .6 }}>
+          <div style={{ textAlign: 'center' }}>
+            <span style={{ fontWeight: 600, color: '#e53e3e', fontSize: 14.5 }}>🔴 Enregistrement en cours…</span>
+            <span style={{ display: 'block', fontSize: 13, marginTop: 4, color: 'var(--text)', fontWeight: 500 }}>
               Parlez librement, hésitez, reprenez-vous — tout est capté
             </span>
+          </div>
+        )}
+        {phase === 'paused' && (
+          <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>
+            En pause — appuyez ▶️ pour reprendre
           </span>
         )}
-        {phase === 'paused' && 'En pause — appuyez ▶️ pour reprendre'}
         {phase === 'processing' && (
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--accent)', fontSize: 14.5 }}>
               <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⚙️</span>
               Gemini analyse votre dictée…
             </span>
-            <span style={{ fontSize: 11, opacity: .6 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-soft)', fontWeight: 500 }}>
               Transcription, détection des ratures, vérification des citations
             </span>
           </span>
