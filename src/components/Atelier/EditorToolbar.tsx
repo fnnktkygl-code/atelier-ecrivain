@@ -95,8 +95,9 @@ export default function EditorToolbar({
                 onClick={onStartDictation}
                 disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
                 style={{
-                  width: 32, height: 32, fontSize: 16,
-                  color: (dictationPhase === 'recording' || dictationPhase === 'processing') ? 'var(--accent)' : 'inherit',
+                  width: 36, height: 36, fontSize: 17,
+                  color: (dictationPhase === 'recording' || dictationPhase === 'processing') ? 'var(--accent)' : 'var(--text)',
+                  background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%',
                   animation: dictationPhase === 'recording' ? 'pulse 2s infinite' : 'none',
                 }}
               >
@@ -112,7 +113,12 @@ export default function EditorToolbar({
             className="btn-icon"
             onClick={onUndo}
             disabled={!canUndo}
-            style={{ width: 32, height: 32, fontSize: 14, opacity: canUndo ? 1 : 0.3 }}
+            style={{
+              width: 36, height: 36, fontSize: 16, fontWeight: 700,
+              color: canUndo ? 'var(--text)' : 'var(--text-soft)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%',
+              opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'not-allowed'
+            }}
           >
             ↩
           </button>
@@ -122,7 +128,12 @@ export default function EditorToolbar({
             className="btn-icon"
             onClick={onRedo}
             disabled={!canRedo}
-            style={{ width: 32, height: 32, fontSize: 14, opacity: canRedo ? 1 : 0.3 }}
+            style={{
+              width: 36, height: 36, fontSize: 16, fontWeight: 700,
+              color: canRedo ? 'var(--text)' : 'var(--text-soft)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%',
+              opacity: canRedo ? 1 : 0.4, cursor: canRedo ? 'pointer' : 'not-allowed'
+            }}
           >
             ↪
           </button>
@@ -134,7 +145,10 @@ export default function EditorToolbar({
           <button
             className="btn-icon"
             onClick={onExport}
-            style={{ width: 32, height: 32, fontSize: 14 }}
+            style={{
+              width: 36, height: 36, fontSize: 16, color: 'var(--text)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%'
+            }}
           >
             📥
           </button>
@@ -144,7 +158,12 @@ export default function EditorToolbar({
           <button
             className={`btn-icon ${isFocusMode ? 'active' : ''}`}
             onClick={onToggleFocus}
-            style={{ width: 32, height: 32, fontSize: 14 }}
+            style={{
+              width: 36, height: 36, fontSize: 16, color: 'var(--text)',
+              background: isFocusMode ? 'var(--accent-glow)' : 'var(--surface-2)',
+              border: isFocusMode ? '1px solid var(--accent)' : '1px solid var(--border)',
+              borderRadius: '50%'
+            }}
           >
             🎯
           </button>

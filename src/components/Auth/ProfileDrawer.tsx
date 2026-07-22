@@ -105,7 +105,7 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
         .profile-drawer.open { transform: translateX(0); }
 
         .drawer-header {
-          padding: 32px 28px 24px;
+          padding: 28px 24px 20px;
           border-bottom: 1px solid var(--border);
           display: flex; align-items: center; gap: 16px;
         }
@@ -118,8 +118,8 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
           width: 56px; height: 56px; border-radius: 50%;
           background: var(--accent);
           display: flex; align-items: center; justify-content: center;
-          font-size: 24px; color: #fff; font-weight: 600;
-          font-family: 'Cormorant Garamond', serif;
+          font-size: 22px; color: #fff; font-weight: 700;
+          font-family: var(--font-sans);
           flex-shrink: 0; cursor: pointer; position: relative;
           transition: opacity .2s;
         }
@@ -161,8 +161,8 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
         .email-toggle-switch.on::after { transform: translateX(16px); }
         .drawer-user-info { flex: 1; min-width: 0; }
         .drawer-name {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 20px; font-weight: 600; color: var(--text);
+          font-family: var(--font-sans);
+          font-size: 18px; font-weight: 700; color: var(--text);
           margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           cursor: pointer; display: inline-block;
           border-bottom: 1px dashed transparent;
@@ -172,21 +172,21 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
           border-bottom-color: var(--text-soft);
         }
         .drawer-name-input {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 20px; font-weight: 600; color: var(--text);
+          font-family: var(--font-sans);
+          font-size: 18px; font-weight: 700; color: var(--text);
           margin: 0; width: 100%; border: none; background: transparent;
           border-bottom: 1px solid var(--accent); outline: none;
           padding: 0;
         }
         .drawer-email {
-          font-size: 12.5px; color: var(--text-soft);
+          font-size: 13px; color: var(--text-soft); font-family: var(--font-sans); font-weight: 500;
           margin: 2px 0 0; overflow: hidden;
           text-overflow: ellipsis; white-space: nowrap;
         }
         .drawer-member {
-          font-size: 11px; color: var(--accent);
-          font-family: 'Cormorant Garamond', serif;
-          letter-spacing: .06em; margin-top: 4px;
+          font-size: 12px; color: var(--accent);
+          font-family: var(--font-sans); font-weight: 600;
+          margin-top: 4px;
         }
         .drawer-close {
           position: absolute; top: 16px; right: 16px;
@@ -198,13 +198,13 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
         .drawer-close:hover { background: var(--hover); color: var(--text); }
 
         .drawer-section {
-          padding: 20px 28px;
+          padding: 20px 24px;
         }
         .drawer-section-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 11px; font-weight: 600;
-          letter-spacing: .18em; text-transform: uppercase;
-          color: var(--accent); margin: 0 0 14px;
+          font-family: var(--font-sans);
+          font-size: 12px; font-weight: 700;
+          letter-spacing: .08em; text-transform: uppercase;
+          color: var(--text-soft); margin: 0 0 14px;
         }
 
         .manuscript-list { list-style: none; margin: 0; padding: 0; }
@@ -230,9 +230,9 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
         }
         .manuscript-info { flex: 1; min-width: 0; }
         .manuscript-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 15px; font-weight: 600; color: var(--text);
-          margin: 0; white-space: normal; line-height: 1.3;
+          font-family: var(--font-sans);
+          font-size: 14.5px; font-weight: 600; color: var(--text);
+          margin: 0; white-space: normal; line-height: 1.35;
           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
           overflow: hidden; text-overflow: ellipsis;
           cursor: pointer;
@@ -243,20 +243,20 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
           border-bottom-color: var(--text-soft);
         }
         .manuscript-title-input {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 15px; font-weight: 600; color: var(--text);
+          font-family: var(--font-sans);
+          font-size: 14.5px; font-weight: 600; color: var(--text);
           margin: 0; width: 100%; border: none; background: transparent;
           border-bottom: 1px solid var(--accent); outline: none;
-          padding: 0; line-height: 1.3;
+          padding: 0; line-height: 1.35;
         }
         .manuscript-date {
-          font-size: 11px; color: var(--text-soft); margin-top: 2px;
+          font-size: 12px; color: var(--text-soft); margin-top: 2px; font-family: var(--font-sans); font-weight: 500;
         }
         .manuscript-active-badge {
-          font-size: 9px; background: var(--accent); color: var(--bg);
-          padding: 2px 8px; border-radius: 10px;
-          font-family: 'Cormorant Garamond', serif;
-          letter-spacing: .06em; font-weight: 600;
+          font-size: 11px; background: var(--accent); color: #fff;
+          padding: 3px 10px; border-radius: 12px;
+          font-family: var(--font-sans);
+          font-weight: 700;
         }
 
         .new-manuscript-btn {
