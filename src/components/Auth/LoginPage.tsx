@@ -45,29 +45,30 @@ export default function LoginPage() {
         }
         .landing-badge {
           display: inline-block;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 11px; letter-spacing: .18em;
+          font-family: var(--font-sans);
+          font-size: 11px; letter-spacing: .14em;
+          font-weight: 700;
           text-transform: uppercase; color: var(--accent);
           background: rgba(138,90,52,0.08);
           padding: 6px 16px; border-radius: 20px;
           margin-bottom: 20px;
         }
         .landing-title {
-          font-family: 'Cormorant Garamond', serif;
+          font-family: var(--font-serif-roman);
           font-size: clamp(32px, 5vw, 44px);
           font-weight: 600; color: var(--text);
           margin: 0 0 12px; line-height: 1.2;
         }
         .landing-tagline {
-          font-family: 'Source Serif 4', serif;
+          font-family: var(--font-sans);
           font-size: clamp(15px, 2vw, 17px);
           color: var(--text-soft); margin: 0 0 8px;
           line-height: 1.7; max-width: 500px;
           margin-left: auto; margin-right: auto;
         }
         .landing-vision {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 14px; font-style: italic;
+          font-family: var(--font-serif-roman);
+          font-size: 15px; font-style: italic;
           color: var(--accent); margin: 16px 0 0;
           opacity: .85; line-height: 1.5;
         }
@@ -82,16 +83,16 @@ export default function LoginPage() {
           display: inline-flex; align-items: center; gap: 12px;
           padding: 14px 32px;
           background: var(--text); color: var(--bg);
-          border: none; border-radius: 10px;
-          font-family: 'Source Serif 4', serif;
-          font-size: 15.5px; font-weight: 500;
+          border: none; border-radius: var(--radius-full);
+          font-family: var(--font-sans);
+          font-size: 15px; font-weight: 600;
           cursor: pointer; transition: all .25s ease;
-          letter-spacing: .02em;
+          letter-spacing: .01em;
           box-shadow: 0 2px 12px rgba(0,0,0,.08);
         }
         .landing-google-btn:hover {
-          opacity: .88; transform: translateY(-2px);
-          box-shadow: 0 6px 24px rgba(0,0,0,.15);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(0,0,0,.14);
         }
         .landing-google-btn:disabled { opacity: .5; cursor: wait; }
         .landing-google-btn svg { width: 20px; height: 20px; }
@@ -107,9 +108,9 @@ export default function LoginPage() {
           animation: fadeIn .7s .25s ease both;
         }
         .landing-section-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 11px; font-weight: 600;
-          letter-spacing: .2em; text-transform: uppercase;
+          font-family: var(--font-sans);
+          font-size: 11px; font-weight: 700;
+          letter-spacing: .16em; text-transform: uppercase;
           color: var(--accent); text-align: center;
           margin: 0 0 28px;
         }
@@ -128,14 +129,14 @@ export default function LoginPage() {
           width: 36px; height: 36px; border-radius: 50%;
           background: rgba(138,90,52,.08);
           display: flex; align-items: center; justify-content: center;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 15px; font-weight: 600; color: var(--accent);
+          font-family: var(--font-sans);
+          font-size: 14px; font-weight: 700; color: var(--accent);
           flex-shrink: 0;
         }
         .how-content { flex: 1; }
         .how-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 16px; font-weight: 600; color: var(--text);
+          font-family: var(--font-sans);
+          font-size: 15px; font-weight: 600; color: var(--text);
           margin: 0 0 4px;
         }
         .how-desc {
@@ -166,7 +167,7 @@ export default function LoginPage() {
           font-size: 28px; margin-bottom: 12px; display: block;
         }
         .feature-title {
-          font-family: 'Cormorant Garamond', serif;
+          font-family: var(--font-sans);
           font-size: 15px; font-weight: 600; color: var(--text);
           margin: 0 0 6px;
         }
