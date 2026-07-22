@@ -68,9 +68,12 @@ function applyHighlights(html: string, highlights: Highlight[]): string {
 
 function buildAllHTML(chapters: any[], highlights: Highlight[]): string {
   let html = chapters.map((ch, ci) => {
-    const shortTitle = ch.title.replace(/^Chapitre \d+ — /, '');
-    const eyebrow = ch.title.split('—')[0]?.trim() || '';
-    const parasHTML = ch.paragraphs.map((p: string) => `<p>${linkNotes(p)}</p>`).join('');
+    const eyebrow = ch.title.includes('—') ? ch.title.split('—')[0]?.trim() : `Chapitre ${ci + 1}`;
+    const shortTitle = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
+    const hasContent = ch.paragraphs && ch.paragraphs.some((p: string) => p && p.trim().length > 0);
+    const parasHTML = hasContent
+      ? ch.paragraphs.map((p: string) => `<p>${linkNotes(p || '')}</p>`).join('')
+      : '<p style="font-style: italic; opacity: 0.6;">(Chapitre vide)</p>';
     return `
       <div class="col-chapter" data-chapter="${ci}">
         <div class="col-chapter-header">
@@ -824,8 +827,8 @@ export default function LiseusePage() {
       <div className={`toc-drawer ${showToc ? 'open' : ''}`}>
         <button className="toc-close" onClick={() => setShowToc(false)}>×</button>
         <h3 className="toc-title">📑 Table des matières</h3>
-        {CHAPTERS.map((ch, ci) => {
-          const title = ch.title.replace(/^Chapitre \d+ — /, '');
+        {chapters.map((ch: any, ci: number) => {
+          const title = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
           return (
             <div
               key={ci}
@@ -840,6 +843,9 @@ export default function LiseusePage() {
                       setCurrentPage(page);
                     }
                   }
+                } else {
+                  const chEl = document.querySelector(`.scroll-chapter[data-chapter="${ci}"]`);
+                  chEl?.scrollIntoView({ behavior: 'smooth' });
                 }
                 setShowToc(false);
               }}
@@ -898,15 +904,14 @@ export default function LiseusePage() {
 
               <div className="progress-wrap">
                 <span style={{ minWidth: 50 }}>{currentPage + 1} / {totalPages}</span>
-                <div className="progress-track" onClick={(e) => {
+                <div className="progress-bar-bg" onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const pct = (e.clientX - rect.left) / rect.width;
                   setCurrentPage(Math.round(pct * (totalPages - 1)));
                 }}>
-                  <div className="progress-fill" style={{ width: `${progressPct.toFixed(1)}%` }} />
+                  <div className="progress-bar-fill" style={{ width: `${progressPct.toFixed(1)}%` }} />
                 </div>
-                <span className="progress-chapter-name">{CHAPTERS[currentChapterIndex]?.title.replace(/^Chapitre \d+ — /, '')}</span>
-                <span>ch. {currentChapterIndex + 1}/{CHAPTERS.length}</span>
+                <span style={{ minWidth: 40, textAlign: 'right' }}>{Math.round(progressPct)}%</span>
               </div>
             </>
           )}
@@ -914,13 +919,16 @@ export default function LiseusePage() {
           {scrollMode && (
             <div className="scroll-view-liseuse">
               <div className="scroll-inner">
-                {CHAPTERS.map((ch, ci) => {
-                  const eyebrow = ch.title.split('—')[0]?.trim() || '';
-                  const title = ch.title.split('—')[1]?.trim() || '';
-                  let parasHtml = ch.paragraphs.map((p) => `<p>${linkNotes(p)}</p>`).join('');
+                {chapters.map((ch: any, ci: number) => {
+                  const eyebrow = ch.title.includes('—') ? ch.title.split('—')[0]?.trim() : `Chapitre ${ci + 1}`;
+                  const title = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
+                  const hasContent = ch.paragraphs && ch.paragraphs.some((p: string) => p && p.trim().length > 0);
+                  let parasHtml = hasContent
+                    ? ch.paragraphs.map((p: string) => `<p>${linkNotes(p)}</p>`).join('')
+                    : '<p style="font-style: italic; opacity: 0.6;">(Chapitre vide)</p>';
                   if (highlights.length > 0) parasHtml = applyHighlights(parasHtml, highlights);
                   return (
-                    <div className="scroll-chapter" key={ci}>
+                    <div className="scroll-chapter" key={ci} data-chapter={ci}>
                       <div className="col-eyebrow">{eyebrow}</div>
                       <div className="col-title">{title}</div>
                       <div dangerouslySetInnerHTML={{ __html: parasHtml }} />
