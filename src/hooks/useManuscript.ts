@@ -8,6 +8,8 @@
 'use client';
 
 import { useReducer, useCallback, useEffect, useRef } from 'react';
+import { useAuth } from '@/components/Auth/AuthProvider';
+import { getChapters } from '@/services/firebase/firestore';
 import type {
   ManuscriptState,
   ManuscriptAction,
@@ -369,6 +371,10 @@ function undoableReducer(state: UndoableState, action: ManuscriptAction | { type
 // ── Hook ──
 
 export function useManuscript() {
+  const { user, manuscript } = useAuth();
+  const currentManuscriptId = manuscript?.id || 'default';
+  const currentStorageKey = `atelier-manuscrit-${currentManuscriptId}`;
+
   const [undoState, dispatch] = useReducer(undoableReducer, undefined, () => ({
     past: [],
     present: createInitialState(),
@@ -377,25 +383,104 @@ export function useManuscript() {
 
   const { present: state } = undoState;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isInitializedRef = useRef(false);
 
-  // Load from localStorage on mount
+  // Reload chapters whenever the active manuscript changes
   useEffect(() => {
-    if (isInitializedRef.current) return;
-    isInitializedRef.current = true;
+    let loaded = false;
 
+    // 1. Try local storage for current manuscript ID
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(currentStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved) as ManuscriptState;
         if (parsed.chapters && parsed.chapters.length > 0) {
           dispatch({ type: 'LOAD_STATE', state: parsed });
+          loaded = true;
         }
       }
     } catch {
-      // Ignore — start fresh
+      // Ignore
     }
-  }, []);
+
+    // 2. Fallback to generic storage key if default
+    if (!loaded && currentManuscriptId === 'default') {
+      try {
+        const savedDefault = localStorage.getItem(STORAGE_KEY);
+        if (savedDefault) {
+          const parsed = JSON.parse(savedDefault) as ManuscriptState;
+          if (parsed.chapters && parsed.chapters.length > 0) {
+            dispatch({ type: 'LOAD_STATE', state: parsed });
+            loaded = true;
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Fallback to Firestore if logged in and not yet loaded locally
+    if (!loaded && user && manuscript?.id) {
+      getChapters(user.uid, manuscript.id)
+        .then((fsChapters) => {
+          if (fsChapters && fsChapters.length > 0) {
+            const editableChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
+              id: `ch-${idx}`,
+              title: ch.title || `Chapitre ${idx + 1}`,
+              blocks: (ch.paragraphs || []).map((p) => ({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                content: p,
+                type: 'paragraph' as const,
+                source: 'original' as const,
+                createdAt: Date.now(),
+              })),
+              notes: [],
+              pendingReviews: [],
+            }));
+
+            const newState: ManuscriptState = {
+              chapters: editableChapters,
+              activeChapterIndex: 0,
+              insertionPoint: null,
+              lastSaved: null,
+              isDirty: false,
+            };
+            dispatch({ type: 'LOAD_STATE', state: newState });
+            try {
+              localStorage.setItem(currentStorageKey, JSON.stringify(newState));
+            } catch {}
+          } else {
+            // New manuscript with 0 chapters -> Initialize 1 fresh chapter
+            const freshState: ManuscriptState = {
+              chapters: [
+                {
+                  id: 'ch-1',
+                  title: 'Chapitre 1',
+                  blocks: [
+                    {
+                      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                      content: '',
+                      type: 'paragraph',
+                      source: 'manual',
+                      createdAt: Date.now(),
+                    },
+                  ],
+                  notes: [],
+                  pendingReviews: [],
+                },
+              ],
+              activeChapterIndex: 0,
+              insertionPoint: null,
+              lastSaved: null,
+              isDirty: false,
+            };
+            dispatch({ type: 'LOAD_STATE', state: freshState });
+            try {
+              localStorage.setItem(currentStorageKey, JSON.stringify(freshState));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentManuscriptId, user, manuscript?.id]);
+
   // Keep a ref to the latest state for unmount saving
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -407,7 +492,7 @@ export function useManuscript() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(currentStorageKey, JSON.stringify(state));
         dispatch({ type: 'MARK_SAVED' });
       } catch {
         // Storage full — ignore
@@ -417,18 +502,18 @@ export function useManuscript() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [state]);
+  }, [state, currentStorageKey]);
 
   // Force save on unmount
   useEffect(() => {
     return () => {
       if (stateRef.current.isDirty) {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+          localStorage.setItem(currentStorageKey, JSON.stringify(stateRef.current));
         } catch {}
       }
     };
-  }, []);
+  }, [currentStorageKey]);
   // ── Convenience methods ──
 
   const activeChapter = state.chapters[state.activeChapterIndex] || state.chapters[0];
