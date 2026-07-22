@@ -12,6 +12,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { useAuth } from '@/components/Auth/AuthProvider';
 import type { EditableChapter, ManuscriptAction } from '@/types/editor';
 
 interface ChapterListProps {
@@ -22,12 +23,23 @@ interface ChapterListProps {
 }
 
 export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar }: ChapterListProps) {
+  const { manuscript, renameManuscript } = useAuth();
+  const [isEditingManuscriptTitle, setIsEditingManuscriptTitle] = useState(false);
+  const [manuscriptTitleValue, setManuscriptTitleValue] = useState('');
+
   const [renamingIndex, setRenamingIndex] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveManuscriptTitle = async () => {
+    if (manuscript && manuscriptTitleValue.trim()) {
+      await renameManuscript(manuscript.id, manuscriptTitleValue.trim());
+    }
+    setIsEditingManuscriptTitle(false);
+  };
 
   const handleSelect = useCallback(
     (index: number) => {
@@ -86,6 +98,46 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
 
   return (
     <div className="chapter-list">
+      {/* Manuscript Title & 1-Click Rename Header */}
+      {manuscript && (
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', marginBottom: 8, background: 'rgba(138,90,52,0.05)', borderRadius: 10 }}>
+          {isEditingManuscriptTitle ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="text"
+                value={manuscriptTitleValue}
+                onChange={(e) => setManuscriptTitleValue(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveManuscriptTitle()}
+                placeholder="Titre du manuscrit..."
+                style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text)', outline: 'none' }}
+              />
+              <button onClick={handleSaveManuscriptTitle} title="Valider" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}>✓</button>
+              <button onClick={() => setIsEditingManuscriptTitle(false)} title="Annuler" style={{ background: 'var(--surface-2)', color: 'var(--text)', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                <span style={{ fontSize: 14 }}>📖</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'var(--font-sans)' }} title={manuscript.title}>
+                  {manuscript.title}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setManuscriptTitleValue(manuscript.title);
+                  setIsEditingManuscriptTitle(true);
+                }}
+                title="Renommer le manuscrit"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.7, padding: '2px 4px', borderRadius: 4 }}
+              >
+                ✏️
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="chapter-list-header">
         <div className="chapter-list-title-group">
           <h3 className="sidebar-section-title">📚 Chapitres</h3>

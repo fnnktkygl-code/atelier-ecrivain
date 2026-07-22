@@ -6,16 +6,7 @@ import { useAuth } from '@/components/Auth/AuthProvider';
 import LoginPage from '@/components/Auth/LoginPage';
 
 export default function Dashboard() {
-  const { user, loading, manuscript, penName, renameManuscript } = useAuth();
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleInput, setTitleInput] = useState('');
-
-  const handleSaveTitle = async () => {
-    if (manuscript && titleInput.trim()) {
-      await renameManuscript(manuscript.id, titleInput.trim());
-    }
-    setIsEditingTitle(false);
-  };
+  const { user, loading, manuscript, penName } = useAuth();
 
   if (loading) {
     return (
@@ -142,41 +133,11 @@ export default function Dashboard() {
             Votre atelier d&apos;écriture est prêt. Que souhaitez-vous faire aujourd&apos;hui ?
           </p>
           {manuscript && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
-              {isEditingTitle ? (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--surface)', padding: '4px 12px', borderRadius: 24, border: '1px solid var(--accent)', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                  <input
-                    type="text"
-                    value={titleInput}
-                    onChange={(e) => setTitleInput(e.target.value)}
-                    autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
-                    placeholder="Titre du projet..."
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: 13.5, fontWeight: 600, outline: 'none', minWidth: 200 }}
-                  />
-                  <button onClick={handleSaveTitle} title="Valider" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '50%', width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>✓</button>
-                  <button onClick={() => setIsEditingTitle(false)} title="Annuler" style={{ background: 'var(--surface-2)', color: 'var(--text)', border: 'none', borderRadius: '50%', width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>✕</button>
-                </div>
-              ) : (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Link href="/atelier" className="home-manuscript-badge" title="Ouvrir ce projet dans l'atelier">
-                    <span style={{ opacity: 0.7, fontWeight: 500, marginRight: 4 }}>Projet actif :</span>
-                    <strong>📖 {manuscript.title}</strong>
-                    <span style={{ marginLeft: 6, fontSize: 13, opacity: 0.8 }}>→</span>
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setTitleInput(manuscript.title);
-                      setIsEditingTitle(true);
-                    }}
-                    title="Modifier le titre du projet"
-                    style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, color: 'var(--text)', transition: 'all .2s' }}
-                  >
-                    ✏️
-                  </button>
-                </div>
-              )}
-            </div>
+            <Link href="/atelier" className="home-manuscript-badge" title="Accéder directement au manuscrit actif dans l'atelier">
+              <span style={{ opacity: 0.75, fontWeight: 500, marginRight: 6 }}>Manuscrit actif :</span>
+              <strong>📖 {manuscript.title}</strong>
+              <span style={{ marginLeft: 8, fontSize: 13, opacity: 0.8 }}>→</span>
+            </Link>
           )}
         </div>
 
