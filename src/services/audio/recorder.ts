@@ -143,6 +143,16 @@ export class AudioRecorder {
     this.emitState();
   }
 
+  cancel(): void {
+    if (this.mediaRecorder) {
+      this.mediaRecorder.onstop = null; // Do not trigger onComplete callback
+      if (this.mediaRecorder.state !== 'inactive') {
+        this.mediaRecorder.stop();
+      }
+    }
+    this.cleanup();
+  }
+
   private cleanup(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.levelInterval) clearInterval(this.levelInterval);

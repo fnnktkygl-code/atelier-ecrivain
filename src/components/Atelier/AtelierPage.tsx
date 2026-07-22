@@ -170,8 +170,15 @@ export default function AtelierPage() {
             <div className="sidebar-record-area">
               {/* Insertion point indicator */}
               {ms.insertionPoint !== null && (
-                <div className="insertion-indicator">
-                  🎙️ La dictée s&apos;insérera après le bloc {ms.insertionPoint + 1}
+                <div className="insertion-indicator" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>🎙️ La dictée s&apos;insérera après le bloc {ms.insertionPoint + 1}</span>
+                  <button
+                    onClick={() => dispatch({ type: 'SET_INSERTION_POINT', blockIndex: null })}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 'bold', padding: '0 4px' }}
+                    title="Annuler le point d'insertion"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
 
@@ -189,6 +196,7 @@ export default function AtelierPage() {
                 onPause={dictation.pauseRecording}
                 onResume={dictation.resumeRecording}
                 onStop={dictation.stopRecording}
+                onCancel={dictation.cancelRecording}
                 onReset={dictation.reset}
                 error={ds.error}
               />

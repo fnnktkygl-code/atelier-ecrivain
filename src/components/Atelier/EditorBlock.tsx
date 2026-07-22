@@ -191,9 +191,18 @@ export default function EditorBlock({
           lang="fr"
         />
 
-        {/* Actions (visible on hover) */}
-        {isHovered && (
+        {/* Actions (visible on hover or focus) */}
+        {(isHovered || isFocused) && (
           <div className="editor-block-actions">
+            {onStartDictation && (
+              <button
+                className="editor-block-action-btn dictation-block-btn"
+                onClick={handleInsertionClick}
+                title="Dicter après ce paragraphe"
+              >
+                🎙️ Dicter
+              </button>
+            )}
             {totalBlocks > 1 && (
               <button
                 className="editor-block-action-btn delete"
@@ -207,7 +216,7 @@ export default function EditorBlock({
         )}
       </div>
 
-      {/* Insert line between blocks */}
+      {/* Insert bar between blocks */}
       <div
         className={`editor-insert-line ${isInsertionPoint ? 'active' : ''}`}
         onDragOver={(e) => {
@@ -218,16 +227,16 @@ export default function EditorBlock({
         <button
           className="editor-insert-line-btn"
           onClick={() => onInsertAfter(block.id)}
-          title="Insérer un paragraphe"
+          title="Insérer un paragraphe vide"
         >
-          ＋
+          ＋ Paragraphe
         </button>
         <button
           className={`editor-insert-line-btn dictation ${isInsertionPoint ? 'active' : ''}`}
           onClick={handleInsertionClick}
-          title={isInsertionPoint ? 'Annuler le point d\'insertion' : 'La dictée s\'insérera ici'}
+          title={isInsertionPoint ? 'Annuler le point d\'insertion' : 'Dicter à la suite de ce paragraphe'}
         >
-          🎙️
+          🎙️ {isInsertionPoint ? 'Point d\'insertion actif' : 'Dicter ici'}
         </button>
       </div>
     </>

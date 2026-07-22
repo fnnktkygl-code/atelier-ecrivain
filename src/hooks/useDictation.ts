@@ -152,6 +152,23 @@ export function useDictation(currentChapterIndex: number) {
     recorderRef.current?.stop();
   }, []);
 
+  const cancelRecording = useCallback(() => {
+    recorderRef.current?.cancel();
+    setState({
+      phase: 'idle',
+      duration: 0,
+      level: 0,
+      error: null,
+      result: null,
+      corrections: [],
+      summary: null,
+      isNewChapter: false,
+      chapterTitle: null,
+      firebaseConfigured: isFirebaseConfigured(),
+      usedModel: null,
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setState({
       phase: 'idle',
@@ -164,6 +181,7 @@ export function useDictation(currentChapterIndex: number) {
       isNewChapter: false,
       chapterTitle: null,
       firebaseConfigured: isFirebaseConfigured(),
+      usedModel: null,
     });
   }, []);
 
@@ -179,6 +197,7 @@ export function useDictation(currentChapterIndex: number) {
     pauseRecording,
     resumeRecording,
     stopRecording,
+    cancelRecording,
     reset,
     formatTime,
   };

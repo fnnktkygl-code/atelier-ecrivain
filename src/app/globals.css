@@ -1067,14 +1067,29 @@ body.night .bottom-sheet {
   background: rgba(192, 57, 43, 0.1);
 }
 
+.editor-block-action-btn.dictation-block-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  margin-right: 4px;
+}
+.editor-block-action-btn.dictation-block-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ── Insert line between blocks ── */
 .editor-insert-line {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 24px;
-  opacity: 0;
+  gap: 10px;
+  height: 32px;
+  opacity: 0.4;
+  margin: 4px 0;
   transition: opacity var(--transition-fast), height var(--transition-fast);
 }
 .editor-insert-line:hover,
@@ -1082,23 +1097,25 @@ body.night .bottom-sheet {
   opacity: 1;
 }
 .editor-insert-line.active {
-  height: 36px;
+  height: 40px;
   background: linear-gradient(90deg, transparent 0%, var(--accent-glow) 30%, var(--accent-glow) 70%, transparent 100%);
   border-radius: var(--radius-sm);
 }
 
 .editor-insert-line-btn {
-  width: 24px;
-  height: 24px;
+  height: 26px;
+  padding: 0 12px;
   border: 1px dashed var(--border);
-  background: none;
-  border-radius: 50%;
-  font-size: 13px;
+  background: var(--surface);
+  border-radius: 13px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-soft);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   transition: all var(--transition-fast);
 }
 .editor-insert-line-btn:hover {
@@ -1107,13 +1124,53 @@ body.night .bottom-sheet {
   background: var(--accent-glow);
 }
 .editor-insert-line-btn.dictation {
-  font-size: 11px;
+  font-size: 12px;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .editor-insert-line-btn.dictation.active {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
   border-style: solid;
+}
+
+/* ── Bottom quick actions ── */
+.editor-bottom-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 32px;
+  padding: 20px 0;
+  border-top: 1px dashed var(--border);
+}
+.btn-editor-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-editor-action:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+.btn-editor-action.dictation {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+.btn-editor-action.dictation:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* ═══════════════════════════════════════════════════════════════

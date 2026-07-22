@@ -8,6 +8,7 @@ interface RecordButtonProps {
   onPause: () => void;
   onResume: () => void;
   onStop: () => void;
+  onCancel?: () => void;
   onReset: () => void;
   error?: string | null;
 }
@@ -20,6 +21,7 @@ export default function RecordButton({
   onPause,
   onResume,
   onStop,
+  onCancel,
   onReset,
   error,
 }: RecordButtonProps) {
@@ -81,15 +83,35 @@ export default function RecordButton({
       {/* Timer */}
       {isActive && <div className="record-timer">{time}</div>}
 
-      {/* Stop button */}
+      {/* Action buttons (Stop & Cancel) */}
       {isActive && (
-        <button
-          className="btn btn-primary"
-          onClick={onStop}
-          style={{ marginTop: 4, fontSize: 13, padding: '8px 20px' }}
-        >
-          ⏹ Terminer la dictée
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            className="btn btn-primary"
+            onClick={onStop}
+            style={{ fontSize: 13, padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            ⏹ Terminer
+          </button>
+          {onCancel && (
+            <button
+              className="btn btn-secondary"
+              onClick={onCancel}
+              style={{
+                fontSize: 13,
+                padding: '8px 14px',
+                borderColor: '#e53e3e',
+                color: '#e53e3e',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4
+              }}
+              title="Annuler l'enregistrement sans transcrire"
+            >
+              ❌ Annuler
+            </button>
+          )}
+        </div>
       )}
 
       {/* Status text — contextual and pedagogical */}
