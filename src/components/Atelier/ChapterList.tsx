@@ -23,7 +23,7 @@ interface ChapterListProps {
 }
 
 export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar }: ChapterListProps) {
-  const { manuscript, renameManuscript } = useAuth();
+  const { manuscript, manuscripts, selectManuscript, renameManuscript } = useAuth();
   const [isEditingManuscriptTitle, setIsEditingManuscriptTitle] = useState(false);
   const [manuscriptTitleValue, setManuscriptTitleValue] = useState('');
 
@@ -114,43 +114,73 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
         )}
       </div>
 
-      {/* Manuscript Title Bar */}
+      {/* Manuscript Switcher Bar */}
       {manuscript && (
-        <div style={{ padding: '8px 10px', marginBottom: 12, background: 'rgba(138,90,52,0.06)', borderRadius: 8, border: '1px solid rgba(138,90,52,0.15)' }}>
-          {isEditingManuscriptTitle ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="text"
-                value={manuscriptTitleValue}
-                onChange={(e) => setManuscriptTitleValue(e.target.value)}
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && handleSaveManuscriptTitle()}
-                placeholder="Titre du manuscrit..."
-                style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '3px 6px', fontSize: 12.5, fontWeight: 600, color: 'var(--text)', outline: 'none' }}
-              />
-              <button onClick={handleSaveManuscriptTitle} title="Valider" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 6px', fontSize: 11, cursor: 'pointer' }}>✓</button>
-              <button onClick={() => setIsEditingManuscriptTitle(false)} title="Annuler" style={{ background: 'var(--surface-2)', color: 'var(--text)', border: 'none', borderRadius: 4, padding: '3px 6px', fontSize: 11, cursor: 'pointer' }}>✕</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                <span style={{ fontSize: 13 }}>📖</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'var(--font-sans)' }} title={manuscript.title}>
-                  {manuscript.title}
-                </span>
+        <div style={{ marginBottom: 14, padding: '0 2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-soft)', fontFamily: 'var(--font-sans)' }}>
+              MANUSCRIT ACTIF
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {isEditingManuscriptTitle ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                <input
+                  type="text"
+                  value={manuscriptTitleValue}
+                  onChange={(e) => setManuscriptTitleValue(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveManuscriptTitle()}
+                  placeholder="Titre du manuscrit..."
+                  style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text)', outline: 'none' }}
+                />
+                <button onClick={handleSaveManuscriptTitle} title="Valider" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>✓</button>
+                <button onClick={() => setIsEditingManuscriptTitle(false)} title="Annuler" style={{ background: 'var(--surface-2)', color: 'var(--text)', border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>✕</button>
               </div>
-              <button
-                onClick={() => {
-                  setManuscriptTitleValue(manuscript.title);
-                  setIsEditingManuscriptTitle(true);
-                }}
-                title="Renommer ce manuscrit"
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, opacity: 0.7, padding: '2px' }}
-              >
-                ✏️
-              </button>
-            </div>
-          )}
+            ) : (
+              <>
+                <select
+                  value={manuscript.id}
+                  onChange={(e) => {
+                    const target = manuscripts.find((m) => m.id === e.target.value);
+                    if (target) selectManuscript(target);
+                  }}
+                  style={{
+                    flex: 1,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                    outline: 'none',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                  }}
+                >
+                  {manuscripts.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      📖 {m.title}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={() => {
+                    setManuscriptTitleValue(manuscript.title);
+                    setIsEditingManuscriptTitle(true);
+                  }}
+                  title="Renommer ce manuscrit"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, padding: '6px 8px' }}
+                >
+                  ✏️
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
