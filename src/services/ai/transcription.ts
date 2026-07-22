@@ -53,6 +53,64 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
+ * Prioritized list of Gemini models for automatic fallback.
+ * 1. Primary high-performance models (3.6 Flash -> 3.5 Flash)
+ * 2. High-quota fallback model (3.5 Flash Lite — 500 RPD)
+ * 3. General alias fallback (gemini-flash-latest)
+ */
+const MODEL_FALLBACK_CHAIN = [
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-latest',
+];
+
+/**
+ * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error
+ */
+async function generateWithFallback<T>(
+  generationConfig: any,
+  systemInstruction: string,
+  execute: (model: any, modelName: string) => Promise<T>
+): Promise<T> {
+  const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
+  const app = getFirebaseApp();
+  const ai = getAI(app, { backend: new GoogleAIBackend() });
+
+  let lastError: any = null;
+
+  for (const modelName of MODEL_FALLBACK_CHAIN) {
+    try {
+      const model = getGenerativeModel(ai, {
+        model: modelName,
+        generationConfig,
+        systemInstruction,
+      });
+
+      return await execute(model, modelName);
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = err?.message || String(err);
+      const isQuotaOrNotFound =
+        errMsg.includes('429') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('Quota exceeded') ||
+        errMsg.includes('404') ||
+        errMsg.includes('not found') ||
+        errMsg.includes('is not supported');
+
+      if (isQuotaOrNotFound) {
+        console.warn(`[AI Fallback] Modèle ${modelName} indisponible ou quota atteint (${errMsg}). Basculement vers le modèle suivant...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new Error('Tous les modèles Gemini de la chaîne de secours ont échoué.');
+}
+
+/**
  * Transcribe and structure an audio recording using Gemini
  */
 export async function transcribeAudio(
@@ -65,24 +123,8 @@ export async function transcribeAudio(
     );
   }
 
-  const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
-  const app = getFirebaseApp();
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
-
-  const model = getGenerativeModel(ai, {
-    model: 'gemini-3.5-flash-lite',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.3, // Low temperature for accurate transcription
-      maxOutputTokens: 8192,
-    },
-    systemInstruction: SYSTEM_PROMPT_TRANSCRIPTION,
-  });
-
-  // Convert audio to base64
   const audioBase64 = await blobToBase64(audioBlob);
 
-  // Build the prompt with context
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {
     contextPrompt += ` L'auteur travaille actuellement sur le chapitre ${context.currentChapter + 1}.`;
@@ -91,29 +133,37 @@ export async function transcribeAudio(
     contextPrompt += ` Voici le contexte du texte précédent pour maintenir la cohérence : « ${context.previousContent.slice(-500)} »`;
   }
 
-  const result = await model.generateContent([
-    contextPrompt,
+  return generateWithFallback(
     {
-      inlineData: {
-        data: audioBase64,
-        mimeType: audioBlob.type || 'audio/webm',
-      },
+      responseMimeType: 'application/json',
+      temperature: 0.3,
+      maxOutputTokens: 8192,
     },
-  ]);
+    SYSTEM_PROMPT_TRANSCRIPTION,
+    async (model, modelName) => {
+      console.log(`[AI Dictation] Exécution avec le modèle : ${modelName}`);
+      const result = await model.generateContent([
+        contextPrompt,
+        {
+          inlineData: {
+            data: audioBase64,
+            mimeType: audioBlob.type || 'audio/webm',
+          },
+        },
+      ]);
 
-  const responseText = result.response.text();
-
-  try {
-    const parsed = JSON.parse(responseText) as TranscriptionResult;
-    return parsed;
-  } catch {
-    // If JSON parsing fails, try to extract JSON from the response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as TranscriptionResult;
+      const responseText = result.response.text();
+      try {
+        return JSON.parse(responseText) as TranscriptionResult;
+      } catch {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]) as TranscriptionResult;
+        }
+        throw new Error('Impossible de parser la réponse de Gemini. Réponse reçue : ' + responseText.slice(0, 200));
+      }
     }
-    throw new Error('Impossible de parser la réponse de Gemini. Réponse reçue : ' + responseText.slice(0, 200));
-  }
+  );
 }
 
 /**
@@ -124,40 +174,34 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
     throw new Error('Firebase n\'est pas configuré.');
   }
 
-  const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
-  const app = getFirebaseApp();
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
-
-  const model = getGenerativeModel(ai, {
-    model: 'gemini-3.5-flash-lite',
-    generationConfig: {
+  return generateWithFallback(
+    {
       responseMimeType: 'application/json',
       temperature: 0.2,
       maxOutputTokens: 4096,
     },
-    systemInstruction: SYSTEM_PROMPT_FACTCHECK,
-  });
-
-  const result = await model.generateContent(
-    `Vérifie les faits dans ce passage de manuscrit :\n\n${text}`
-  );
-
-  const responseText = result.response.text();
-
-  try {
-    return JSON.parse(responseText) as VerificationItem[];
-  } catch {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as VerificationItem[];
+    SYSTEM_PROMPT_FACTCHECK,
+    async (model, modelName) => {
+      console.log(`[AI FactCheck] Exécution avec le modèle : ${modelName}`);
+      const result = await model.generateContent(
+        `Vérifie les faits dans ce passage de manuscrit :\n\n${text}`
+      );
+      const responseText = result.response.text();
+      try {
+        return JSON.parse(responseText) as VerificationItem[];
+      } catch {
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]) as VerificationItem[];
+        }
+        return [];
+      }
     }
-    return [];
-  }
+  );
 }
 
 /**
  * Streaming transcription — sends audio and streams back the structured result
- * (useful for showing progress during long recordings)
  */
 export async function transcribeAudioStream(
   audioBlob: Blob,
@@ -168,20 +212,6 @@ export async function transcribeAudioStream(
     throw new Error('Firebase n\'est pas configuré.');
   }
 
-  const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
-  const app = getFirebaseApp();
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
-
-  const model = getGenerativeModel(ai, {
-    model: 'gemini-flash-latest',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.3,
-      maxOutputTokens: 8192,
-    },
-    systemInstruction: SYSTEM_PROMPT_TRANSCRIPTION,
-  });
-
   const audioBase64 = await blobToBase64(audioBlob);
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
@@ -189,32 +219,43 @@ export async function transcribeAudioStream(
     contextPrompt += ` Chapitre en cours : ${context.currentChapter + 1}.`;
   }
 
-  const result = await model.generateContentStream([
-    contextPrompt,
+  return generateWithFallback(
     {
-      inlineData: {
-        data: audioBase64,
-        mimeType: audioBlob.type || 'audio/webm',
-      },
+      responseMimeType: 'application/json',
+      temperature: 0.3,
+      maxOutputTokens: 8192,
     },
-  ]);
+    SYSTEM_PROMPT_TRANSCRIPTION,
+    async (model, modelName) => {
+      console.log(`[AI Stream] Exécution avec le modèle : ${modelName}`);
+      const result = await model.generateContentStream([
+        contextPrompt,
+        {
+          inlineData: {
+            data: audioBase64,
+            mimeType: audioBlob.type || 'audio/webm',
+          },
+        },
+      ]);
 
-  let fullText = '';
-  for await (const chunk of result.stream) {
-    const chunkText = chunk.text();
-    fullText += chunkText;
-    onChunk(fullText);
-  }
+      let fullText = '';
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        fullText += chunkText;
+        onChunk(fullText);
+      }
 
-  try {
-    return JSON.parse(fullText) as TranscriptionResult;
-  } catch {
-    const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as TranscriptionResult;
+      try {
+        return JSON.parse(fullText) as TranscriptionResult;
+      } catch {
+        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]) as TranscriptionResult;
+        }
+        throw new Error('Erreur de parsing de la réponse streaming.');
+      }
     }
-    throw new Error('Erreur de parsing de la réponse streaming.');
-  }
+  );
 }
 
 /**
