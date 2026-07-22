@@ -112,7 +112,7 @@ export default function Editor({
           </div>
           <div style={{ display: 'flex', gap: 16, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
             <button
-              className="btn-primary"
+              className="btn btn-primary"
               onClick={() => {
                 if (chapter.blocks.length === 0) {
                   dispatch({ type: 'ADD_BLOCK', chapterIndex, afterBlockId: null });
@@ -123,14 +123,13 @@ export default function Editor({
                 }, 100);
               }}
             >
-              Écrire
+              <span>✍️</span> Écrire
             </button>
             {onStartDictation && (
               <button
-                className="btn-secondary"
+                className="btn btn-secondary"
                 onClick={onStartDictation}
                 disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
-                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
               >
                 <span>🎙️</span> Dicter
               </button>

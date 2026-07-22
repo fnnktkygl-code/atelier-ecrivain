@@ -285,9 +285,21 @@ body.night .card-glass {
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
   background: var(--accent);
   color: #fff;
   box-shadow: 0 2px 8px rgba(138, 90, 52, 0.3);
+  transition: all var(--transition-fast);
 }
 .btn-primary:hover {
   background: var(--accent-hover);
