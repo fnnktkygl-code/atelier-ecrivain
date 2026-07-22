@@ -124,10 +124,11 @@ const DEFAULT_SETTINGS: ReaderSettings = {
 };
 
 const FONT_OPTIONS = [
-  { label: 'Serif', value: "'Source Serif 4', Georgia, serif" },
-  { label: 'Sans-serif', value: "'Inter', -apple-system, sans-serif" },
-  { label: 'Classique', value: "'Cormorant Garamond', 'Garamond', serif" },
-  { label: 'Monospace', value: "'JetBrains Mono', 'Fira Code', monospace" },
+  { label: 'Roman (Serif)', value: "'Source Serif 4', Georgia, serif" },
+  { label: 'Éditorial (Merriweather)', value: "'Merriweather', Georgia, serif" },
+  { label: 'Classique (Garamond)', value: "'Cormorant Garamond', 'Garamond', serif" },
+  { label: 'Moderne (Sans-serif)', value: "'Plus Jakarta Sans', system-ui, sans-serif" },
+  { label: 'Monospace (Notes)', value: "'JetBrains Mono', monospace" },
 ];
 
 const THEME_OPTIONS = [

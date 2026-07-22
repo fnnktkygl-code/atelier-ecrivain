@@ -36,11 +36,18 @@
   --accent-glow: rgba(138, 90, 52, 0.16);
   --accent-hover: #a06b3e;
 
+  /* Font Families */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-serif-roman: 'Source Serif 4', Georgia, serif;
+  --font-serif-classic: 'Cormorant Garamond', 'Garamond', serif;
+  --font-serif-editorial: 'Merriweather', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
   /* Reader settings (overrideable) */
   --reader-font-size: 19px;
   --reader-line-height: 1.85;
   --reader-max-width: 60ch;
-  --reader-font-family: 'Source Serif 4', Georgia, serif;
+  --reader-font-family: var(--font-serif-roman);
   --reader-brightness: 1;
 
   /* Dashboard / Atelier */
@@ -104,7 +111,7 @@ html, body {
 }
 
 body {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   background-image: radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.35), transparent 60%);
   color: var(--text);
@@ -123,10 +130,10 @@ body.night {
 
 /* ── Typography ── */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-serif-classic);
   margin-top: 0;
-  font-weight: 500;
-  line-height: 1.3;
+  font-weight: 600;
+  line-height: 1.25;
   margin: 0;
 }
 
