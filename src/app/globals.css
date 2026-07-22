@@ -295,10 +295,37 @@ body.night .card-glass {
   box-shadow: 0 4px 14px rgba(138, 90, 52, 0.4);
 }
 
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  transition: all var(--transition-fast);
+}
+.btn-secondary:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text-soft);
   border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
 }
 .btn-ghost:hover {
   border-color: var(--accent);
@@ -1154,20 +1181,22 @@ body.night .bottom-sheet {
 .btn-editor-action {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  border-radius: 20px;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--fg);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .btn-editor-action:hover {
-  background: var(--surface-hover);
+  background: var(--surface-2);
   border-color: var(--accent);
+  transform: translateY(-1px);
 }
 .btn-editor-action.dictation {
   border-color: var(--accent);
@@ -1177,6 +1206,7 @@ body.night .bottom-sheet {
 .btn-editor-action.dictation:hover {
   background: var(--accent);
   color: #fff;
+  transform: translateY(-1px);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1184,16 +1214,17 @@ body.night .bottom-sheet {
    ═══════════════════════════════════════════════════════════════ */
 
 .editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  backdrop-filter: blur(8px);
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  flex-shrink: 0;
-  min-height: 48px;
-  flex-wrap: wrap; /* Prevent overflow */
+  gap: 16px;
 }
 
 .editor-toolbar-left {
@@ -1235,18 +1266,24 @@ body.night .bottom-sheet {
 }
 
 .editor-save-indicator {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-soft);
   white-space: nowrap;
 }
 
 .editor-word-count {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 15px; /* Increased from 12px */
-  color: var(--text-soft);
-  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(138, 90, 52, 0.2);
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .toolbar-badge {
