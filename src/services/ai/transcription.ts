@@ -70,7 +70,7 @@ export async function transcribeAudio(
   const ai = getAI(app, { backend: new GoogleAIBackend() });
 
   const model = getGenerativeModel(ai, {
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.5-flash-lite',
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.3, // Low temperature for accurate transcription
@@ -129,7 +129,7 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
   const ai = getAI(app, { backend: new GoogleAIBackend() });
 
   const model = getGenerativeModel(ai, {
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.5-flash-lite',
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.2,
