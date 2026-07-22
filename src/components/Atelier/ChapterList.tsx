@@ -1,17 +1,18 @@
 /**
- * ChapterList — Interactive chapter sidebar
+ * ChapterList — Interactive chapter & manuscript sidebar
  *
- * Features:
- * - Create new chapters
- * - Rename chapters (double-click)
- * - Delete chapters (with confirmation)
- * - Drag & drop reorder
- * - Active chapter highlight
+ * Implements the exact user design refonte from apercu-refonte-chapitres.html
+ * - Manuscript Cards with Chevron collapse/expand
+ * - Active Manuscript Badge
+ * - Manuscript Kebab Menu (Renommer, Supprimer)
+ * - Chapter Rows with Drag handle, Ch. Badge, Title, Word count, Kebab Menu
+ * - Nouveau chapitre button per manuscript
+ * - Nouveau manuscrit button at bottom
  */
 
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import type { EditableChapter, ManuscriptAction } from '@/types/editor';
 
@@ -23,25 +24,96 @@ interface ChapterListProps {
 }
 
 export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar }: ChapterListProps) {
-  const { manuscript, manuscripts, selectManuscript, renameManuscript } = useAuth();
-  const [isEditingManuscriptTitle, setIsEditingManuscriptTitle] = useState(false);
-  const [manuscriptTitleValue, setManuscriptTitleValue] = useState('');
+  const { manuscript, manuscripts, selectManuscript, createManuscript, renameManuscript, deleteManuscript } = useAuth();
 
+  // Expanded manuscript accordion state (defaults to active manuscript ID)
+  const [openManuscriptId, setOpenManuscriptId] = useState<string | null>(manuscript?.id || null);
+
+  // Sync open manuscript when active manuscript changes
+  useEffect(() => {
+    if (manuscript?.id && openManuscriptId === null) {
+      setOpenManuscriptId(manuscript.id);
+    }
+  }, [manuscript?.id, openManuscriptId]);
+
+  // Manuscript Kebab & Rename state
+  const [msMenuId, setMsMenuId] = useState<string | null>(null);
+  const [renamingMsId, setRenamingMsId] = useState<string | null>(null);
+  const [renamingMsTitle, setRenamingMsTitle] = useState('');
+  const [confirmDeleteMsId, setConfirmDeleteMsId] = useState<string | null>(null);
+
+  // New Manuscript creation input state
+  const [isCreatingManuscript, setIsCreatingManuscript] = useState(false);
+  const [newManuscriptTitle, setNewManuscriptTitle] = useState('');
+
+  // Chapter Kebab, Rename & Delete state
   const [renamingIndex, setRenamingIndex] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [menuIndex, setMenuIndex] = useState<number | null>(null);
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
+
+  // Drag & drop state
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSaveManuscriptTitle = async () => {
-    if (manuscript && manuscriptTitleValue.trim()) {
-      await renameManuscript(manuscript.id, manuscriptTitleValue.trim());
+  const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const msMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuIndex(null);
+        setConfirmDeleteIndex(null);
+      }
+      if (msMenuRef.current && !msMenuRef.current.contains(e.target as Node)) {
+        setMsMenuId(null);
+        setConfirmDeleteMsId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ── Manuscript Handlers ──
+  const toggleManuscriptCard = (id: string) => {
+    const target = manuscripts.find((m) => m.id === id);
+    if (target && target.id !== manuscript?.id) {
+      selectManuscript(target);
     }
-    setIsEditingManuscriptTitle(false);
+    setOpenManuscriptId((cur) => (cur === id ? null : id));
   };
 
-  const handleSelect = useCallback(
+  const handleStartRenameManuscript = (id: string, currentTitle: string) => {
+    setRenamingMsId(id);
+    setRenamingMsTitle(currentTitle);
+    setMsMenuId(null);
+  };
+
+  const handleSaveRenameManuscript = async (id: string) => {
+    if (renamingMsTitle.trim()) {
+      await renameManuscript(id, renamingMsTitle.trim());
+    }
+    setRenamingMsId(null);
+  };
+
+  const handleDeleteManuscript = async (id: string) => {
+    await deleteManuscript(id);
+    setConfirmDeleteMsId(null);
+    setMsMenuId(null);
+  };
+
+  const handleCreateNewManuscript = async () => {
+    if (newManuscriptTitle.trim()) {
+      await createManuscript(newManuscriptTitle.trim());
+      setNewManuscriptTitle('');
+      setIsCreatingManuscript(false);
+    }
+  };
+
+  // ── Chapter Handlers ──
+  const handleSelectChapter = useCallback(
     (index: number) => {
       dispatch({ type: 'SET_ACTIVE_CHAPTER', index });
       if (onCloseSidebar) {
@@ -51,28 +123,31 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
     [dispatch, onCloseSidebar]
   );
 
-  const handleStartRename = useCallback((index: number, currentTitle: string) => {
+  const handleStartRenameChapter = useCallback((index: number, currentTitle: string) => {
     setRenamingIndex(index);
     setRenameValue(currentTitle);
+    setMenuIndex(null);
+    setConfirmDeleteIndex(null);
     setTimeout(() => inputRef.current?.select(), 0);
   }, []);
 
-  const handleFinishRename = useCallback(() => {
+  const handleFinishRenameChapter = useCallback(() => {
     if (renamingIndex !== null && renameValue.trim()) {
       dispatch({ type: 'RENAME_CHAPTER', chapterIndex: renamingIndex, title: renameValue.trim() });
     }
     setRenamingIndex(null);
   }, [renamingIndex, renameValue, dispatch]);
 
-  const handleAdd = useCallback(() => {
+  const handleAddChapter = useCallback(() => {
     const num = chapters.length + 1;
     dispatch({ type: 'ADD_CHAPTER', title: `Chapitre ${num} — Nouveau chapitre` });
   }, [chapters.length, dispatch]);
 
-  const handleDelete = useCallback(
+  const handleDeleteChapter = useCallback(
     (index: number) => {
       dispatch({ type: 'DELETE_CHAPTER', chapterIndex: index });
       setConfirmDeleteIndex(null);
+      setMenuIndex(null);
     },
     [dispatch]
   );
@@ -85,202 +160,232 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
     setDragOverIndex(null);
   }, [dragFromIndex, dragOverIndex, dispatch]);
 
-  // Extract short title from chapter title
   const shortTitle = (title: string) => {
     const parts = title.split('—');
     return parts.length > 1 ? parts[1].trim() : title;
   };
 
-  const chapterNumber = (title: string) => {
+  const chapterNumberStr = (title: string, index: number) => {
     const match = title.match(/chapitre\s*(\d+)/i);
-    return match ? `Ch. ${match[1]}` : '';
+    return match ? `Ch. ${match[1]}` : `Ch. ${index + 1}`;
   };
+
+  const chapterWordCount = (ch: EditableChapter) =>
+    ch.blocks.reduce((s, b) => s + b.content.split(/\s+/).filter(Boolean).length, 0);
+
+  const totalWords = chapters.reduce((sum, ch) => sum + chapterWordCount(ch), 0);
 
   return (
     <div className="chapter-list">
+      {/* Header */}
       <div className="chapter-list-header">
-        <div className="chapter-list-title-group">
-          <h3 className="sidebar-section-title">📚 Chapitres</h3>
-          <span className="chapter-count-badge">{chapters.length}</span>
+        <div className="chapter-list-title-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 className="sidebar-section-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700 }}>
+            📚 Mes manuscrits
+          </h3>
+          <span className="chapter-count-badge">{manuscripts.length}</span>
         </div>
         {onCloseSidebar && (
-          <button 
-            className="sidebar-close-btn" 
-            onClick={onCloseSidebar}
-            title="Fermer le menu"
-          >
+          <button className="sidebar-close-btn" onClick={onCloseSidebar} title="Fermer le menu">
             ✕
           </button>
         )}
       </div>
 
-      {/* Manuscript Switcher Bar */}
-      {manuscript && (
-        <div style={{ marginBottom: 14, padding: '0 2px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-soft)', fontFamily: 'var(--font-sans)' }}>
-              MANUSCRIT ACTIF
-            </span>
-          </div>
+      {/* Manuscripts List */}
+      <div className="manuscripts-container" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+        {manuscripts.map((m) => {
+          const isActive = m.id === manuscript?.id;
+          const isOpen = openManuscriptId === m.id || (openManuscriptId === null && isActive);
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isEditingManuscriptTitle ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                <input
-                  type="text"
-                  value={manuscriptTitleValue}
-                  onChange={(e) => setManuscriptTitleValue(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveManuscriptTitle()}
-                  placeholder="Titre du manuscrit..."
-                  style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text)', outline: 'none' }}
-                />
-                <button onClick={handleSaveManuscriptTitle} title="Valider" style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>✓</button>
-                <button onClick={() => setIsEditingManuscriptTitle(false)} title="Annuler" style={{ background: 'var(--surface-2)', color: 'var(--text)', border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>✕</button>
-              </div>
-            ) : (
-              <>
-                <select
-                  value={manuscript.id}
-                  onChange={(e) => {
-                    const target = manuscripts.find((m) => m.id === e.target.value);
-                    if (target) selectManuscript(target);
-                  }}
-                  style={{
-                    flex: 1,
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 8,
-                    padding: '6px 10px',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-sans)',
-                    outline: 'none',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-                  }}
-                >
-                  {manuscripts.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      📖 {m.title}
-                    </option>
-                  ))}
-                </select>
+          return (
+            <div key={m.id} className={`manuscript-card ${isOpen ? 'open' : ''}`}>
+              {/* Manuscript Header */}
+              <div className="manuscript-header" onClick={() => toggleManuscriptCard(m.id)}>
+                <span className="chevron" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                  ›
+                </span>
+                <span className="ms-icon">📖</span>
 
-                <button
-                  onClick={() => {
-                    setManuscriptTitleValue(manuscript.title);
-                    setIsEditingManuscriptTitle(true);
-                  }}
-                  title="Renommer ce manuscrit"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, padding: '6px 8px' }}
-                >
-                  ✏️
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="chapter-list-add-area">
-        <button
-          className="btn-add-chapter"
-          onClick={handleAdd}
-          title="Ajouter un nouveau chapitre"
-        >
-          <span className="add-icon">＋</span>
-          <span>Nouveau chapitre</span>
-        </button>
-      </div>
-
-      <div className="chapter-items">
-        {chapters.map((ch, i) => (
-          <div
-            key={ch.id}
-            className={`chapter-list-item ${i === activeIndex ? 'active' : ''} ${dragOverIndex === i ? 'drag-over' : ''}`}
-            draggable={renamingIndex !== i}
-            onClick={() => renamingIndex !== i && handleSelect(i)}
-            onDoubleClick={() => handleStartRename(i, ch.title)}
-            onDragStart={() => setDragFromIndex(i)}
-            onDragOver={(e) => { e.preventDefault(); setDragOverIndex(i); }}
-            onDragEnd={handleDragEnd}
-          >
-            {renamingIndex === i ? (
-              <div className="chapter-rename-box" onClick={(e) => e.stopPropagation()}>
-                <input
-                  ref={inputRef}
-                  className="chapter-rename-input"
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={handleFinishRename}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleFinishRename();
-                    if (e.key === 'Escape') setRenamingIndex(null);
-                  }}
-                  autoFocus
-                />
-                <button className="btn-confirm-rename" onClick={handleFinishRename} title="Valider">
-                  ✓
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="chapter-info">
-                  <div className="chapter-title-row">
-                    <span className="chapter-number">{chapterNumber(ch.title) || `Ch. ${i + 1}`}</span>
-                    <span className="chapter-title-text" title="Double-cliquez pour renommer">
-                      {shortTitle(ch.title)}
-                    </span>
+                {renamingMsId === m.id ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      value={renamingMsTitle}
+                      onChange={(e) => setRenamingMsTitle(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveRenameManuscript(m.id)}
+                      style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '2px 6px', fontSize: 13, fontWeight: 600 }}
+                    />
+                    <button onClick={() => handleSaveRenameManuscript(m.id)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 6px', fontSize: 11, cursor: 'pointer' }}>✓</button>
                   </div>
-                  <span className="chapter-meta">
-                    {ch.blocks.reduce((s, b) => s + b.content.split(/\s+/).filter(Boolean).length, 0)} mots
-                  </span>
-                </div>
+                ) : (
+                  <span className="ms-title">{m.title}</span>
+                )}
 
-                {/* Visible Actions: Edit & Delete */}
-                <div className="chapter-item-actions" onClick={(e) => e.stopPropagation()}>
-                  {confirmDeleteIndex === i ? (
-                    <div className="chapter-delete-confirm">
-                      <button
-                        className="btn-confirm-no"
-                        onClick={() => setConfirmDeleteIndex(null)}
-                      >
-                        Non
-                      </button>
-                      <button
-                        className="btn-confirm-yes"
-                        onClick={() => handleDelete(i)}
-                      >
-                        Oui
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        className="chapter-action-btn chapter-edit-btn"
-                        onClick={() => handleStartRename(i, ch.title)}
-                        title="Renommer le chapitre"
-                      >
-                        ✏️
-                      </button>
-                      {chapters.length > 1 && (
-                        <button
-                          className="chapter-action-btn chapter-delete-btn"
-                          onClick={() => setConfirmDeleteIndex(i)}
-                          title="Supprimer le chapitre"
-                        >
-                          🗑️
-                        </button>
+                {isActive && <span className="badge-active">Actif</span>}
+
+                <div className="kebab-wrap" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="kebab-btn"
+                    onClick={() => {
+                      setMsMenuId(msMenuId === m.id ? null : m.id);
+                      setConfirmDeleteMsId(null);
+                    }}
+                    title="Actions manuscrit"
+                  >
+                    ⋮
+                  </button>
+
+                  {msMenuId === m.id && (
+                    <div className="kebab-menu show" ref={msMenuRef}>
+                      {confirmDeleteMsId === m.id ? (
+                        <>
+                          <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 600 }}>Supprimer ce manuscrit ?</div>
+                          <div className="confirm-row">
+                            <button onClick={() => setConfirmDeleteMsId(null)}>Non</button>
+                            <button className="danger" onClick={() => handleDeleteManuscript(m.id)}>Oui</button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => handleStartRenameManuscript(m.id, m.title)}>Renommer</button>
+                          {manuscripts.length > 1 && (
+                            <button className="danger" onClick={() => setConfirmDeleteMsId(m.id)}>Supprimer</button>
+                          )}
+                        </>
                       )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Manuscript Chapters Body */}
+              {isOpen && (
+                <div className="manuscript-body">
+                  {isActive && (
+                    <>
+                      <div className="manuscript-meta">
+                        <span>{chapters.length} chapitre{chapters.length > 1 ? 's' : ''}</span>
+                        <span>{totalWords} mots</span>
+                      </div>
+
+                      <div className="add-chapter-area">
+                        <button className="btn-add-chapter" onClick={handleAddChapter}>
+                          ＋ Nouveau chapitre
+                        </button>
+                      </div>
+
+                      <div className="chapter-rows">
+                        {chapters.map((ch, i) => {
+                          const isChActive = i === activeIndex;
+
+                          return (
+                            <div
+                              key={ch.id}
+                              className={`chapter-row ${isChActive ? 'active' : ''}`}
+                              draggable={renamingIndex !== i}
+                              onClick={() => renamingIndex !== i && handleSelectChapter(i)}
+                              onDoubleClick={() => handleStartRenameChapter(i, ch.title)}
+                              onDragStart={() => setDragFromIndex(i)}
+                              onDragOver={(e) => { e.preventDefault(); setDragOverIndex(i); }}
+                              onDragEnd={handleDragEnd}
+                            >
+                              {renamingIndex === i ? (
+                                <div className="chapter-rename-box" onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 6, flex: 1 }}>
+                                  <input
+                                    ref={inputRef}
+                                    className="chapter-rename-input"
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value)}
+                                    onBlur={handleFinishRenameChapter}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleFinishRenameChapter();
+                                      if (e.key === 'Escape') setRenamingIndex(null);
+                                    }}
+                                    autoFocus
+                                    style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '3px 6px', fontSize: 13 }}
+                                  />
+                                  <button className="btn-confirm-rename" onClick={handleFinishRenameChapter} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px' }}>✓</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="drag-handle" title="Glisser pour réordonner">⠿</span>
+                                  <span className="ch-badge">{chapterNumberStr(ch.title, i)}</span>
+                                  <span className="ch-title" title={ch.title}>
+                                    {shortTitle(ch.title)}
+                                  </span>
+                                  <span className="ch-words">{chapterWordCount(ch)} mots</span>
+
+                                  <div className="kebab-wrap" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      className="kebab-btn"
+                                      onClick={() => {
+                                        setMenuIndex(menuIndex === i ? null : i);
+                                        setConfirmDeleteIndex(null);
+                                      }}
+                                      title="Actions chapitre"
+                                    >
+                                      ⋮
+                                    </button>
+
+                                    {menuIndex === i && (
+                                      <div className="kebab-menu show" ref={menuRef}>
+                                        {confirmDeleteIndex === i ? (
+                                          <>
+                                            <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 600 }}>Supprimer ?</div>
+                                            <div className="confirm-row">
+                                              <button onClick={() => setConfirmDeleteIndex(null)}>Non</button>
+                                              <button className="danger" onClick={() => handleDeleteChapter(i)}>Oui</button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <button onClick={() => handleStartRenameChapter(i, ch.title)}>Renommer</button>
+                                            {chapters.length > 1 && (
+                                              <button className="danger" onClick={() => setConfirmDeleteIndex(i)}>Supprimer</button>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </>
                   )}
                 </div>
-              </>
-            )}
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Button to Create a New Manuscript */}
+      <div style={{ marginTop: 14 }}>
+        {isCreatingManuscript ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="text"
+              value={newManuscriptTitle}
+              onChange={(e) => setNewManuscriptTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateNewManuscript()}
+              placeholder="Titre du nouveau manuscrit..."
+              style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--accent)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 600, color: 'var(--text)', outline: 'none' }}
+            />
+            <button onClick={handleCreateNewManuscript} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>Créer</button>
+            <button onClick={() => setIsCreatingManuscript(false)} style={{ background: 'transparent', color: 'var(--text)', border: 'none', padding: '6px', fontSize: 12, cursor: 'pointer' }}>✕</button>
           </div>
-        ))}
+        ) : (
+          <button className="btn-new-manuscript" onClick={() => setIsCreatingManuscript(true)}>
+            ＋ Nouveau manuscrit
+          </button>
+        )}
       </div>
     </div>
   );

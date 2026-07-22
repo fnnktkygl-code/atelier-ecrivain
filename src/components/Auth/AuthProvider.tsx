@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthChange, signInWithGoogle, signOut } from '@/services/firebase/auth';
-import { migrateStaticData, getManuscripts, createManuscript, updateManuscriptTitle, getPenName, setPenName, getProfileSettings, updateProfileSettings as updateProfileSettingsDB, type ManuscriptMeta, type ProfileSettings } from '@/services/firebase/firestore';
+import { migrateStaticData, getManuscripts, createManuscript as createManuscriptDB, updateManuscriptTitle, deleteManuscript as deleteManuscriptDB, getPenName, setPenName, getProfileSettings, updateProfileSettings as updateProfileSettingsDB, type ManuscriptMeta, type ProfileSettings } from '@/services/firebase/firestore';
 import { isFirebaseConfigured } from '@/services/firebase/config';
 
 interface AuthContextType {
@@ -19,6 +19,8 @@ interface AuthContextType {
   logOut: () => Promise<void>;
   selectManuscript: (m: ManuscriptMeta) => void;
   addManuscript: (title: string) => Promise<void>;
+  createManuscript: (title: string) => Promise<void>;
+  deleteManuscript: (manuscriptId: string) => Promise<void>;
   refreshManuscripts: () => Promise<void>;
   updatePenName: (name: string) => Promise<void>;
   renameManuscript: (manuscriptId: string, title: string) => Promise<void>;
@@ -38,6 +40,8 @@ const AuthContext = createContext<AuthContextType>({
   logOut: async () => {},
   selectManuscript: () => {},
   addManuscript: async () => {},
+  createManuscript: async () => {},
+  deleteManuscript: async () => {},
   refreshManuscripts: async () => {},
   updatePenName: async () => {},
   renameManuscript: async () => {},
@@ -133,11 +137,21 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   const addManuscript = async (title: string) => {
     if (!user) return;
-    const id = await createManuscript(user.uid, title);
+    const id = await createManuscriptDB(user.uid, title);
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
     const newM = list.find((m) => m.id === id) || null;
     if (newM) setManuscript(newM);
+  };
+
+  const deleteManuscriptHandler = async (manuscriptId: string) => {
+    if (!user) return;
+    await deleteManuscriptDB(user.uid, manuscriptId);
+    const list = await getManuscripts(user.uid);
+    setManuscripts(list);
+    if (manuscript?.id === manuscriptId) {
+      setManuscript(list[0] || null);
+    }
   };
 
   const updatePenName = async (name: string) => {
@@ -167,7 +181,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, manuscript, manuscripts, penName: penNameState, avatarColor, avatarUrl, showEmail: showEmailState, signIn, logOut, selectManuscript, addManuscript, refreshManuscripts, updatePenName, renameManuscript, updateProfileSettings: updateProfileSettingsHandler }}>
+    <AuthContext.Provider value={{ user, loading, manuscript, manuscripts, penName: penNameState, avatarColor, avatarUrl, showEmail: showEmailState, signIn, logOut, selectManuscript, addManuscript, createManuscript: addManuscript, deleteManuscript: deleteManuscriptHandler, refreshManuscripts, updatePenName, renameManuscript, updateProfileSettings: updateProfileSettingsHandler }}>
       {children}
     </AuthContext.Provider>
   );

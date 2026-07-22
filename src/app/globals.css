@@ -1696,50 +1696,47 @@ body.night .bottom-sheet {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
   padding: 2px;
 }
 
+/* One row: drag handle · number · title · word count · menu.
+   Title wraps onto as many lines as it needs — the row grows with it,
+   the other elements just top-align instead of forcing a single truncated line. */
 .chapter-list-item {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  background: var(--surface);
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 52px;
+  padding: 10px 8px 10px 6px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
   user-select: none;
 }
 .chapter-list-item:hover {
   background: var(--surface-2);
-  border-color: var(--border);
 }
+/* Active state reuses the same left-border + tint language as .manuscript-rature,
+   instead of introducing a new glow/shadow treatment. */
 .chapter-list-item.active {
-  background: var(--surface-2);
-  border-color: var(--accent);
-  box-shadow: 0 2px 8px var(--accent-glow);
+  background: var(--accent-glow);
+  border-left-color: var(--accent);
 }
 .chapter-list-item.drag-over {
   border-top: 2px solid var(--accent);
 }
 
-.chapter-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-  min-width: 0;
-}
-
-.chapter-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-  width: 100%;
+.chapter-drag-handle {
+  flex-shrink: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  letter-spacing: -2px;
+  opacity: 0.5;
+  cursor: grab;
+  margin-top: 3px;
 }
 
 .chapter-number {
@@ -1756,51 +1753,99 @@ body.night .bottom-sheet {
 }
 
 .chapter-title-text {
+  flex: 1;
+  min-width: 0;
   font-family: var(--font-serif-roman);
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
-  line-height: 1.45;
   white-space: normal;
-  word-break: break-word;
   overflow-wrap: break-word;
-  flex: 1;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
-.chapter-meta {
+.chapter-word-count {
+  flex-shrink: 0;
   font-family: var(--font-sans);
   font-size: 11px;
   color: var(--text-soft);
-  font-weight: 500;
+  margin-top: 3px;
 }
 
-/* Actions block: ALWAYS VISIBLE! */
-.chapter-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.chapter-kebab-wrap {
+  position: relative;
   flex-shrink: 0;
+  margin-top: -2px;
 }
 
-.chapter-action-btn {
-  width: 32px;
-  height: 32px;
+.chapter-kebab-btn {
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-  opacity: 0.85;
+  transition: all 0.15s ease;
 }
-.chapter-action-btn:hover {
-  opacity: 1;
-  background: var(--accent-glow);
-  border-color: var(--accent);
-  transform: scale(1.05);
+.chapter-kebab-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.chapter-kebab-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.chapter-kebab-menu button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.chapter-kebab-menu button:hover {
+  background: var(--surface-2);
+}
+.chapter-kebab-menu button.danger {
+  color: #a33a2c;
+}
+.chapter-kebab-confirm-label {
+  padding: 6px 10px 2px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.chapter-kebab-confirm-row {
+  display: flex;
+  gap: 4px;
+  padding: 2px 4px 4px;
+}
+.chapter-kebab-confirm-row button {
+  flex: 1;
+  text-align: center;
 }
 
 .chapter-rename-box {
@@ -1839,31 +1884,6 @@ body.night .bottom-sheet {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.chapter-delete-confirm {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.btn-confirm-no {
-  padding: 4px 8px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.btn-confirm-yes {
-  padding: 4px 8px;
-  font-size: 12px;
-  border: none;
-  background: #c0392b;
-  color: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
 }
 
 /* ═══════════════════════════════════════════════════════════════

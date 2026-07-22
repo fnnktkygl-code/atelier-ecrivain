@@ -11,6 +11,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  deleteDoc,
   type Firestore,
 } from 'firebase/firestore';
 import { getFirebaseApp } from './config';
@@ -62,6 +63,12 @@ export async function updateManuscriptTitle(uid: string, manuscriptId: string, t
   const db = getDb();
   const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId);
   await setDoc(ref, { title, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function deleteManuscript(uid: string, manuscriptId: string): Promise<void> {
+  const db = getDb();
+  const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId);
+  await deleteDoc(ref);
 }
 
 // ── Chapters ──
