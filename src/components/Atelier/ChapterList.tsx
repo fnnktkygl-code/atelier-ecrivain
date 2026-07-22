@@ -27,14 +27,14 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
   const { manuscript, manuscripts, selectManuscript, createManuscript, renameManuscript, deleteManuscript } = useAuth();
 
   // Expanded manuscript accordion state (defaults to active manuscript ID)
-  const [openManuscriptId, setOpenManuscriptId] = useState<string | null>(manuscript?.id || null);
+  const [openManuscriptIds, setOpenManuscriptIds] = useState<string[]>(() => (manuscript?.id ? [manuscript.id] : []));
 
-  // Sync open manuscript when active manuscript changes
+  // Sync open manuscript when active manuscript changes if not already open
   useEffect(() => {
-    if (manuscript?.id && openManuscriptId === null) {
-      setOpenManuscriptId(manuscript.id);
+    if (manuscript?.id) {
+      setOpenManuscriptIds((prev) => (prev.includes(manuscript.id) ? prev : [...prev, manuscript.id]));
     }
-  }, [manuscript?.id, openManuscriptId]);
+  }, [manuscript?.id]);
 
   // Manuscript Kebab & Rename state
   const [msMenuId, setMsMenuId] = useState<string | null>(null);
@@ -82,7 +82,9 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
     if (target && target.id !== manuscript?.id) {
       selectManuscript(target);
     }
-    setOpenManuscriptId((cur) => (cur === id ? null : id));
+    setOpenManuscriptIds((prev) =>
+      prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
+    );
   };
 
   const handleStartRenameManuscript = (id: string, currentTitle: string) => {
@@ -196,7 +198,7 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
       <div className="manuscripts-container" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
         {manuscripts.map((m) => {
           const isActive = m.id === manuscript?.id;
-          const isOpen = openManuscriptId === m.id || (openManuscriptId === null && isActive);
+          const isOpen = openManuscriptIds.includes(m.id);
 
           return (
             <div key={m.id} className={`manuscript-card ${isOpen ? 'open' : ''}`}>
