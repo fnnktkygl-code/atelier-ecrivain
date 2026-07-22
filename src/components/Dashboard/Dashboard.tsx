@@ -125,9 +125,10 @@ export default function Dashboard() {
             Votre atelier d&apos;écriture est prêt. Que souhaitez-vous faire aujourd&apos;hui ?
           </p>
           {manuscript && (
-            <span className="home-manuscript-badge">
-              📖 {manuscript.title}
-            </span>
+            <div className="home-manuscript-badge">
+              <span style={{ opacity: 0.7, fontWeight: 500, marginRight: 6 }}>Manuscrit actif :</span>
+              <strong>📖 {manuscript.title}</strong>
+            </div>
           )}
         </div>
 
