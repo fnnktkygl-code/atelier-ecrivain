@@ -86,36 +86,30 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
 
   return (
     <div className="chapter-list">
-      <div className="chapter-list-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h3
-          style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 12,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--accent)',
-            margin: 0,
-          }}
-        >
-          Chapitres
-        </h3>
-        <button 
-          className="mobile-only-toggle" 
-          onClick={onCloseSidebar}
-          style={{ padding: 4, cursor: 'pointer', fontSize: 18 }}
-        >
-          ✕
-        </button>
+      <div className="chapter-list-header">
+        <div className="chapter-list-title-group">
+          <h3 className="sidebar-section-title">📚 Chapitres</h3>
+          <span className="chapter-count-badge">{chapters.length}</span>
+        </div>
+        {onCloseSidebar && (
+          <button 
+            className="sidebar-close-btn" 
+            onClick={onCloseSidebar}
+            title="Fermer le menu"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
-      <div style={{ padding: '0 16px 12px' }}>
+      <div className="chapter-list-add-area">
         <button
-          className="btn-primary"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', padding: '8px' }}
+          className="btn-add-chapter"
           onClick={handleAdd}
-          title="Ajouter un chapitre"
+          title="Ajouter un nouveau chapitre"
         >
-          <span>+</span> Nouveau chapitre
+          <span className="add-icon">＋</span>
+          <span>Nouveau chapitre</span>
         </button>
       </div>
 
@@ -132,65 +126,75 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
             onDragEnd={handleDragEnd}
           >
             {renamingIndex === i ? (
-              <input
-                ref={inputRef}
-                className="chapter-rename-input"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={handleFinishRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleFinishRename();
-                  if (e.key === 'Escape') setRenamingIndex(null);
-                }}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <>
-                <span className="number">{chapterNumber(ch.title)}</span>
-                <span className="title">{shortTitle(ch.title)}</span>
-                <span className="word-count">
-                  {ch.blocks.reduce((s, b) => s + b.content.split(/\s+/).filter(Boolean).length, 0)} m
-                </span>
-              </>
-            )}
-
-            {/* Delete button */}
-            {confirmDeleteIndex === i ? (
-              <div className="chapter-delete-confirm" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => setConfirmDeleteIndex(null)}
-                  style={{ fontSize: 10, padding: '2px 8px' }}
-                >
-                  Non
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleDelete(i)}
-                  style={{ fontSize: 10, padding: '2px 8px', background: '#c0392b' }}
-                >
-                  Supprimer
+              <div className="chapter-rename-box" onClick={(e) => e.stopPropagation()}>
+                <input
+                  ref={inputRef}
+                  className="chapter-rename-input"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={handleFinishRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleFinishRename();
+                    if (e.key === 'Escape') setRenamingIndex(null);
+                  }}
+                  autoFocus
+                />
+                <button className="btn-confirm-rename" onClick={handleFinishRename} title="Valider">
+                  ✓
                 </button>
               </div>
             ) : (
               <>
-                <button
-                  className="chapter-action-btn chapter-edit-btn"
-                  onClick={(e) => { e.stopPropagation(); handleStartRename(i, ch.title); }}
-                  title="Renommer"
-                >
-                  ✎
-                </button>
-                {chapters.length > 1 && (
-                  <button
-                    className="chapter-action-btn chapter-delete-btn"
-                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteIndex(i); }}
-                    title="Supprimer"
-                  >
-                    ✕
-                  </button>
-                )}
+                <div className="chapter-info">
+                  <div className="chapter-title-row">
+                    <span className="chapter-number">{chapterNumber(ch.title) || `Ch. ${i + 1}`}</span>
+                    <span className="chapter-title-text" title="Double-cliquez pour renommer">
+                      {shortTitle(ch.title)}
+                    </span>
+                  </div>
+                  <span className="chapter-meta">
+                    {ch.blocks.reduce((s, b) => s + b.content.split(/\s+/).filter(Boolean).length, 0)} mots
+                  </span>
+                </div>
+
+                {/* Visible Actions: Edit & Delete */}
+                <div className="chapter-item-actions" onClick={(e) => e.stopPropagation()}>
+                  {confirmDeleteIndex === i ? (
+                    <div className="chapter-delete-confirm">
+                      <button
+                        className="btn-confirm-no"
+                        onClick={() => setConfirmDeleteIndex(null)}
+                      >
+                        Non
+                      </button>
+                      <button
+                        className="btn-confirm-yes"
+                        onClick={() => handleDelete(i)}
+                      >
+                        Oui
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        className="chapter-action-btn chapter-edit-btn"
+                        onClick={() => handleStartRename(i, ch.title)}
+                        title="Renommer le chapitre"
+                      >
+                        ✏️
+                      </button>
+                      {chapters.length > 1 && (
+                        <button
+                          className="chapter-action-btn chapter-delete-btn"
+                          onClick={() => setConfirmDeleteIndex(i)}
+                          title="Supprimer le chapitre"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
