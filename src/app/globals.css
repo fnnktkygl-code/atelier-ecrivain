@@ -672,7 +672,66 @@ body.night .bottom-sheet {
   flex: 1;
   min-height: 0;
   overflow-y: auto !important;
-  padding: 20px 16px;
+  padding: 20px 16px 140px 16px !important;
+}
+
+.sidebar-record-area {
+  flex-shrink: 0 !important;
+  margin-top: auto;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface) !important;
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.manuscript-card {
+  overflow: visible !important;
+  position: relative;
+}
+
+.manuscript-header {
+  overflow: visible !important;
+  position: relative;
+}
+
+.manuscript-body {
+  overflow: visible !important;
+}
+
+.chapter-rows {
+  overflow: visible !important;
+}
+
+.chapter-row {
+  overflow: visible !important;
+  position: relative;
+}
+
+.kebab-wrap {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.kebab-menu {
+  position: absolute;
+  right: 34px;
+  top: -4px;
+  z-index: 999999 !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  min-width: 140px;
+  display: none;
+  flex-direction: column;
+  padding: 4px;
 }
 
 .atelier-main {
@@ -2382,13 +2441,13 @@ body.night .bottom-sheet {
 
 .kebab-menu {
   position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 9999;
-  background: var(--surface);
+  right: 34px;
+  top: -4px;
+  z-index: 999999 !important;
+  background: var(--surface) !important;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
   min-width: 140px;
   display: none;
   flex-direction: column;
@@ -2396,7 +2455,7 @@ body.night .bottom-sheet {
 }
 
 .kebab-menu.show {
-  display: flex;
+  display: flex !important;
 }
 
 .kebab-menu button {
