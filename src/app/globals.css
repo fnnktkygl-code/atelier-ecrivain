@@ -1702,6 +1702,32 @@ body.night .bottom-sheet {
 
 
 /* ═══════════════════════════════════════════════════════════════
+   Chapter Drawer Unified Button
+   ═══════════════════════════════════════════════════════════════ */
+.chapter-drawer-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  color: var(--text);
+  padding: 6px 12px;
+  height: 38px;
+  border-radius: 10px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.chapter-drawer-toggle-btn:hover {
+  background: var(--hover, rgba(0, 0, 0, 0.08));
+  border-color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Mobile Typography & Layout Adjustments
    ═══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
@@ -1736,26 +1762,36 @@ body.night .bottom-sheet {
   .review-text-strike, .review-text-new { font-size: 16px; }
   .review-explanation { font-size: 14px; }
   .note-textarea { font-size: 16px; }
-  .manuscript-block h3 { font-size: 18px; }
-  .manuscript-paragraph { font-size: 18px; line-height: 1.6; }
+  .manuscript-block h3 { font-size: 20px; font-weight: 600; }
+  .manuscript-paragraph { font-size: 19px; line-height: 1.7; }
   
   /* Atelier / Editor Specific Mobile Typography */
-  .editor-block textarea { font-size: 18px !important; line-height: 1.6 !important; }
-  .editor-toolbar-title { font-size: 16px; font-weight: bold; }
+  .editor-block textarea { font-size: 19px !important; line-height: 1.7 !important; }
+  .editor-toolbar-title { font-size: 17px; font-weight: 600; }
   .editor-toolbar { padding: 10px; flex-wrap: wrap; }
-  .chapter-name { font-size: 16px; }
-  .chapter-number { font-size: 14px; }
+  .chapter-name { font-size: 17px; }
+  .chapter-number { font-size: 15px; }
   .sidebar-record-area .dictation-summary { font-size: 16px; }
   .insertion-indicator { font-size: 14px; }
   
   /* Liseuse Mobile Typography */
-  .col-title { font-size: 26px; }
-  .col-chapter p { font-size: 18px; line-height: 1.7; }
-  .liseuse-hud .page-info { font-size: 14px; }
+  .col-title { font-size: 26px; font-weight: 700; }
+  .col-chapter p { font-size: 19px; line-height: 1.85; }
+  .liseuse-hud .page-info { font-size: 15px; }
 
   /* Increase padding for better touch targets */
   .action-card { padding: 24px 20px; }
-  button { min-height: 44px; }
+  button { min-height: 40px; }
   .btn-primary, .btn-secondary, .btn-ghost { font-size: 16px; padding: 12px 20px; }
+}
+
+@media (max-width: 520px) {
+  .toggle-btn-label {
+    display: none;
+  }
+  .chapter-drawer-toggle-btn {
+    padding: 6px 10px;
+    height: 36px;
+  }
 }
   /* Mobile Sidebar Buttons always visible */

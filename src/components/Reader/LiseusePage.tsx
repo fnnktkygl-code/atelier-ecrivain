@@ -117,7 +117,7 @@ interface ReaderSettings {
 }
 
 const DEFAULT_SETTINGS: ReaderSettings = {
-  fontSize: 18,
+  fontSize: 19,
   fontFamily: "'Source Serif 4', Georgia, serif",
   lineHeight: 1.85,
   theme: 'light',
@@ -798,27 +798,45 @@ export default function LiseusePage() {
           orphans:2; widows:2;
         }
 
-        .iconbtn-liseuse { background:none; border:1px solid currentColor; color:inherit; width:28px; height:28px; min-width:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:.7; font-size:13px; transition:opacity .2s; }
-        .iconbtn-liseuse:hover { opacity:1; }
-        .iconbtn-liseuse.active { opacity:1; background:rgba(138,90,52,0.16); }
+        .iconbtn-liseuse {
+          background: var(--surface-2, rgba(0,0,0,0.05));
+          border: 1px solid var(--border, rgba(0,0,0,0.12));
+          color: var(--text);
+          width: 36px;
+          height: 36px;
+          min-width: 36px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          opacity: 0.85;
+          font-size: 15px;
+          flex-shrink: 0;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .iconbtn-liseuse:hover { opacity: 1; background: var(--hover, rgba(0,0,0,0.08)); }
+        .iconbtn-liseuse.active { opacity: 1; background: var(--accent); color: #fff; border-color: var(--accent); }
 
         @media (max-width:768px) {
-          .col-viewport { padding:28px 28px 44px; }
-          .col-title { font-size:18px !important; }
-          .nav-arrow { width:36px; height:36px; font-size:16px; }
-          .nav-arrow.left { left:6px; }
-          .nav-arrow.right { right:6px; }
-          .page-footer-overlay { padding:8px 28px 10px; }
-          .progress-wrap { padding:6px 28px; }
-          .scroll-inner { padding:28px 28px 60px; }
-          .scroll-chapter .col-title { font-size:18px !important; }
-          .toc-drawer { width:280px; }
+          .col-viewport { padding: 24px 20px 40px; }
+          .col-title { font-size: 24px !important; font-weight: 700 !important; }
+          .col-chapter p { font-size: 19px !important; line-height: 1.85 !important; }
+          .nav-arrow { width: 40px; height: 40px; font-size: 18px; }
+          .nav-arrow.left { left: 8px; }
+          .nav-arrow.right { right: 8px; }
+          .page-footer-overlay { padding: 10px 20px 12px; }
+          .progress-wrap { padding: 8px 20px; font-size: 14px; }
+          .scroll-inner { padding: 28px 20px 60px; }
+          .scroll-chapter .col-title { font-size: 24px !important; font-weight: 700 !important; }
+          .toc-drawer { width: 310px; max-width: 85vw; }
         }
         @media (max-width:520px) {
-          .col-viewport { padding:20px 20px 36px; }
-          .page-footer-overlay { padding:8px 20px 10px; }
-          .progress-wrap { padding:6px 20px; }
-          .scroll-inner { padding:20px 20px 48px; }
+          .col-viewport { padding: 20px 16px 36px; }
+          .page-footer-overlay { padding: 8px 16px 10px; }
+          .progress-wrap { padding: 6px 16px; }
+          .scroll-inner { padding: 20px 16px 48px; }
         }
       `}</style>
 
@@ -859,7 +877,14 @@ export default function LiseusePage() {
 
       <div className="liseuse-wrap">
         <div className="liseuse-topbar">
-          <div className="brand" style={{ cursor: 'pointer' }} onClick={() => setShowToc(true)}>☰ L&apos;Atelier de l&apos;Écrivain</div>
+          <button
+            className="chapter-drawer-toggle-btn"
+            onClick={() => setShowToc(true)}
+            title="Table des matières / Chapitres"
+          >
+            <span style={{ fontSize: 16 }}>📑</span>
+            <span className="toggle-btn-label">Chapitres</span>
+          </button>
           <div className="controls">
             {/* Font size quick controls */}
             <div className="font-controls">
@@ -870,10 +895,6 @@ export default function LiseusePage() {
             {/* Settings */}
             <button className="iconbtn-liseuse" onClick={() => setShowSettings(!showSettings)} title="Paramètres de lecture">
               ⚙️
-            </button>
-            {/* TOC */}
-            <button className="iconbtn-liseuse" onClick={() => setShowToc(true)} title="Table des matières">
-              📑
             </button>
             {/* View mode */}
             <button

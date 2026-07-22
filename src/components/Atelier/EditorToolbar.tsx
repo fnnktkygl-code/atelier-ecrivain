@@ -74,12 +74,12 @@ export default function EditorToolbar({
       <div className="editor-toolbar-left" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         {onToggleSidebar && (
           <button
-            className="btn-icon mobile-only-toggle"
+            className="chapter-drawer-toggle-btn mobile-only-toggle"
             onClick={onToggleSidebar}
             title="Afficher les chapitres"
-            style={{ width: 36, height: 36, fontSize: 20 }}
           >
-            ☰
+            <span style={{ fontSize: 16 }}>📑</span>
+            <span className="toggle-btn-label">Chapitres</span>
           </button>
         )}
         <span className="editor-toolbar-title">{chapterTitle}</span>
