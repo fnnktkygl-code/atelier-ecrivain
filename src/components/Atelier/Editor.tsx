@@ -102,7 +102,7 @@ export default function Editor({
     setDragOverIndex(null);
   }, [dragFromIndex, dragOverIndex, chapterIndex, dispatch]);
 
-  if (!chapter || chapter.blocks.length === 0 || (chapter.blocks.length === 1 && chapter.blocks[0].content === '')) {
+  if (!chapter || chapter.blocks.length === 0) {
     return (
       <div className="editor-empty">
         <div className="empty-state">
@@ -114,13 +114,11 @@ export default function Editor({
             <button
               className="btn btn-primary"
               onClick={() => {
-                if (chapter.blocks.length === 0) {
-                  dispatch({ type: 'ADD_BLOCK', chapterIndex, afterBlockId: null });
-                }
+                dispatch({ type: 'ADD_BLOCK', chapterIndex, afterBlockId: null });
                 setTimeout(() => {
                   const firstBlock = document.querySelector('.editor-block textarea') as HTMLTextAreaElement;
                   if (firstBlock) firstBlock.focus();
-                }, 100);
+                }, 50);
               }}
             >
               <span>✍️</span> Écrire
