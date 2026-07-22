@@ -662,7 +662,16 @@ body.night .bottom-sheet {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.chapter-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto !important;
   padding: 20px 16px;
 }
 
@@ -1887,17 +1896,70 @@ body.night .bottom-sheet {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIDEBAR ENHANCEMENTS
+   SIDEBAR ENHANCEMENTS & POPUP OVERLAYS
    ═══════════════════════════════════════════════════════════════ */
 
 .sidebar-record-area {
+  flex-shrink: 0 !important;
   margin-top: auto;
-  padding-top: 16px;
+  padding: 16px;
   border-top: 1px solid var(--border);
+  background: var(--surface) !important;
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
+}
+
+.manuscript-card {
+  overflow: visible !important;
+  position: relative;
+}
+
+.manuscript-header {
+  overflow: visible !important;
+  position: relative;
+}
+
+.manuscript-body {
+  overflow: visible !important;
+}
+
+.chapter-rows {
+  overflow: visible !important;
+}
+
+.chapter-row {
+  overflow: visible !important;
+  position: relative;
+}
+
+.kebab-wrap {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.kebab-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 999999 !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  min-width: 150px;
+  display: none;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.kebab-menu.show {
+  display: flex !important;
 }
 
 .insertion-indicator {
