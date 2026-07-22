@@ -136,7 +136,6 @@ export async function transcribeAudio(
   return generateWithFallback(
     {
       responseMimeType: 'application/json',
-      temperature: 0.3,
       maxOutputTokens: 8192,
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
@@ -177,7 +176,6 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
   return generateWithFallback(
     {
       responseMimeType: 'application/json',
-      temperature: 0.2,
       maxOutputTokens: 4096,
     },
     SYSTEM_PROMPT_FACTCHECK,
@@ -222,7 +220,6 @@ export async function transcribeAudioStream(
   return generateWithFallback(
     {
       responseMimeType: 'application/json',
-      temperature: 0.3,
       maxOutputTokens: 8192,
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
