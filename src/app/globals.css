@@ -276,10 +276,9 @@ body.night .card-glass {
   gap: 8px;
   padding: 10px 20px;
   border-radius: var(--radius-full);
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.03em;
   cursor: pointer;
   border: none;
   transition: all var(--transition-fast);
@@ -1688,9 +1687,10 @@ body.night .bottom-sheet {
 
 .chapter-title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-width: 0;
+  width: 100%;
 }
 
 .chapter-number {
@@ -1703,6 +1703,7 @@ body.night .bottom-sheet {
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .chapter-title-text {
@@ -1710,9 +1711,10 @@ body.night .bottom-sheet {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
   flex: 1;
 }
 

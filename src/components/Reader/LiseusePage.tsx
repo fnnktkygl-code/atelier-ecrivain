@@ -844,36 +844,51 @@ export default function LiseusePage() {
       {/* ── TOC Drawer ── */}
       <div className={`toc-overlay ${showToc ? 'open' : ''}`} onClick={() => setShowToc(false)} />
       <div className={`toc-drawer ${showToc ? 'open' : ''}`}>
-        <button className="toc-close" onClick={() => setShowToc(false)}>×</button>
-        <h3 className="toc-title">📑 Table des matières</h3>
-        {chapters.map((ch: any, ci: number) => {
-          const title = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
-          return (
-            <div
-              key={ci}
-              className={`toc-item ${ci === currentChapterIndex ? 'active' : ''}`}
-              onClick={() => {
-                if (!scrollMode) {
-                  const flow = colFlowRef.current;
-                  if (flow && colWidthPx > 0) {
-                    const chEl = flow.querySelector(`[data-chapter="${ci}"]`) as HTMLElement;
-                    if (chEl) {
-                      const page = Math.round(chEl.offsetLeft / (colWidthPx + COLUMN_GAP));
-                      setCurrentPage(page);
+        <div className="chapter-list-header">
+          <div className="chapter-list-title-group">
+            <h3 className="sidebar-section-title">📑 Table des matières</h3>
+            <span className="chapter-count-badge">{chapters.length}</span>
+          </div>
+          <button className="sidebar-close-btn" onClick={() => setShowToc(false)} title="Fermer le menu">
+            ✕
+          </button>
+        </div>
+
+        <div className="chapter-items">
+          {chapters.map((ch: any, ci: number) => {
+            const title = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
+            const chNum = ch.title.match(/chapitre\s*(\d+)/i)?.[1] || `${ci + 1}`;
+            return (
+              <div
+                key={ci}
+                className={`chapter-list-item ${ci === currentChapterIndex ? 'active' : ''}`}
+                onClick={() => {
+                  if (!scrollMode) {
+                    const flow = colFlowRef.current;
+                    if (flow && colWidthPx > 0) {
+                      const chEl = flow.querySelector(`[data-chapter="${ci}"]`) as HTMLElement;
+                      if (chEl) {
+                        const page = Math.round(chEl.offsetLeft / (colWidthPx + COLUMN_GAP));
+                        setCurrentPage(page);
+                      }
                     }
+                  } else {
+                    const chEl = document.querySelector(`.scroll-chapter[data-chapter="${ci}"]`);
+                    chEl?.scrollIntoView({ behavior: 'smooth' });
                   }
-                } else {
-                  const chEl = document.querySelector(`.scroll-chapter[data-chapter="${ci}"]`);
-                  chEl?.scrollIntoView({ behavior: 'smooth' });
-                }
-                setShowToc(false);
-              }}
-            >
-              <span className="toc-item-number">{ci + 1}</span>
-              <span className="toc-item-title">{title}</span>
-            </div>
-          );
-        })}
+                  setShowToc(false);
+                }}
+              >
+                <div className="chapter-info">
+                  <div className="chapter-title-row">
+                    <span className="chapter-number">Ch. {chNum}</span>
+                    <span className="chapter-title-text">{title}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="liseuse-wrap">
