@@ -205,6 +205,11 @@ export default function AtelierPage() {
               {ds.summary && ds.phase === 'complete' && (
                 <div className="dictation-summary">
                   ✨ {ds.summary}
+                  {ds.usedModel && (
+                    <span className="dictation-model-badge" title={`Modèle IA utilisé : ${ds.usedModel}`}>
+                      • {ds.usedModel}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

@@ -35,6 +35,7 @@ interface TranscriptionResult {
   notes: Record<string, string>;
   floatingNotes: string[];
   summary: string;
+  modelUsed?: string;
 }
 
 /**
@@ -72,7 +73,7 @@ async function generateWithFallback<T>(
   generationConfig: any,
   systemInstruction: string,
   execute: (model: any, modelName: string) => Promise<T>
-): Promise<T> {
+): Promise<{ result: T; modelUsed: string }> {
   const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
   const app = getFirebaseApp();
   const ai = getAI(app, { backend: new GoogleAIBackend() });
@@ -87,7 +88,8 @@ async function generateWithFallback<T>(
         systemInstruction,
       });
 
-      return await execute(model, modelName);
+      const res = await execute(model, modelName);
+      return { result: res, modelUsed: modelName };
     } catch (err: any) {
       lastError = err;
       const errMsg = err?.message || String(err);
@@ -133,7 +135,7 @@ export async function transcribeAudio(
     contextPrompt += ` Voici le contexte du texte précédent pour maintenir la cohérence : « ${context.previousContent.slice(-500)} »`;
   }
 
-  return generateWithFallback(
+  const { result, modelUsed } = await generateWithFallback(
     {
       responseMimeType: 'application/json',
       maxOutputTokens: 8192,
@@ -141,7 +143,7 @@ export async function transcribeAudio(
     SYSTEM_PROMPT_TRANSCRIPTION,
     async (model, modelName) => {
       console.log(`[AI Dictation] Exécution avec le modèle : ${modelName}`);
-      const result = await model.generateContent([
+      const apiResult = await model.generateContent([
         contextPrompt,
         {
           inlineData: {
@@ -151,7 +153,7 @@ export async function transcribeAudio(
         },
       ]);
 
-      const responseText = result.response.text();
+      const responseText = apiResult.response.text();
       try {
         return JSON.parse(responseText) as TranscriptionResult;
       } catch {
@@ -163,6 +165,8 @@ export async function transcribeAudio(
       }
     }
   );
+
+  return { ...result, modelUsed };
 }
 
 /**
@@ -173,7 +177,7 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
     throw new Error('Firebase n\'est pas configuré.');
   }
 
-  return generateWithFallback(
+  const { result } = await generateWithFallback(
     {
       responseMimeType: 'application/json',
       maxOutputTokens: 4096,
@@ -181,10 +185,10 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
     SYSTEM_PROMPT_FACTCHECK,
     async (model, modelName) => {
       console.log(`[AI FactCheck] Exécution avec le modèle : ${modelName}`);
-      const result = await model.generateContent(
+      const apiResult = await model.generateContent(
         `Vérifie les faits dans ce passage de manuscrit :\n\n${text}`
       );
-      const responseText = result.response.text();
+      const responseText = apiResult.response.text();
       try {
         return JSON.parse(responseText) as VerificationItem[];
       } catch {
@@ -196,6 +200,8 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
       }
     }
   );
+
+  return result;
 }
 
 /**
@@ -217,7 +223,7 @@ export async function transcribeAudioStream(
     contextPrompt += ` Chapitre en cours : ${context.currentChapter + 1}.`;
   }
 
-  return generateWithFallback(
+  const { result, modelUsed } = await generateWithFallback(
     {
       responseMimeType: 'application/json',
       maxOutputTokens: 8192,
@@ -225,7 +231,7 @@ export async function transcribeAudioStream(
     SYSTEM_PROMPT_TRANSCRIPTION,
     async (model, modelName) => {
       console.log(`[AI Stream] Exécution avec le modèle : ${modelName}`);
-      const result = await model.generateContentStream([
+      const streamResult = await model.generateContentStream([
         contextPrompt,
         {
           inlineData: {
@@ -236,7 +242,7 @@ export async function transcribeAudioStream(
       ]);
 
       let fullText = '';
-      for await (const chunk of result.stream) {
+      for await (const chunk of streamResult.stream) {
         const chunkText = chunk.text();
         fullText += chunkText;
         onChunk(fullText);
@@ -253,6 +259,8 @@ export async function transcribeAudioStream(
       }
     }
   );
+
+  return { ...result, modelUsed };
 }
 
 /**

@@ -34,6 +34,7 @@ export interface DictationState {
   isNewChapter: boolean;
   chapterTitle: string | null;
   firebaseConfigured: boolean;
+  usedModel?: string | null;
 }
 
 export function useDictation(currentChapterIndex: number) {
@@ -48,6 +49,7 @@ export function useDictation(currentChapterIndex: number) {
     isNewChapter: false,
     chapterTitle: null,
     firebaseConfigured: false,
+    usedModel: null,
   });
 
   const recorderRef = useRef<AudioRecorder | null>(null);
@@ -100,6 +102,7 @@ export function useDictation(currentChapterIndex: number) {
                 floatingNotes: [],
               },
               summary: 'Mode démonstration — Firebase non configuré',
+              usedModel: 'demo',
             }));
           }, 1500);
           return;
@@ -118,6 +121,7 @@ export function useDictation(currentChapterIndex: number) {
             summary: result.summary,
             isNewChapter: result.isNewChapter,
             chapterTitle: result.chapterTitle,
+            usedModel: result.modelUsed,
           }));
         } catch (err) {
           setState((prev) => ({
