@@ -261,19 +261,29 @@ export default function AtelierPage() {
               {ds.phase === 'recording' && (
                 <>
                   <span style={{ fontWeight: 600 }}>🔴 Enregistrement… {dictation.formatTime(ds.duration)}</span>
-                  <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto' }}>
-                    ⏹ Terminer
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                    <button className="btn btn-ghost" onClick={dictation.pauseRecording} style={{ fontSize: 12, padding: '4px 10px' }}>⏸ Pause</button>
+                    <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px' }}>⏹ Terminer</button>
+                    <button className="btn btn-secondary" onClick={dictation.cancelRecording} style={{ fontSize: 12, padding: '4px 12px', borderColor: '#e53e3e', color: '#e53e3e' }}>❌ Annuler</button>
+                  </div>
                 </>
               )}
               {ds.phase === 'paused' && (
                 <>
-                  <span style={{ fontWeight: 600 }}>⏸ En pause</span>
-                  <button className="btn btn-ghost" onClick={dictation.resumeRecording} style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto' }}>▶️ Reprendre</button>
-                  <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px' }}>⏹ Terminer</button>
+                  <span style={{ fontWeight: 600 }}>⏸ En pause ({dictation.formatTime(ds.duration)})</span>
+                  <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                    <button className="btn btn-ghost" onClick={dictation.resumeRecording} style={{ fontSize: 12, padding: '4px 10px' }}>▶️ Reprendre</button>
+                    <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px' }}>⏹ Terminer</button>
+                    <button className="btn btn-secondary" onClick={dictation.cancelRecording} style={{ fontSize: 12, padding: '4px 12px', borderColor: '#e53e3e', color: '#e53e3e' }}>❌ Annuler</button>
+                  </div>
                 </>
               )}
-              {ds.phase === 'processing' && <span style={{ fontWeight: 600 }}>⚙️ Gemini analyse la dictée…</span>}
+              {ds.phase === 'processing' && (
+                <>
+                  <span style={{ fontWeight: 600 }}>⚙️ Gemini analyse la dictée…</span>
+                  <button className="btn btn-secondary" onClick={dictation.cancelRecording} style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto', borderColor: '#e53e3e', color: '#e53e3e' }}>❌ Annuler</button>
+                </>
+              )}
               {ds.phase === 'error' && <span style={{ fontWeight: 600, color: '#c0392b' }}>❌ {ds.error}</span>}
             </div>
           )}

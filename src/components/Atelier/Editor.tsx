@@ -167,31 +167,6 @@ export default function Editor({
           totalBlocks={chapter.blocks.length}
         />
       ))}
-
-      {/* Bottom quick actions */}
-      <div className="editor-bottom-actions">
-        <button
-          className="btn-editor-action"
-          onClick={() => {
-            const lastBlock = chapter.blocks[chapter.blocks.length - 1];
-            if (lastBlock) handleInsertAfter(lastBlock.id);
-          }}
-        >
-          ＋ Paragraphe
-        </button>
-        {onStartDictation && (
-          <button
-            className="btn-editor-action dictation"
-            onClick={() => {
-              handleSetInsertionPoint(chapter.blocks.length - 1);
-              onStartDictation();
-            }}
-            disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
-          >
-            🎙️ Dicter à la fin
-          </button>
-        )}
-      </div>
     </div>
   );
 }
