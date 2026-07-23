@@ -15,6 +15,8 @@ interface AuthContextType {
   avatarColor: string;
   avatarUrl: string;
   showEmail: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   signIn: () => Promise<void>;
   logOut: () => Promise<void>;
   selectManuscript: (m: ManuscriptMeta) => void;
@@ -36,6 +38,8 @@ const AuthContext = createContext<AuthContextType>({
   avatarColor: '',
   avatarUrl: '',
   showEmail: true,
+  authError: null,
+  clearAuthError: () => {},
   signIn: async () => {},
   logOut: async () => {},
   selectManuscript: () => {},
@@ -61,6 +65,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [avatarColor, setAvatarColor] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [showEmailState, setShowEmailState] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   const refreshManuscripts = useCallback(async () => {
     if (!user) return;
@@ -104,18 +113,19 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async () => {
+    setAuthError(null);
     try {
       await signInWithGoogle();
     } catch (err: any) {
       console.error('Sign-in error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
-        alert('La fenêtre de connexion a été fermée avant la fin.');
+        setAuthError('La fenêtre de connexion a été fermée avant la fin.');
       } else if (err.code === 'auth/unauthorized-domain') {
-        alert("Erreur: Ce domaine n'est pas autorisé dans la configuration Firebase (Authorized domains).");
+        setAuthError("Ce domaine n'est pas autorisé dans la configuration Firebase (Authorized domains).");
       } else if (err.code === 'auth/web-storage-unsupported') {
-        alert("Erreur: Les cookies tiers sont bloqués (fréquent en navigation privée). Veuillez les autoriser pour vous connecter.");
+        setAuthError("Les cookies tiers sont bloqués (fréquent en navigation privée). Veuillez les autoriser pour vous connecter.");
       } else {
-        alert(`Erreur de connexion: ${err.message || 'Erreur inconnue'}`);
+        setAuthError(`Erreur de connexion: ${err.message || 'Erreur inconnue'}`);
       }
     }
   };
@@ -181,7 +191,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, manuscript, manuscripts, penName: penNameState, avatarColor, avatarUrl, showEmail: showEmailState, signIn, logOut, selectManuscript, addManuscript, createManuscript: addManuscript, deleteManuscript: deleteManuscriptHandler, refreshManuscripts, updatePenName, renameManuscript, updateProfileSettings: updateProfileSettingsHandler }}>
+    <AuthContext.Provider value={{ user, loading, manuscript, manuscripts, penName: penNameState, avatarColor, avatarUrl, showEmail: showEmailState, authError, clearAuthError, signIn, logOut, selectManuscript, addManuscript, createManuscript: addManuscript, deleteManuscript: deleteManuscriptHandler, refreshManuscripts, updatePenName, renameManuscript, updateProfileSettings: updateProfileSettingsHandler }}>
       {children}
     </AuthContext.Provider>
   );

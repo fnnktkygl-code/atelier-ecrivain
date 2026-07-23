@@ -3,7 +3,7 @@
 import { useAuth } from './AuthProvider';
 
 export default function LoginPage() {
-  const { signIn, loading } = useAuth();
+  const { signIn, loading, authError, clearAuthError } = useAuth();
 
   const features = [
     {
@@ -210,6 +210,41 @@ export default function LoginPage() {
 
         {/* ── CTA ── */}
         <div className="landing-cta">
+          {authError && (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: '10px 16px',
+                borderRadius: '8px',
+                background: 'rgba(229, 62, 62, 0.1)',
+                border: '1px solid rgba(229, 62, 62, 0.3)',
+                color: '#e53e3e',
+                fontSize: 13,
+                fontFamily: 'var(--font-sans)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                maxWidth: 420,
+                margin: '0 auto 16px',
+              }}
+            >
+              <span>⚠️ {authError}</span>
+              <button
+                onClick={clearAuthError}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#e53e3e',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <button
             className="landing-google-btn"
             onClick={signIn}

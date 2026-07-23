@@ -69,20 +69,31 @@ function applyHighlights(html: string, highlights: Highlight[]): string {
   return result;
 }
 
+function escapeHTML(str: string): string {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function renderParagraph(raw: string): string {
   const p = (raw || '').trim();
   if (!p) return '';
   if (p.startsWith('>')) {
-    const content = p.replace(/^>\s*/, '');
+    const content = escapeHTML(p.replace(/^>\s*/, ''));
     return `<blockquote>${linkNotes(content)}</blockquote>`;
   }
   if (p.startsWith('## ')) {
-    return `<h3>${linkNotes(p.replace(/^##\s*/, ''))}</h3>`;
+    const content = escapeHTML(p.replace(/^##\s*/, ''));
+    return `<h3>${linkNotes(content)}</h3>`;
   }
   if (p.startsWith('# ')) {
-    return `<h2>${linkNotes(p.replace(/^#\s*/, ''))}</h2>`;
+    const content = escapeHTML(p.replace(/^#\s*/, ''));
+    return `<h2>${linkNotes(content)}</h2>`;
   }
-  return `<p>${linkNotes(p)}</p>`;
+  return `<p>${linkNotes(escapeHTML(p))}</p>`;
 }
 
 function buildAllHTML(chapters: any[], highlights: Highlight[]): string {

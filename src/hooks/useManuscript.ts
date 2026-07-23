@@ -166,7 +166,10 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
       const curIdx = ch.blocks.findIndex((b) => b.id === action.blockId);
       if (prevIdx === -1 || curIdx === -1) return state;
       const blocks = [...ch.blocks];
-      const mergedContent = blocks[prevIdx].content + blocks[curIdx].content;
+      const p1 = blocks[prevIdx].content || '';
+      const p2 = blocks[curIdx].content || '';
+      const needsSpace = p1 && p2 && !/\s$/.test(p1) && !/^\s/.test(p2) && !/[.,!?;:]$/.test(p1);
+      const mergedContent = p1 + (needsSpace ? ' ' : '') + p2;
       blocks[prevIdx] = { ...blocks[prevIdx], content: mergedContent };
       blocks.splice(curIdx, 1);
       ch.blocks = blocks;
@@ -386,6 +389,7 @@ export function useManuscript() {
 
   // Reload chapters whenever the active manuscript changes
   useEffect(() => {
+    let cancelled = false;
     let loaded = false;
     let targetState: ManuscriptState | null = null;
 
@@ -403,38 +407,24 @@ export function useManuscript() {
       // Ignore
     }
 
-    // 2. Fallback to generic storage key if default
-    if (!loaded && currentManuscriptId === 'default') {
-      try {
-        const savedDefault = localStorage.getItem(STORAGE_KEY);
-        if (savedDefault) {
-          const parsed = JSON.parse(savedDefault) as ManuscriptState;
-          if (parsed.chapters && parsed.chapters.length > 0) {
-            targetState = parsed;
-            loaded = true;
-          }
-        }
-      } catch {}
-    }
-
-    if (loaded && targetState) {
+    if (loaded && targetState && !cancelled) {
       dispatch({ type: 'LOAD_STATE', state: targetState });
       try {
         localStorage.setItem(currentStorageKey, JSON.stringify(targetState));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(targetState));
         window.dispatchEvent(
           new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
         );
       } catch {}
     }
 
-    // 3. Fallback to Firestore if logged in and not yet loaded locally
+    // 2. Fallback to Firestore if logged in and not yet loaded locally
     if (!loaded && user && manuscript?.id) {
       getChapters(user.uid, manuscript.id)
         .then((fsChapters) => {
+          if (cancelled) return;
           if (fsChapters && fsChapters.length > 0) {
             const editableChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
-              id: `ch-${idx}`,
+              id: ch.id || `ch-${idx}`,
               title: ch.title || `Chapitre ${idx + 1}`,
               blocks: (ch.paragraphs || []).map((p) => ({
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -457,7 +447,6 @@ export function useManuscript() {
             dispatch({ type: 'LOAD_STATE', state: newState });
             try {
               localStorage.setItem(currentStorageKey, JSON.stringify(newState));
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
               window.dispatchEvent(
                 new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
               );
@@ -490,7 +479,6 @@ export function useManuscript() {
             dispatch({ type: 'LOAD_STATE', state: freshState });
             try {
               localStorage.setItem(currentStorageKey, JSON.stringify(freshState));
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(freshState));
               window.dispatchEvent(
                 new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
               );
@@ -499,7 +487,11 @@ export function useManuscript() {
         })
         .catch(() => {});
     }
-  }, [currentManuscriptId, user, manuscript?.id]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentManuscriptId, currentStorageKey, user, manuscript?.id]);
 
   // Keep a ref to the latest state for unmount saving
   const stateRef = useRef(state);
@@ -512,7 +504,6 @@ export function useManuscript() {
     // 1. Save IMMEDIATELY to localStorage and notify all listeners (Liseuse, etc.)
     try {
       localStorage.setItem(currentStorageKey, JSON.stringify(state));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       window.dispatchEvent(
         new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
       );
@@ -542,7 +533,6 @@ export function useManuscript() {
       if (stateRef.current.isDirty) {
         try {
           localStorage.setItem(currentStorageKey, JSON.stringify(stateRef.current));
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
           window.dispatchEvent(
             new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
           );

@@ -142,7 +142,9 @@ export async function transcribeAudio(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     async (model, modelName) => {
-      console.log(`[AI Dictation] Exécution avec le modèle : ${modelName}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[AI Dictation] Exécution avec le modèle : ${modelName}`);
+      }
       const apiResult = await model.generateContent([
         contextPrompt,
         {
@@ -184,7 +186,9 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
     },
     SYSTEM_PROMPT_FACTCHECK,
     async (model, modelName) => {
-      console.log(`[AI FactCheck] Exécution avec le modèle : ${modelName}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[AI FactCheck] Exécution avec le modèle : ${modelName}`);
+      }
       const apiResult = await model.generateContent(
         `Vérifie les faits dans ce passage de manuscrit :\n\n${text}`
       );
@@ -230,7 +234,9 @@ export async function transcribeAudioStream(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     async (model, modelName) => {
-      console.log(`[AI Stream] Exécution avec le modèle : ${modelName}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[AI Stream] Exécution avec le modèle : ${modelName}`);
+      }
       const streamResult = await model.generateContentStream([
         contextPrompt,
         {

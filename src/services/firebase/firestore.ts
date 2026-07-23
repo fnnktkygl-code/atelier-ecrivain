@@ -36,6 +36,7 @@ export interface ManuscriptMeta {
 }
 
 export interface ChapterData {
+  id?: string;
   title: string;
   paragraphs: string[];
   order: number;
@@ -79,12 +80,12 @@ export async function getChapters(uid: string, manuscriptId: string): Promise<Ch
     orderBy('order')
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as ChapterData);
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
 }
 
-export async function saveChapter(uid: string, manuscriptId: string, chapterIdx: number, chapter: ChapterData): Promise<void> {
+export async function saveChapter(uid: string, manuscriptId: string, chapterId: string, chapter: ChapterData): Promise<void> {
   const db = getDb();
-  const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${chapterIdx}`);
+  const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', chapterId);
   await setDoc(ref, chapter);
   // Update manuscript timestamp
   const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
@@ -94,18 +95,33 @@ export async function saveChapter(uid: string, manuscriptId: string, chapterIdx:
 export async function saveAllChapters(
   uid: string,
   manuscriptId: string,
-  chapters: { title: string; blocks: { content: string }[] }[]
+  chapters: { id?: string; title: string; blocks: { content: string }[] }[]
 ): Promise<void> {
   const db = getDb();
+  const chaptersCol = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
+  
+  // 1. Fetch existing chapter docs in Firestore to clean up orphaned deleted chapters
+  const existingSnap = await getDocs(chaptersCol);
+  
   const batch = writeBatch(db);
+  const currentDocIds = new Set<string>();
 
   chapters.forEach((ch, idx) => {
-    const chRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${idx}`);
+    const docId = ch.id || `ch-${idx}`;
+    currentDocIds.add(docId);
+    const chRef = doc(chaptersCol, docId);
     batch.set(chRef, {
       title: ch.title,
       paragraphs: ch.blocks.map((b) => b.content || ''),
       order: idx,
     });
+  });
+
+  // 2. Delete orphaned docs
+  existingSnap.docs.forEach((docSnap) => {
+    if (!currentDocIds.has(docSnap.id)) {
+      batch.delete(docSnap.ref);
+    }
   });
 
   const totalWords = chapters.reduce(
@@ -118,7 +134,7 @@ export async function saveAllChapters(
     0
   );
 
-  const mRef = doc(doc(db, 'users', uid, 'manuscripts', manuscriptId).path ? db : db, 'users', uid, 'manuscripts', manuscriptId);
+  const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
   batch.set(mRef, { updatedAt: serverTimestamp(), wordCount: totalWords }, { merge: true });
 
   await batch.commit();
