@@ -138,10 +138,16 @@ function ReviewItem({
       {/* Original text */}
       {review.original && (
         <div className="review-original">
-          <span className="review-label">Original :</span>
-          <span className="review-text-strike">{review.original}</span>
+          <span className="label">Original : </span>
+          <span className="text">{review.original}</span>
         </div>
       )}
+
+      {/* Verification Notice */}
+      <div style={{ fontSize: 10.5, color: 'var(--text-soft)', marginTop: 6, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span>ℹ️</span>
+        <span>Généré par IA — À valider auprès des textes et sources d&apos;origine.</span>
+      </div>
 
       {/* Suggestion */}
       <div className="review-suggestion">
