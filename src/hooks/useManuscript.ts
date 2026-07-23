@@ -524,32 +524,49 @@ export function useManuscript() {
     let loaded = false;
     let targetState: ManuscriptState | null = null;
 
-    // 1. Try local storage for current manuscript ID (with fallbacks to preserve user created chapters)
+    // 1. Try local storage: scan all matching keys and pick the state with the highest chapter count
     try {
-      const keysToTry = [
+      const keysToScan: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('atelier-manuscrit')) {
+          keysToScan.push(k);
+        }
+      }
+      const explicitKeys = [
         currentStorageKey,
         `atelier-manuscrit-${currentManuscriptId}`,
-        `atelier-manuscrit-v1`,
-        `atelier-manuscrit-default`,
+        'atelier-manuscrit-default',
+        'atelier-manuscrit-v1',
       ];
-      let saved: string | null = null;
-      for (const key of keysToTry) {
-        saved = localStorage.getItem(key);
-        if (saved) break;
+      explicitKeys.forEach((k) => {
+        if (!keysToScan.includes(k)) keysToScan.push(k);
+      });
+
+      let bestState: ManuscriptState | null = null;
+      for (const key of keysToScan) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as ManuscriptState;
+            if (parsed.chapters && parsed.chapters.length > 0) {
+              if (!bestState || parsed.chapters.length > bestState.chapters.length) {
+                bestState = parsed;
+              }
+            }
+          }
+        } catch {}
       }
 
-      if (saved) {
-        const parsed = JSON.parse(saved) as ManuscriptState;
-        if (parsed.chapters && parsed.chapters.length > 0) {
-          const staticChapters = migrateFromStatic();
-          const rawChapters = parsed.chapters.map((c, idx) => ({
-            ...c,
-            notes: c.notes && c.notes.length > 0 ? c.notes : staticChapters[idx]?.notes || [],
-          }));
-          parsed.chapters = normalizeChapterNotesAndSuperscripts(rawChapters);
-          targetState = parsed;
-          loaded = true;
-        }
+      if (bestState && bestState.chapters.length > 0) {
+        const staticChapters = migrateFromStatic();
+        const rawChapters = bestState.chapters.map((c, idx) => ({
+          ...c,
+          notes: c.notes && c.notes.length > 0 ? c.notes : staticChapters[idx]?.notes || [],
+        }));
+        bestState.chapters = normalizeChapterNotesAndSuperscripts(rawChapters);
+        targetState = bestState;
+        loaded = true;
       }
     } catch {
       // Ignore

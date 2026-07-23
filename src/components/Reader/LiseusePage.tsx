@@ -236,28 +236,46 @@ export default function LiseusePage() {
   const loadManuscript = useCallback(() => {
     let loaded = false;
     try {
-      const keysToTry = [
+      const keysToScan: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('atelier-manuscrit')) {
+          keysToScan.push(k);
+        }
+      }
+      const explicitKeys = [
         `atelier-manuscrit-v4-${currentManuscriptId}`,
         `atelier-manuscrit-${currentManuscriptId}`,
         'atelier-manuscrit-default',
         'atelier-manuscrit-v1',
       ];
-      let stored: string | null = null;
-      for (const k of keysToTry) {
-        stored = localStorage.getItem(k);
-        if (stored) break;
+      explicitKeys.forEach((k) => {
+        if (!keysToScan.includes(k)) keysToScan.push(k);
+      });
+
+      let bestParsed: any = null;
+      for (const k of keysToScan) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const p = JSON.parse(raw);
+            if (p && p.chapters && Array.isArray(p.chapters) && p.chapters.length > 0) {
+              if (!bestParsed || p.chapters.length > bestParsed.chapters.length) {
+                bestParsed = p;
+              }
+            }
+          }
+        } catch {}
       }
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.chapters && Array.isArray(parsed.chapters) && parsed.chapters.length > 0) {
-          const formatted = parsed.chapters.map((ch: any) => ({
-            title: ch.title || 'Chapitre sans titre',
-            paragraphs: ch.blocks ? ch.blocks.map((b: any) => (b && b.content) || '') : [],
-            notes: ch.notes || [],
-          }));
-          setChapters(formatted);
-          loaded = true;
-        }
+
+      if (bestParsed && bestParsed.chapters && bestParsed.chapters.length > 0) {
+        const formatted = bestParsed.chapters.map((ch: any) => ({
+          title: ch.title || 'Chapitre sans titre',
+          paragraphs: ch.blocks ? ch.blocks.map((b: any) => (b && b.content) || '') : (ch.paragraphs || []),
+          notes: ch.notes || [],
+        }));
+        setChapters(formatted);
+        loaded = true;
       }
     } catch (e) {
       console.error('Error loading manuscript in Liseuse:', e);
