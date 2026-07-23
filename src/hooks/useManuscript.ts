@@ -9,7 +9,8 @@
 
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
-import { getChapters, saveAllChapters } from '@/services/firebase/firestore';
+import { getChapters, saveAllChapters, getDb } from '@/services/firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import type {
   ManuscriptState,
   ManuscriptAction,
@@ -493,9 +494,39 @@ export function useManuscript() {
     };
   }, [currentManuscriptId, currentStorageKey, user, manuscript?.id]);
 
-  // Keep a ref to the latest state for unmount saving
+  // Keep a ref to the latest state
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // ── Multi-device / Multi-tab Conflict Listener ──
+  const lastCloudSaveTimeRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    if (!user || !manuscript?.id) return;
+    let unsub: (() => void) | null = null;
+    try {
+      const db = getDb();
+      const mRef = doc(db, 'users', user.uid, 'manuscripts', manuscript.id);
+      unsub = onSnapshot(mRef, (snapshot) => {
+        if (!snapshot.exists()) return;
+        const data = snapshot.data();
+        const remoteTime = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
+        if (remoteTime > lastCloudSaveTimeRef.current + 5000 && stateRef.current.isDirty) {
+          console.warn('[Conflict Warning] Des modifications à distance ont été enregistrées sur un autre appareil.');
+          window.dispatchEvent(
+            new CustomEvent('atelier_sync_conflict', {
+              detail: { manuscriptId: manuscript.id, remoteTime },
+            })
+          );
+        }
+      });
+    } catch (e) {
+      console.warn('Conflict listener setup failed:', e);
+    }
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [user, manuscript?.id]);
 
   // Auto-save: INSTANT local storage & custom event sync + DEBOUCED Firestore sync
   useEffect(() => {
