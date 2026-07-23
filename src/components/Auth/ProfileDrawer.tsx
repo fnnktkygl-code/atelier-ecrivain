@@ -5,7 +5,7 @@ import { useAuth } from './AuthProvider';
 import { useTheme } from '@/components/Shared/ThemeProvider';
 
 export default function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, manuscript, manuscripts, penName, avatarColor, avatarUrl, showEmail, updatePenName, renameManuscript, logOut, selectManuscript, addManuscript, updateProfileSettings } = useAuth();
+  const { user, manuscript, manuscripts, penName, avatarColor, avatarUrl, showEmail, updatePenName, renameManuscript, logOut, selectManuscript, addManuscript, deleteManuscript, updateProfileSettings } = useAuth();
   const { theme, setTheme } = useTheme();
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
@@ -564,11 +564,74 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
           </div>
         </div>
 
-        {/* ── Logout ── */}
-        <div className="drawer-footer">
+        {/* ── RGPD & Data Rights ── */}
+        <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <p className="drawer-section-title">🛡️ Données & Confidentialité (RGPD)</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              onClick={() => {
+                const exportData = {
+                  email: user?.email,
+                  penName,
+                  manuscripts,
+                  exportedAt: new Date().toISOString(),
+                };
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `mes-manuscrits-atelier-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--surface-2)',
+                color: 'var(--text)',
+                fontSize: 12,
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              📥 Exporter toutes mes données (JSON)
+            </button>
+          </div>
+        </div>
+
+        {/* ── Logout & Account Deletion ── */}
+        <div className="drawer-footer" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button className="drawer-logout-btn" onClick={() => { logOut(); onClose(); }}>
             <span>🚪</span>
             <span>Se déconnecter</span>
+          </button>
+          <button
+            onClick={async () => {
+              if (window.confirm('Êtes-vous sûr de vouloir supprimer définitivement votre compte et TOUS vos manuscrits ? Cette action est irréversible.')) {
+                for (const m of manuscripts) {
+                  await deleteManuscript(m.id);
+                }
+                await logOut();
+                onClose();
+              }
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#e53e3e',
+              fontSize: 11.5,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              opacity: 0.8,
+              marginTop: 4,
+            }}
+          >
+            🗑️ Supprimer définitivement mon compte (Droit à l'effacement)
           </button>
         </div>
       </div>

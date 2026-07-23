@@ -12,6 +12,7 @@
  */
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
@@ -28,6 +29,18 @@ export function getFirebaseApp(): FirebaseApp {
   if (!app) {
     const existing = getApps();
     app = existing.length > 0 ? existing[0] : initializeApp(firebaseConfig);
+
+    // Initialize App Check if ReCAPTCHA site key is provided
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+      try {
+        initializeAppCheck(app, {
+          provider: new ReCaptchaEnterpriseProvider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
+          isTokenAutoRefreshEnabled: true,
+        });
+      } catch (err) {
+        console.warn('App Check initialization warning:', err);
+      }
+    }
   }
   return app;
 }

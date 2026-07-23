@@ -7,11 +7,14 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "auth": {
     "providers": {
       "googleSignIn": {
         "oAuthBrandDisplayName": "Atelier d'Écrivain",
-        "supportEmail": "lunneko.njm@gmail.com",
+        "supportEmail": "support@atelier-ecrivain.app",
         "authorizedRedirectUris": [
           "https://atelier-ecrivain.vercel.app/__/auth/handler"
         ]

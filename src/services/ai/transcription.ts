@@ -115,6 +115,21 @@ async function generateWithFallback<T>(
 /**
  * Transcribe and structure an audio recording using Gemini
  */
+// ── Rate Limiter ──
+const requestTimestamps: number[] = [];
+
+function checkRateLimit() {
+  const now = Date.now();
+  const oneMinuteAgo = now - 60000;
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
+    requestTimestamps.shift();
+  }
+  if (requestTimestamps.length >= 10) {
+    throw new Error('Limite de requêtes atteinte (max 10 dictées / minute). Veuillez patienter quelques secondes.');
+  }
+  requestTimestamps.push(now);
+}
+
 export async function transcribeAudio(
   audioBlob: Blob,
   context?: { currentChapter?: number; previousContent?: string }
@@ -124,6 +139,8 @@ export async function transcribeAudio(
       'Firebase n\'est pas configuré. Ajoutez votre config dans .env.local'
     );
   }
+
+  checkRateLimit();
 
   const audioBase64 = await blobToBase64(audioBlob);
 

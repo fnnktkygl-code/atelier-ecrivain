@@ -46,6 +46,22 @@ export default function ReviewPanel({ reviews, chapterIndex, dispatch, isOpen, o
         </button>
       </div>
 
+      {/* AI Notice Disclaimer */}
+      <div
+        style={{
+          padding: '8px 12px',
+          margin: '8px 12px 0 12px',
+          borderRadius: '6px',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          fontSize: '11px',
+          color: 'var(--text-soft)',
+          lineHeight: '1.4',
+        }}
+      >
+        💡 <strong>Note de l&apos;Atelier :</strong> Les révisions et vérifications sont générées par l&apos;IA Gemini. Veuillez valider les citations avec les textes originaux.
+      </div>
+
       {/* Filter tabs */}
       <div className="review-filters">
         {(['pending', 'accepted', 'rejected', 'all'] as const).map((f) => (
