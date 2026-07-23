@@ -190,6 +190,37 @@ function saveSettings(s: ReaderSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
 
+function formatChaptersForLiseuse(rawChapters: any[]): any[] {
+  const editableChapters = rawChapters.map((ch: any, idx: number) => ({
+    id: ch.id || `ch-${idx}`,
+    title: ch.title || `Chapitre ${idx + 1}`,
+    blocks: ch.blocks
+      ? ch.blocks.map((b: any, bIdx: number) => ({
+          id: b.id || `b-${bIdx}`,
+          content: (b && b.content) || '',
+          type: 'paragraph' as const,
+          source: 'original' as const,
+          createdAt: 0,
+        }))
+      : (ch.paragraphs || []).map((p: string, pIdx: number) => ({
+          id: `p-${pIdx}`,
+          content: p,
+          type: 'paragraph' as const,
+          source: 'original' as const,
+          createdAt: 0,
+        })),
+    notes: ch.notes && ch.notes.length > 0 ? ch.notes : [],
+    pendingReviews: [],
+  }));
+
+  const normalized = normalizeChapterNotesAndSuperscripts(editableChapters);
+  return normalized.map((ch) => ({
+    title: ch.title,
+    paragraphs: ch.blocks.map((b) => b.content),
+    notes: ch.notes,
+  }));
+}
+
 export default function LiseusePage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -269,11 +300,12 @@ export default function LiseusePage() {
       }
 
       if (bestParsed && bestParsed.chapters && bestParsed.chapters.length > 0) {
-        const formatted = bestParsed.chapters.map((ch: any) => ({
-          title: ch.title || 'Chapitre sans titre',
-          paragraphs: ch.blocks ? ch.blocks.map((b: any) => (b && b.content) || '') : (ch.paragraphs || []),
-          notes: ch.notes || [],
+        const staticChapters = CHAPTERS;
+        const rawChaptersToFormat = bestParsed.chapters.map((c: any, idx: number) => ({
+          ...c,
+          notes: c.notes && c.notes.length > 0 ? c.notes : (staticChapters[idx] as any)?.notes || [],
         }));
+        const formatted = formatChaptersForLiseuse(rawChaptersToFormat);
         setChapters(formatted);
         loaded = true;
       }
@@ -285,11 +317,7 @@ export default function LiseusePage() {
       getChapters(user.uid, manuscript.id)
         .then((fsChapters) => {
           if (fsChapters && fsChapters.length > 0) {
-            const formatted = fsChapters.map((ch: any) => ({
-              title: ch.title || 'Chapitre sans titre',
-              paragraphs: ch.paragraphs || [],
-              notes: ch.notes || [],
-            }));
+            const formatted = formatChaptersForLiseuse(fsChapters);
             setChapters(formatted);
           }
         })
