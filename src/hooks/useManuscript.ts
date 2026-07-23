@@ -292,9 +292,66 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
     case 'ACCEPT_REVIEW': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      ch.pendingReviews = ch.pendingReviews.map((r) =>
-        r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
-      );
+      const review = ch.pendingReviews.find((r) => r.id === action.reviewId);
+
+      if (review && review.status === 'pending') {
+        let replaced = false;
+
+        // 1. Try exact or partial text replacement in chapter blocks
+        if (review.original && review.suggestion && review.original !== review.suggestion) {
+          const target = review.original.trim();
+          ch.blocks = ch.blocks.map((block) => {
+            if (!replaced && target.length > 2 && block.content.includes(target)) {
+              replaced = true;
+              return {
+                ...block,
+                content: block.content.replace(target, review.suggestion),
+              };
+            }
+            return block;
+          });
+
+          // Fallback: If exact original wasn't found, try matching leading key words
+          if (!replaced && target.length > 8) {
+            const firstWords = target.split(' ').slice(0, 3).join(' ');
+            if (firstWords.length > 4) {
+              ch.blocks = ch.blocks.map((block) => {
+                if (!replaced && block.content.includes(firstWords)) {
+                  replaced = true;
+                  return {
+                    ...block,
+                    content: block.content.replace(firstWords, review.suggestion),
+                  };
+                }
+                return block;
+              });
+            }
+          }
+        }
+
+        // 2. If source exists, automatically add as a Note to the chapter's notes list
+        if (review.source) {
+          const noteKey = `Note ${ch.notes.length + 1}`;
+          const noteContent = `${review.suggestion || review.original} — Source : ${review.source}`;
+          if (!ch.notes.some((n) => n.content === noteContent)) {
+            ch.notes = [
+              ...ch.notes,
+              {
+                id: uid(),
+                key: noteKey,
+                content: noteContent,
+                source: 'ai',
+              },
+            ];
+          }
+        }
+
+        // 3. Mark review status as accepted
+        ch.pendingReviews = ch.pendingReviews.map((r) =>
+          r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
+        );
+      }
+
       chapters[action.chapterIndex] = ch;
       return { ...state, chapters, isDirty: true };
     }

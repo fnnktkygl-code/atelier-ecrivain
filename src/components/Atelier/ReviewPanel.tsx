@@ -197,14 +197,18 @@ function ReviewItem({
       )}
 
       {/* Actions */}
-      {isPending && (
-        <div className="review-actions">
-          <button className="btn btn-primary" onClick={onAccept} style={{ fontSize: 12, padding: '6px 14px' }}>
-            ✓ Accepter
+      {isPending ? (
+        <div className="review-actions" style={{ gap: 6, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={onAccept} style={{ fontSize: 12, padding: '6px 12px' }} title="Remplace automatiquement le texte dans le manuscrit">
+            ✓ Appliquer au texte
           </button>
-          <button className="btn btn-ghost" onClick={onReject} style={{ fontSize: 12, padding: '6px 14px' }}>
+          <button className="btn btn-ghost" onClick={onReject} style={{ fontSize: 12, padding: '6px 12px' }}>
             ✕ Rejeter
           </button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: review.status === 'accepted' ? '#2e7d32' : '#c0392b', fontWeight: 600, marginTop: 8 }}>
+          {review.status === 'accepted' ? '✅ Appliqué au manuscrit' : '❌ Rejeté'}
         </div>
       )}
     </div>
