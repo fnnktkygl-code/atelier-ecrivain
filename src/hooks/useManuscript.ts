@@ -69,9 +69,9 @@ function migrateFromStatic(): EditableChapter[] {
       else noteKeys.push(...allKeys.slice(25));
     }
 
-    const notes: EditableNote[] = noteKeys.map((key) => ({
+    const notes: EditableNote[] = noteKeys.map((key, noteIdx) => ({
       id: uid(),
-      key: `Note ${key}`,
+      key: `Note ${noteIdx + 1}`,
       content: NOTES[key],
       source: 'original' as const,
     }));
@@ -249,7 +249,7 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
     case 'ADD_NOTE': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      const nextKey = String(ch.notes.length + 1);
+      const nextKey = `Note ${ch.notes.length + 1}`;
       const note: EditableNote = {
         id: uid(),
         key: nextKey,

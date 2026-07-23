@@ -18,10 +18,14 @@ interface ReviewPanelProps {
 }
 
 export default function ReviewPanel({ reviews, chapterIndex, dispatch, isOpen, onClose }: ReviewPanelProps) {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('pending');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('all');
+
+  const pendingCount = reviews.filter((r) => r.status === 'pending').length;
+  const acceptedCount = reviews.filter((r) => r.status === 'accepted').length;
+  const rejectedCount = reviews.filter((r) => r.status === 'rejected').length;
+  const totalCount = reviews.length;
 
   const filtered = reviews.filter((r) => filter === 'all' || r.status === filter);
-  const pendingCount = reviews.filter((r) => r.status === 'pending').length;
 
   const handleAccept = (reviewId: string) => {
     dispatch({ type: 'ACCEPT_REVIEW', chapterIndex, reviewId });
@@ -36,10 +40,14 @@ export default function ReviewPanel({ reviews, chapterIndex, dispatch, isOpen, o
       {/* Header */}
       <div className="review-panel-header">
         <h3>
-          Révisions
-          {pendingCount > 0 && (
-            <span className="review-count">{pendingCount}</span>
-          )}
+          Révisions & Historique
+          {pendingCount > 0 ? (
+            <span className="review-count">{pendingCount} en attente</span>
+          ) : totalCount > 0 ? (
+            <span className="review-count" style={{ background: 'var(--surface-2)', color: 'var(--text-soft)' }}>
+              {totalCount} archivée{totalCount > 1 ? 's' : ''}
+            </span>
+          ) : null}
         </h3>
         <button className="btn-icon" onClick={onClose} style={{ width: 32, height: 32, fontSize: 14 }}>
           ✕
@@ -59,24 +67,39 @@ export default function ReviewPanel({ reviews, chapterIndex, dispatch, isOpen, o
           lineHeight: '1.4',
         }}
       >
-        💡 <strong>Note de l&apos;Atelier :</strong> Les révisions et vérifications sont générées par l&apos;IA Gemini. Veuillez valider les citations avec les textes originaux.
+        💡 <strong>Historique & Traçabilité :</strong> Retrouvez ci-dessous toutes les suggestions Gemini acceptées ou rejetées.
       </div>
 
       {/* Filter tabs */}
       <div className="review-filters">
-        {(['pending', 'accepted', 'rejected', 'all'] as const).map((f) => (
-          <button
-            key={f}
-            className={`pill ${filter === f ? 'active' : ''}`}
-            onClick={() => setFilter(f)}
-            style={{ fontSize: 11, padding: '4px 8px' }}
-          >
-            {f === 'pending' && '⏳ En attente'}
-            {f === 'accepted' && '✅ Acceptées'}
-            {f === 'rejected' && '❌ Rejetées'}
-            {f === 'all' && '📋 Toutes'}
-          </button>
-        ))}
+        <button
+          className={`pill ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+          style={{ fontSize: 11, padding: '4px 8px' }}
+        >
+          📋 Toutes ({totalCount})
+        </button>
+        <button
+          className={`pill ${filter === 'pending' ? 'active' : ''}`}
+          onClick={() => setFilter('pending')}
+          style={{ fontSize: 11, padding: '4px 8px' }}
+        >
+          ⏳ En attente ({pendingCount})
+        </button>
+        <button
+          className={`pill ${filter === 'accepted' ? 'active' : ''}`}
+          onClick={() => setFilter('accepted')}
+          style={{ fontSize: 11, padding: '4px 8px' }}
+        >
+          ✅ Acceptées ({acceptedCount})
+        </button>
+        <button
+          className={`pill ${filter === 'rejected' ? 'active' : ''}`}
+          onClick={() => setFilter('rejected')}
+          style={{ fontSize: 11, padding: '4px 8px' }}
+        >
+          ❌ Rejetées ({rejectedCount})
+        </button>
       </div>
 
       {/* Review items */}

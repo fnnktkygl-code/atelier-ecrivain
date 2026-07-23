@@ -1697,16 +1697,19 @@ body.night .bottom-sheet {
 
 .note-key {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   background: var(--accent-glow);
   color: var(--accent);
-  border-radius: 50%;
-  width: 22px;
+  border: 1px solid rgba(197, 160, 89, 0.4);
+  border-radius: 12px;
+  padding: 1px 8px;
+  min-width: 24px;
   height: 22px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
 }
 
 .note-ai-badge {
