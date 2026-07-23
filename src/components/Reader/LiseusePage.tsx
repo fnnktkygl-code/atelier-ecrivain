@@ -254,6 +254,18 @@ export default function LiseusePage() {
     };
   }, [loadManuscript, currentManuscriptId]);
 
+  // Sync body data-liseuse-theme for full-page immersive reading background & navbar
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.setAttribute('data-liseuse-theme', settings.theme);
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.removeAttribute('data-liseuse-theme');
+      }
+    };
+  }, [settings.theme]);
+
   const updateSettings = (patch: Partial<ReaderSettings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
@@ -489,9 +501,11 @@ export default function LiseusePage() {
       <style>{`
         .liseuse-wrap {
           display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;
+          background: var(--surface); color: var(--text); transition: background-color .3s ease, color .3s ease;
           --reader-font-size:${settings.fontSize}px;
           --reader-font-family:${settings.fontFamily};
           --reader-line-height:${settings.lineHeight};
+          ${settings.theme === 'light' ? '--surface:#faf8f4; --surface-2:#f4efe6; --text:#2c2820; --text-soft:#6b6255; --border:rgba(44,40,32,.12); --hover:rgba(44,40,32,.06); --accent:#a36b4f;' : ''}
           ${settings.theme === 'sepia' ? '--surface:#f4ead5; --surface-2:#efe5d0; --text:#3d3224; --text-soft:#7a6b57; --border:rgba(61,50,36,.12); --hover:rgba(61,50,36,.06); --accent:#8a5a34;' : ''}
           ${settings.theme === 'dark' ? '--surface:#1a1a1a; --surface-2:#232323; --text:#d4d0c8; --text-soft:#8f8874; --border:rgba(212,208,200,.1); --hover:rgba(212,208,200,.06); --accent:#c4956a;' : ''}
         }
