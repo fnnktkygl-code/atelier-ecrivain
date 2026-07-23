@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthProvider';
+import { useTheme } from '@/components/Shared/ThemeProvider';
 
 export default function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, manuscript, manuscripts, penName, avatarColor, avatarUrl, showEmail, updatePenName, renameManuscript, logOut, selectManuscript, addManuscript, updateProfileSettings } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -525,6 +527,41 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
               </div>
             </div>
           )}
+        </div>
+
+        {/* ── Theme Switcher ── */}
+        <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <p className="drawer-section-title">🎨 Thème de l'application</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[
+              { id: 'day', label: '☀️ Jour', bg: '#efe7d5' },
+              { id: 'sepia', label: '📜 Sépia', bg: '#e8d9b8' },
+              { id: 'night', label: '🌙 Nuit', bg: '#1b1a17' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id as any)}
+                style={{
+                  flex: 1,
+                  padding: '8px 4px',
+                  borderRadius: 8,
+                  border: theme === t.id ? '2px solid var(--accent)' : '1px solid var(--border)',
+                  background: 'var(--surface-2)',
+                  color: 'var(--text)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Logout ── */}
