@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     // Shared system quotas for multi-user real-time tracking
-    match /system/{document=**} {
+    match /system/quotas {
       allow read, write: if request.auth != null && isValidPayload();
     }
 
