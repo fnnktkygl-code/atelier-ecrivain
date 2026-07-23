@@ -51,39 +51,50 @@ export function normalizeChapterNotesAndSuperscripts(chapters: EditableChapter[]
   };
 
   return chapters.map((ch) => {
-    // 1. Collect all unique note keys present in this chapter
-    const originalKeysFound: string[] = [];
+    // Collect all note keys referenced in blocks or notes array
+    const legacyKeysOrder: string[] = [];
+
+    // Scan blocks in order for note reference markers
     ch.blocks.forEach((block) => {
       const matches = block.content.match(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g);
       if (matches) {
         matches.forEach((m) => {
           const num = m.split('').map((c) => supMap[c] || c).join('');
-          if (!originalKeysFound.includes(num)) {
-            originalKeysFound.push(num);
+          if (!legacyKeysOrder.includes(num)) {
+            legacyKeysOrder.push(num);
           }
         });
       }
     });
 
+    // Also include any notes that exist in ch.notes but weren't in text regex
     ch.notes.forEach((n, idx) => {
       const num = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
-      if (!originalKeysFound.includes(num)) {
-        originalKeysFound.push(num);
+      if (!legacyKeysOrder.includes(num)) {
+        legacyKeysOrder.push(num);
       }
     });
 
-    // 2. Map old key -> 1-based index for THIS chapter
-    const keyToNewNumber: Record<string, number> = {};
-    originalKeysFound.forEach((oldKey, idx) => {
-      keyToNewNumber[oldKey] = idx + 1;
+    // Map old key (e.g. "10", "11", "12") -> 1-based index (1, 2, 3...)
+    const oldKeyToNewIndex: Record<string, number> = {};
+    legacyKeysOrder.forEach((oldKey, idx) => {
+      oldKeyToNewIndex[oldKey] = idx + 1;
     });
 
-    // 3. Update chapter's text blocks: replace old superscripts with 1-based superscripts for THIS chapter
+    // Also map sequential index if notes were already re-keyed as 1..N
+    ch.notes.forEach((n, idx) => {
+      const num = n.key ? String(n.key).replace(/\D/g, '') : String(idx + 1);
+      if (oldKeyToNewIndex[num] === undefined) {
+        oldKeyToNewIndex[num] = idx + 1;
+      }
+    });
+
+    // Replace text block superscripts with per-chapter 1-based superscripts
     const updatedBlocks = ch.blocks.map((block) => {
       let content = block.content;
       content = content.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => {
         const oldNum = m.split('').map((c) => supMap[c] || c).join('');
-        const newNum = keyToNewNumber[oldNum];
+        const newNum = oldKeyToNewIndex[oldNum];
         if (newNum !== undefined) {
           return toSuperscript(newNum);
         }
@@ -92,13 +103,15 @@ export function normalizeChapterNotesAndSuperscripts(chapters: EditableChapter[]
       return { ...block, content };
     });
 
-    // 4. Update chapter's notes array: re-key as Note 1, Note 2, Note 3...
-    const updatedNotes = originalKeysFound.map((oldKey, idx) => {
+    // Re-key notes array strictly as Note 1, Note 2, Note 3...
+    const updatedNotes: EditableNote[] = legacyKeysOrder.map((oldKey, idx) => {
       const existingNote = ch.notes.find((n) => {
         const num = n.key ? String(n.key).replace(/\D/g, '') : '';
         return num === oldKey;
-      });
+      }) || ch.notes[idx];
+
       const noteContent = existingNote ? existingNote.content : (NOTES[oldKey] || `Note ${idx + 1}`);
+
       return {
         id: existingNote ? existingNote.id : uid(),
         key: `Note ${idx + 1}`,
