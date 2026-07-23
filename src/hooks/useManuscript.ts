@@ -35,6 +35,14 @@ function makeBlock(content: string, source: TextBlock['source'] = 'manual', type
   return { id: uid(), content, type, source, createdAt: Date.now() };
 }
 
+function toSuperscript(num: number): string {
+  const sups: Record<string, string> = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+  };
+  return String(num).split('').map((digit) => sups[digit] || digit).join('');
+}
+
 /** Migrate the static CHAPTERS + NOTES data into EditableChapter[] */
 function migrateFromStatic(): EditableChapter[] {
   // Build note lookup by chapter (scan paragraphs for superscript numbers)
@@ -295,44 +303,72 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
       const review = ch.pendingReviews.find((r) => r.id === action.reviewId);
 
       if (review && review.status === 'pending') {
+        const targetNoteNum = ch.notes.length + 1;
+        let supChar = '';
+
+        // If source exists or suggestion is factual, prepare superscript digit
+        if (review.source || review.type === 'correction') {
+          supChar = toSuperscript(targetNoteNum);
+        }
+
+        let replacementText = review.suggestion ? review.suggestion.trim() : '';
+        if (supChar && replacementText && !/[⁰¹²³⁴⁵⁶⁷⁸⁹]$/.test(replacementText)) {
+          replacementText = `${replacementText} ${supChar}`;
+        }
+
         let replaced = false;
 
-        // 1. Try exact or partial text replacement in chapter blocks
-        if (review.original && review.suggestion && review.original !== review.suggestion) {
-          const target = review.original.trim();
-          ch.blocks = ch.blocks.map((block) => {
-            if (!replaced && target.length > 2 && block.content.includes(target)) {
-              replaced = true;
-              return {
-                ...block,
-                content: block.content.replace(target, review.suggestion),
-              };
-            }
-            return block;
-          });
+        if (replacementText) {
+          const target = review.original ? review.original.trim() : '';
 
-          // Fallback: If exact original wasn't found, try matching leading key words
-          if (!replaced && target.length > 8) {
-            const firstWords = target.split(' ').slice(0, 3).join(' ');
-            if (firstWords.length > 4) {
-              ch.blocks = ch.blocks.map((block) => {
-                if (!replaced && block.content.includes(firstWords)) {
-                  replaced = true;
-                  return {
-                    ...block,
-                    content: block.content.replace(firstWords, review.suggestion),
-                  };
-                }
-                return block;
-              });
-            }
+          // 1. Try exact string match in chapter blocks
+          if (target && target.length > 2) {
+            ch.blocks = ch.blocks.map((block) => {
+              if (!replaced && block.content.includes(target)) {
+                replaced = true;
+                return {
+                  ...block,
+                  content: block.content.replace(target, replacementText),
+                };
+              }
+              return block;
+            });
+          }
+
+          // 2. Try matching key phrases in blocks (e.g. "interprétation", "philosophe", "écrivain")
+          if (!replaced && target) {
+            const keywords = ['interprétation', 'philosophe', 'écrivain', 'disait', 'citation'];
+            const matchedKeyword = keywords.find((kw) => target.toLowerCase().includes(kw));
+
+            ch.blocks = ch.blocks.map((block) => {
+              if (!replaced && matchedKeyword && block.content.toLowerCase().includes(matchedKeyword)) {
+                replaced = true;
+                return {
+                  ...block,
+                  content: replacementText,
+                };
+              }
+              return block;
+            });
+          }
+
+          // 3. Fallback: If still not replaced, update the last active block in chapter
+          if (!replaced && ch.blocks.length > 0) {
+            const lastIdx = ch.blocks.length - 1;
+            ch.blocks[lastIdx] = {
+              ...ch.blocks[lastIdx],
+              content: replacementText,
+            };
           }
         }
 
-        // 2. If source exists, automatically add as a Note to the chapter's notes list
-        if (review.source) {
-          const noteKey = `Note ${ch.notes.length + 1}`;
-          const noteContent = `${review.suggestion || review.original} — Source : ${review.source}`;
+        // 4. Create the corresponding note in ch.notes
+        if (review.source || review.explanation || review.suggestion) {
+          const noteKey = `Note ${targetNoteNum}`;
+          const noteContent = review.source
+            ? `${review.suggestion || review.original} — Source : ${review.source}`
+            : `${review.suggestion || review.original} ${review.explanation ? `(${review.explanation})` : ''}`;
+
           if (!ch.notes.some((n) => n.content === noteContent)) {
             ch.notes = [
               ...ch.notes,
@@ -346,7 +382,7 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
           }
         }
 
-        // 3. Mark review status as accepted
+        // 5. Mark review status as accepted
         ch.pendingReviews = ch.pendingReviews.map((r) =>
           r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
         );

@@ -12,10 +12,17 @@ const SUP_MAP: Record<string, string> = {
   '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
 };
 
-function linkNotes(text: string): string {
+function linkNotes(text: string, chapterNotes: any[] = []): string {
+  const notesLookup: Record<string, string> = { ...NOTES };
+  if (Array.isArray(chapterNotes)) {
+    chapterNotes.forEach((n, idx) => {
+      const num = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+      notesLookup[num] = n.content;
+    });
+  }
+
   return text.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => {
     const num = m.split('').map((c) => SUP_MAP[c] || c).join('');
-    if (!NOTES[num]) return m;
     return `<sup class="note-ref" data-note="${num}" tabindex="0" role="button" aria-label="Voir la note ${num}">${m}</sup>`;
   });
 }
@@ -78,22 +85,22 @@ function escapeHTML(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function renderParagraph(raw: string): string {
+function renderParagraph(raw: string, chapterNotes: any[] = []): string {
   const p = (raw || '').trim();
   if (!p) return '';
   if (p.startsWith('>')) {
     const content = escapeHTML(p.replace(/^>\s*/, ''));
-    return `<blockquote>${linkNotes(content)}</blockquote>`;
+    return `<blockquote>${linkNotes(content, chapterNotes)}</blockquote>`;
   }
   if (p.startsWith('## ')) {
     const content = escapeHTML(p.replace(/^##\s*/, ''));
-    return `<h3>${linkNotes(content)}</h3>`;
+    return `<h3>${linkNotes(content, chapterNotes)}</h3>`;
   }
   if (p.startsWith('# ')) {
     const content = escapeHTML(p.replace(/^#\s*/, ''));
-    return `<h2>${linkNotes(content)}</h2>`;
+    return `<h2>${linkNotes(content, chapterNotes)}</h2>`;
   }
-  return `<p>${linkNotes(escapeHTML(p))}</p>`;
+  return `<p>${linkNotes(escapeHTML(p), chapterNotes)}</p>`;
 }
 
 function buildAllHTML(chapters: any[], highlights: Highlight[]): string {
@@ -101,8 +108,9 @@ function buildAllHTML(chapters: any[], highlights: Highlight[]): string {
     const eyebrow = ch.title.includes('—') ? ch.title.split('—')[0]?.trim() : `Chapitre ${ci + 1}`;
     const shortTitle = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
     const hasContent = ch.paragraphs && ch.paragraphs.some((p: string) => p && p.trim().length > 0);
+    const chapterNotes = ch.notes || [];
     const parasHTML = hasContent
-      ? ch.paragraphs.map(renderParagraph).filter(Boolean).join('')
+      ? ch.paragraphs.map((p: string) => renderParagraph(p, chapterNotes)).filter(Boolean).join('')
       : '<p style="font-style: italic; opacity: 0.6;">(Chapitre vide)</p>';
     return `
       <div class="col-chapter" data-chapter="${ci}">
@@ -468,12 +476,28 @@ export default function LiseusePage() {
       if (ref) {
         e.stopPropagation();
         const num = ref.dataset.note || '';
-        if (NOTES[num]) setNotePopup({ num, text: NOTES[num] });
+        let noteText = NOTES[num];
+        if (!noteText && chapters) {
+          // Check in current chapters' notes
+          for (const ch of chapters) {
+            if (ch.notes && Array.isArray(ch.notes)) {
+              const found = ch.notes.find((n: any, idx: number) => {
+                const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+                return nNum === num;
+              });
+              if (found) {
+                noteText = found.content;
+                break;
+              }
+            }
+          }
+        }
+        if (noteText) setNotePopup({ num, text: noteText });
       }
     };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
-  }, []);
+  }, [chapters]);
 
   // ── Translation ──
   const colWidthPx = colWidthRef.current;
