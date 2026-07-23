@@ -13,7 +13,6 @@ export function getAuthInstance() {
 }
 
 const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/generative-language');
 
 export async function signInWithGoogle(): Promise<User> {
   const auth = getAuthInstance();
