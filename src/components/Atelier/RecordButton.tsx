@@ -39,24 +39,35 @@ export default function RecordButton({
           if (phase === 'complete' || phase === 'error') onReset();
           onStart();
         }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 10px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          cursor: 'pointer',
+          width: '100%',
+        }}
       >
         <div className="record-mic-badge">
           🎙️
         </div>
-        <div className="record-text-compact">
-          <span className="record-title-compact">
+        <div className="record-text-compact" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span className="record-title-compact" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', whiteSpace: 'nowrap' }}>
             {phase === 'complete' ? '✅ Texte inséré' : phase === 'error' ? '❌ Erreur' : 'Dictée vocale IA'}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-            <span className="record-sub-compact" style={{ flex: 1, minWidth: 0 }}>
-              {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : 'Appuyez pour dicter'}
-            </span>
-            <QuotaBadge />
-          </div>
+          <span className="record-sub-compact" style={{ fontSize: 11, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
+            {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : 'Appuyez pour dicter'}
+          </span>
         </div>
-        <button className="record-btn-start-compact">
-          Dicter ➔
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          <button className="record-btn-start-compact">
+            Dicter ➔
+          </button>
+          <QuotaBadge />
+        </div>
       </div>
     );
   }

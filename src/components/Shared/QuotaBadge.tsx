@@ -41,13 +41,13 @@ export default function QuotaBadge() {
           display: 'inline-flex',
           alignItems: 'center',
           gap: 4,
-          fontSize: 10,
+          fontSize: 9.5,
           fontWeight: 600,
           fontFamily: 'var(--font-sans)',
           color: hasCustomKey ? '#27ae60' : status.isWarning ? '#e53e3e' : 'var(--text-soft)',
           whiteSpace: 'nowrap',
-          padding: '2px 7px',
-          borderRadius: 8,
+          padding: '1px 6px',
+          borderRadius: 6,
           background: status.isWarning ? 'rgba(229,62,62,0.1)' : 'var(--surface-2, rgba(0,0,0,0.04))',
           border: '1px solid var(--border)',
           cursor: 'pointer',
@@ -99,8 +99,8 @@ export default function QuotaBadge() {
             <div>• Clé personnelle active (Quota Illimité)<br />• Dictées aujourd&apos;hui : {status.dayCount}</div>
           ) : (
             <div>
-              • <strong>Minute :</strong> {status.minuteRemaining}/${status.minuteLimit} req. disponibles<br />
-              • <strong>Jour :</strong> {status.dayRemaining}/${status.dayLimit} req. disponibles<br />
+              • <strong>Minute :</strong> {status.minuteRemaining}/{status.minuteLimit} requêtes disponibles<br />
+              • <strong>Jour :</strong> {status.dayRemaining}/{status.dayLimit} requêtes disponibles<br />
               <span style={{ fontSize: 10, color: 'var(--text-soft)', fontStyle: 'italic', marginTop: 4, display: 'block' }}>
                 Totalement indépendant des autres utilisateurs
               </span>
