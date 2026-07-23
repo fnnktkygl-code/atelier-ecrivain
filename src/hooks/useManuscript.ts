@@ -61,9 +61,17 @@ function migrateFromStatic(): EditableChapter[] {
       }
     });
 
+    // Fallback: If no notes were matched by regex, attach notes based on chapter index
+    if (noteKeys.length === 0) {
+      const allKeys = Object.keys(NOTES);
+      if (idx === 0) noteKeys.push(...allKeys.slice(0, 10));
+      else if (idx === 1) noteKeys.push(...allKeys.slice(10, 25));
+      else noteKeys.push(...allKeys.slice(25));
+    }
+
     const notes: EditableNote[] = noteKeys.map((key) => ({
       id: uid(),
-      key,
+      key: `Note ${key}`,
       content: NOTES[key],
       source: 'original' as const,
     }));
@@ -400,6 +408,11 @@ export function useManuscript() {
       if (saved) {
         const parsed = JSON.parse(saved) as ManuscriptState;
         if (parsed.chapters && parsed.chapters.length > 0) {
+          const staticChapters = migrateFromStatic();
+          parsed.chapters = parsed.chapters.map((c, idx) => ({
+            ...c,
+            notes: c.notes && c.notes.length > 0 ? c.notes : staticChapters[idx]?.notes || [],
+          }));
           targetState = parsed;
           loaded = true;
         }
@@ -424,6 +437,7 @@ export function useManuscript() {
         .then((fsChapters) => {
           if (cancelled) return;
           if (fsChapters && fsChapters.length > 0) {
+            const staticChapters = migrateFromStatic();
             const editableChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
               id: ch.id || `ch-${idx}`,
               title: ch.title || `Chapitre ${idx + 1}`,
@@ -434,8 +448,8 @@ export function useManuscript() {
                 source: 'original' as const,
                 createdAt: Date.now(),
               })),
-              notes: [],
-              pendingReviews: [],
+              notes: (ch as any).notes && (ch as any).notes.length > 0 ? (ch as any).notes : staticChapters[idx]?.notes || [],
+              pendingReviews: (ch as any).pendingReviews || [],
             }));
 
             const newState: ManuscriptState = {

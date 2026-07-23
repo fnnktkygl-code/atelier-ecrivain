@@ -121,13 +121,17 @@ export async function saveAllChapters(
       !existing ||
       existing.title !== ch.title ||
       existing.order !== idx ||
-      JSON.stringify(existing.paragraphs) !== JSON.stringify(newParagraphs);
+      JSON.stringify(existing.paragraphs) !== JSON.stringify(newParagraphs) ||
+      JSON.stringify(existing.notes) !== JSON.stringify((ch as any).notes || []);
 
     if (isModified) {
       const chRef = doc(chaptersCol, docId);
       batch.set(chRef, {
         title: ch.title,
         paragraphs: newParagraphs,
+        blocks: ch.blocks,
+        notes: (ch as any).notes || [],
+        pendingReviews: (ch as any).pendingReviews || [],
         order: idx,
       });
       hasWriteOps = true;
