@@ -100,27 +100,45 @@ export async function saveAllChapters(
   const db = getDb();
   const chaptersCol = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
   
-  // 1. Fetch existing chapter docs in Firestore to clean up orphaned deleted chapters
+  // 1. Fetch existing chapter docs in Firestore to clean up orphaned deleted chapters and perform diff check
   const existingSnap = await getDocs(chaptersCol);
+  const existingDocsMap = new Map<string, any>();
+  existingSnap.docs.forEach((docSnap) => {
+    existingDocsMap.set(docSnap.id, docSnap.data());
+  });
   
   const batch = writeBatch(db);
   const currentDocIds = new Set<string>();
+  let hasWriteOps = false;
 
   chapters.forEach((ch, idx) => {
     const docId = ch.id || `ch-${idx}`;
     currentDocIds.add(docId);
-    const chRef = doc(chaptersCol, docId);
-    batch.set(chRef, {
-      title: ch.title,
-      paragraphs: ch.blocks.map((b) => b.content || ''),
-      order: idx,
-    });
+    const newParagraphs = ch.blocks.map((b) => b.content || '');
+    const existing = existingDocsMap.get(docId);
+
+    const isModified =
+      !existing ||
+      existing.title !== ch.title ||
+      existing.order !== idx ||
+      JSON.stringify(existing.paragraphs) !== JSON.stringify(newParagraphs);
+
+    if (isModified) {
+      const chRef = doc(chaptersCol, docId);
+      batch.set(chRef, {
+        title: ch.title,
+        paragraphs: newParagraphs,
+        order: idx,
+      });
+      hasWriteOps = true;
+    }
   });
 
   // 2. Delete orphaned docs
   existingSnap.docs.forEach((docSnap) => {
     if (!currentDocIds.has(docSnap.id)) {
       batch.delete(docSnap.ref);
+      hasWriteOps = true;
     }
   });
 
