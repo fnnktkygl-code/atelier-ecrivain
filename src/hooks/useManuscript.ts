@@ -43,58 +43,93 @@ function toSuperscript(num: number): string {
   return String(num).split('').map((digit) => sups[digit] || digit).join('');
 }
 
-/** Migrate the static CHAPTERS + NOTES data into EditableChapter[] */
-function migrateFromStatic(): EditableChapter[] {
-  // Build note lookup by chapter (scan paragraphs for superscript numbers)
+/** Re-index all chapters so every chapter's note list starts at Note 1 with matching ¹, ², ³ superscripts */
+export function normalizeChapterNotesAndSuperscripts(chapters: EditableChapter[]): EditableChapter[] {
   const supMap: Record<string, string> = {
     '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
     '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
   };
 
-  return CHAPTERS.map((ch, idx) => {
-    // Convert paragraphs to blocks
-    const blocks: TextBlock[] = ch.paragraphs.map((p) => makeBlock(p, 'original'));
-
-    // Extract note keys from paragraphs
-    const noteKeys: string[] = [];
-    ch.paragraphs.forEach((p) => {
-      const matches = p.match(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g);
+  return chapters.map((ch) => {
+    // 1. Collect all unique note keys present in this chapter
+    const originalKeysFound: string[] = [];
+    ch.blocks.forEach((block) => {
+      const matches = block.content.match(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g);
       if (matches) {
         matches.forEach((m) => {
           const num = m.split('').map((c) => supMap[c] || c).join('');
-          if (NOTES[num] && !noteKeys.includes(num)) {
-            noteKeys.push(num);
+          if (!originalKeysFound.includes(num)) {
+            originalKeysFound.push(num);
           }
         });
       }
     });
 
-    // Fallback: If no notes were matched by regex, attach notes based on chapter index
-    if (noteKeys.length === 0) {
-      const allKeys = Object.keys(NOTES);
-      if (idx === 0) noteKeys.push(...allKeys.slice(0, 10));
-      else if (idx === 1) noteKeys.push(...allKeys.slice(10, 25));
-      else noteKeys.push(...allKeys.slice(25));
-    }
+    ch.notes.forEach((n, idx) => {
+      const num = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+      if (!originalKeysFound.includes(num)) {
+        originalKeysFound.push(num);
+      }
+    });
 
-    const notes: EditableNote[] = noteKeys.map((key, noteIdx) => ({
-      id: uid(),
-      key: `Note ${noteIdx + 1}`,
-      content: NOTES[key],
-      source: 'original' as const,
-    }));
+    // 2. Map old key -> 1-based index for THIS chapter
+    const keyToNewNumber: Record<string, number> = {};
+    originalKeysFound.forEach((oldKey, idx) => {
+      keyToNewNumber[oldKey] = idx + 1;
+    });
 
-    // Extract title
+    // 3. Update chapter's text blocks: replace old superscripts with 1-based superscripts for THIS chapter
+    const updatedBlocks = ch.blocks.map((block) => {
+      let content = block.content;
+      content = content.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => {
+        const oldNum = m.split('').map((c) => supMap[c] || c).join('');
+        const newNum = keyToNewNumber[oldNum];
+        if (newNum !== undefined) {
+          return toSuperscript(newNum);
+        }
+        return m;
+      });
+      return { ...block, content };
+    });
+
+    // 4. Update chapter's notes array: re-key as Note 1, Note 2, Note 3...
+    const updatedNotes = originalKeysFound.map((oldKey, idx) => {
+      const existingNote = ch.notes.find((n) => {
+        const num = n.key ? String(n.key).replace(/\D/g, '') : '';
+        return num === oldKey;
+      });
+      const noteContent = existingNote ? existingNote.content : (NOTES[oldKey] || `Note ${idx + 1}`);
+      return {
+        id: existingNote ? existingNote.id : uid(),
+        key: `Note ${idx + 1}`,
+        content: noteContent,
+        source: (existingNote ? existingNote.source : 'original') as 'manual' | 'ai' | 'original',
+      };
+    });
+
+    return {
+      ...ch,
+      blocks: updatedBlocks,
+      notes: updatedNotes,
+    };
+  });
+}
+
+/** Migrate the static CHAPTERS + NOTES data into EditableChapter[] */
+function migrateFromStatic(): EditableChapter[] {
+  const rawChapters: EditableChapter[] = CHAPTERS.map((ch, idx) => {
+    const blocks: TextBlock[] = ch.paragraphs.map((p) => makeBlock(p, 'original'));
     const title = ch.title.split('—')[1]?.trim() || ch.title;
-
     return {
       id: uid(),
       title: `Chapitre ${idx + 1} — ${title}`,
       blocks,
-      notes,
+      notes: [],
       pendingReviews: [],
     };
   });
+
+  return normalizeChapterNotesAndSuperscripts(rawChapters);
 }
 
 function createInitialState(): ManuscriptState {
@@ -496,10 +531,11 @@ export function useManuscript() {
         const parsed = JSON.parse(saved) as ManuscriptState;
         if (parsed.chapters && parsed.chapters.length > 0) {
           const staticChapters = migrateFromStatic();
-          parsed.chapters = parsed.chapters.map((c, idx) => ({
+          const rawChapters = parsed.chapters.map((c, idx) => ({
             ...c,
             notes: c.notes && c.notes.length > 0 ? c.notes : staticChapters[idx]?.notes || [],
           }));
+          parsed.chapters = normalizeChapterNotesAndSuperscripts(rawChapters);
           targetState = parsed;
           loaded = true;
         }
@@ -525,7 +561,7 @@ export function useManuscript() {
           if (cancelled) return;
           if (fsChapters && fsChapters.length > 0) {
             const staticChapters = migrateFromStatic();
-            const editableChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
+            const rawChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
               id: ch.id || `ch-${idx}`,
               title: ch.title || `Chapitre ${idx + 1}`,
               blocks: (ch.paragraphs || []).map((p) => ({
@@ -538,6 +574,8 @@ export function useManuscript() {
               notes: (ch as any).notes && (ch as any).notes.length > 0 ? (ch as any).notes : staticChapters[idx]?.notes || [],
               pendingReviews: (ch as any).pendingReviews || [],
             }));
+
+            const editableChapters = normalizeChapterNotesAndSuperscripts(rawChapters);
 
             const newState: ManuscriptState = {
               chapters: editableChapters,

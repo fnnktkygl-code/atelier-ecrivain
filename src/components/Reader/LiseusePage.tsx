@@ -6,6 +6,7 @@ import { NOTES } from '@/data/notes';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useTheme } from '@/components/Shared/ThemeProvider';
 import { getChapters } from '@/services/firebase/firestore';
+import { normalizeChapterNotesAndSuperscripts } from '@/hooks/useManuscript';
 
 const SUP_MAP: Record<string, string> = {
   '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
@@ -209,7 +210,28 @@ export default function LiseusePage() {
   const { theme, setTheme } = useTheme();
   const currentManuscriptId = manuscript?.id || 'default';
 
-  const [chapters, setChapters] = useState<any[]>(CHAPTERS);
+  const [chapters, setChapters] = useState<any[]>(() => {
+    const rawChapters = CHAPTERS.map((ch, idx) => ({
+      id: `ch-${idx}`,
+      title: ch.title,
+      blocks: ch.paragraphs.map((p) => ({
+        id: `b-${idx}`,
+        content: p,
+        type: 'paragraph' as const,
+        source: 'original' as const,
+        createdAt: 0,
+      })),
+      notes: [],
+      pendingReviews: [],
+    }));
+
+    const normalized = normalizeChapterNotesAndSuperscripts(rawChapters);
+    return normalized.map((ch) => ({
+      title: ch.title,
+      paragraphs: ch.blocks.map((b) => b.content),
+      notes: ch.notes,
+    }));
+  });
 
   const loadManuscript = useCallback(() => {
     let loaded = false;
