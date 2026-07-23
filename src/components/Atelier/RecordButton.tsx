@@ -39,21 +39,20 @@ export default function RecordButton({
           if (phase === 'complete' || phase === 'error') onReset();
           onStart();
         }}
-        title="Démarrer la dictée vocale IA"
       >
         <div className="record-mic-badge">
           🎙️
         </div>
         <div className="record-text-compact">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <span className="record-title-compact">
-              {phase === 'complete' ? '✅ Text inséré' : phase === 'error' ? '❌ Erreur' : 'Dictée vocale IA'}
+          <span className="record-title-compact">
+            {phase === 'complete' ? '✅ Texte inséré' : phase === 'error' ? '❌ Erreur' : 'Dictée vocale IA'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <span className="record-sub-compact" style={{ flex: 1, minWidth: 0 }}>
+              {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : 'Appuyez pour dicter'}
             </span>
             <QuotaBadge />
           </div>
-          <span className="record-sub-compact">
-            {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : 'Appuyez pour dicter'}
-          </span>
         </div>
         <button className="record-btn-start-compact">
           Dicter ➔
