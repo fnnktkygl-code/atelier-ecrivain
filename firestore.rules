@@ -7,9 +7,13 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Helper function to prevent payload abuse
+    // Helper function to prevent payload abuse and storage inflation
     function isValidPayload() {
-      return request.resource == null || request.resource.data.keys().size() < 100;
+      return request.resource == null || (
+        request.resource.data.keys().size() < 100 &&
+        (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 2000)) &&
+        (!('content' in request.resource.data) || (request.resource.data.content is string && request.resource.data.content.size() <= 250000))
+      );
     }
 
     // Shared system quotas for multi-user real-time tracking
