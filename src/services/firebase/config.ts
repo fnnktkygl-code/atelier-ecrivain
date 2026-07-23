@@ -31,14 +31,19 @@ export function getFirebaseApp(): FirebaseApp {
     app = existing.length > 0 ? existing[0] : initializeApp(firebaseConfig);
 
     // Initialize App Check if ReCAPTCHA site key is provided
-    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
-      try {
-        initializeAppCheck(app, {
-          provider: new ReCaptchaEnterpriseProvider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
-          isTokenAutoRefreshEnabled: true,
-        });
-      } catch (err) {
-        console.warn('App Check initialization warning:', err);
+    if (typeof window !== 'undefined') {
+      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+      if (siteKey) {
+        try {
+          initializeAppCheck(app, {
+            provider: new ReCaptchaEnterpriseProvider(siteKey),
+            isTokenAutoRefreshEnabled: true,
+          });
+        } catch (err) {
+          console.warn('[Security Warning] App Check initialization failed:', err);
+        }
+      } else if (process.env.NODE_ENV === 'production') {
+        console.warn('[Security Notice] NEXT_PUBLIC_RECAPTCHA_SITE_KEY non définie. Firebase App Check désactivé.');
       }
     }
   }
