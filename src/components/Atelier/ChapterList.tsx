@@ -314,10 +314,12 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                                 <>
                                   <span className="drag-handle" title="Glisser pour réordonner">⠿</span>
                                   <span className="ch-badge">{chapterNumberStr(ch.title, i)}</span>
-                                  <span className="ch-title" title={ch.title}>
-                                    {shortTitle(ch.title)}
-                                  </span>
-                                  <span className="ch-words">{chapterWordCount(ch)} mots</span>
+                                  <div className="ch-info">
+                                    <span className="ch-title" title={ch.title}>
+                                      {shortTitle(ch.title)}
+                                    </span>
+                                    <span className="ch-words">{chapterWordCount(ch)} mots</span>
+                                  </div>
 
                                   <div className="kebab-wrap" onClick={(e) => e.stopPropagation()}>
                                     <button

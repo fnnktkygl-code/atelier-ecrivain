@@ -68,13 +68,29 @@ function applyHighlights(html: string, highlights: Highlight[]): string {
   return result;
 }
 
+function renderParagraph(raw: string): string {
+  const p = (raw || '').trim();
+  if (!p) return '';
+  if (p.startsWith('>')) {
+    const content = p.replace(/^>\s*/, '');
+    return `<blockquote>${linkNotes(content)}</blockquote>`;
+  }
+  if (p.startsWith('## ')) {
+    return `<h3>${linkNotes(p.replace(/^##\s*/, ''))}</h3>`;
+  }
+  if (p.startsWith('# ')) {
+    return `<h2>${linkNotes(p.replace(/^#\s*/, ''))}</h2>`;
+  }
+  return `<p>${linkNotes(p)}</p>`;
+}
+
 function buildAllHTML(chapters: any[], highlights: Highlight[]): string {
   let html = chapters.map((ch, ci) => {
     const eyebrow = ch.title.includes('—') ? ch.title.split('—')[0]?.trim() : `Chapitre ${ci + 1}`;
     const shortTitle = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
     const hasContent = ch.paragraphs && ch.paragraphs.some((p: string) => p && p.trim().length > 0);
     const parasHTML = hasContent
-      ? ch.paragraphs.map((p: string) => `<p>${linkNotes(p || '')}</p>`).join('')
+      ? ch.paragraphs.map(renderParagraph).filter(Boolean).join('')
       : '<p style="font-style: italic; opacity: 0.6;">(Chapitre vide)</p>';
     return `
       <div class="col-chapter" data-chapter="${ci}">
