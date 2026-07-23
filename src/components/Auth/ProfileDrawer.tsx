@@ -564,6 +564,34 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
           </div>
         </div>
 
+        {/* ── Custom API Key (BYOK) ── */}
+        <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <p className="drawer-section-title">🔑 Clé IA Personnelle (Optionnelle)</p>
+          <p style={{ fontSize: 11, color: 'var(--text-soft)', margin: '0 0 8px' }}>
+            Individualisée automatiquement via Google Sign-In. Optionnel : collez votre clé Gemini (aistudio.google.com) pour un quota personnel dédié.
+          </p>
+          <input
+            type="password"
+            placeholder="AIzaSy..."
+            defaultValue={typeof window !== 'undefined' ? localStorage.getItem('atelier_user_gemini_key') || '' : ''}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              if (val) localStorage.setItem('atelier_user_gemini_key', val);
+              else localStorage.removeItem('atelier_user_gemini_key');
+            }}
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
+              background: 'var(--surface-2)',
+              color: 'var(--text)',
+              fontSize: 12,
+              fontFamily: 'monospace',
+            }}
+          />
+        </div>
+
         {/* ── RGPD & Data Rights ── */}
         <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <p className="drawer-section-title">🛡️ Données & Confidentialité (RGPD)</p>
