@@ -3,6 +3,8 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { CHAPTERS } from '@/data/chapters';
 import { NOTES } from '@/data/notes';
+import { useAuth } from '@/components/Auth/AuthProvider';
+import { getChapters } from '@/services/firebase/firestore';
 
 const SUP_MAP: Record<string, string> = {
   '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
@@ -165,42 +167,76 @@ export default function LiseusePage() {
   const colWidthRef = useRef(0);
   const [, forceUpdate] = useState(0);
 
+  const { user, manuscript } = useAuth();
+  const currentManuscriptId = manuscript?.id || 'default';
+
   const [chapters, setChapters] = useState<any[]>(CHAPTERS);
 
-  // Load from localStorage
-  useEffect(() => {
-    setHighlights(loadHighlights());
-    setSettings(loadSettings());
-    
-    const loadManuscript = () => {
-      try {
-        const stored = localStorage.getItem('atelier-manuscrit-v1');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.chapters && Array.isArray(parsed.chapters) && parsed.chapters.length > 0) {
-            const formatted = parsed.chapters.map((ch: any) => ({
+  const loadManuscript = useCallback(() => {
+    let loaded = false;
+    try {
+      let stored = localStorage.getItem(`atelier-manuscrit-${currentManuscriptId}`);
+      if (!stored) {
+        stored = localStorage.getItem('atelier-manuscrit-v1');
+      }
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.chapters && Array.isArray(parsed.chapters) && parsed.chapters.length > 0) {
+          const formatted = parsed.chapters.map((ch: any) => ({
+            title: ch.title || 'Chapitre sans titre',
+            paragraphs: ch.blocks ? ch.blocks.map((b: any) => (b && b.content) || '') : [],
+          }));
+          setChapters(formatted);
+          loaded = true;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading manuscript in Liseuse:', e);
+    }
+
+    if (!loaded && user && manuscript?.id) {
+      getChapters(user.uid, manuscript.id)
+        .then((fsChapters) => {
+          if (fsChapters && fsChapters.length > 0) {
+            const formatted = fsChapters.map((ch: any) => ({
               title: ch.title || 'Chapitre sans titre',
-              paragraphs: ch.blocks ? ch.blocks.map((b: any) => b.content) : [],
+              paragraphs: ch.paragraphs || [],
             }));
             setChapters(formatted);
           }
-        }
-      } catch (e) {
-        console.error('Error loading manuscript:', e);
-      }
-    };
+        })
+        .catch((err) => console.error('Error loading Firestore chapters in Liseuse:', err));
+    }
+  }, [currentManuscriptId, user, manuscript?.id]);
+
+  // Load from localStorage and listen to updates
+  useEffect(() => {
+    setHighlights(loadHighlights());
+    setSettings(loadSettings());
 
     loadManuscript();
 
-    // Listen for storage events (e.g. from other tabs or if the hook saves)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'atelier-manuscrit-v1') {
+      if (
+        e.key === `atelier-manuscrit-${currentManuscriptId}` ||
+        e.key === 'atelier-manuscrit-v1'
+      ) {
         loadManuscript();
       }
     };
+
+    const handleCustomUpdate = () => {
+      loadManuscript();
+    };
+
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+    window.addEventListener('atelier_manuscript_updated', handleCustomUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('atelier_manuscript_updated', handleCustomUpdate);
+    };
+  }, [loadManuscript, currentManuscriptId]);
 
   const updateSettings = (patch: Partial<ReaderSettings>) => {
     setSettings((prev) => {

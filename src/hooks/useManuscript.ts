@@ -9,7 +9,7 @@
 
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
-import { getChapters } from '@/services/firebase/firestore';
+import { getChapters, saveAllChapters } from '@/services/firebase/firestore';
 import type {
   ManuscriptState,
   ManuscriptAction,
@@ -387,6 +387,7 @@ export function useManuscript() {
   // Reload chapters whenever the active manuscript changes
   useEffect(() => {
     let loaded = false;
+    let targetState: ManuscriptState | null = null;
 
     // 1. Try local storage for current manuscript ID
     try {
@@ -394,7 +395,7 @@ export function useManuscript() {
       if (saved) {
         const parsed = JSON.parse(saved) as ManuscriptState;
         if (parsed.chapters && parsed.chapters.length > 0) {
-          dispatch({ type: 'LOAD_STATE', state: parsed });
+          targetState = parsed;
           loaded = true;
         }
       }
@@ -409,10 +410,21 @@ export function useManuscript() {
         if (savedDefault) {
           const parsed = JSON.parse(savedDefault) as ManuscriptState;
           if (parsed.chapters && parsed.chapters.length > 0) {
-            dispatch({ type: 'LOAD_STATE', state: parsed });
+            targetState = parsed;
             loaded = true;
           }
         }
+      } catch {}
+    }
+
+    if (loaded && targetState) {
+      dispatch({ type: 'LOAD_STATE', state: targetState });
+      try {
+        localStorage.setItem(currentStorageKey, JSON.stringify(targetState));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(targetState));
+        window.dispatchEvent(
+          new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+        );
       } catch {}
     }
 
@@ -445,6 +457,10 @@ export function useManuscript() {
             dispatch({ type: 'LOAD_STATE', state: newState });
             try {
               localStorage.setItem(currentStorageKey, JSON.stringify(newState));
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+              window.dispatchEvent(
+                new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+              );
             } catch {}
           } else {
             // New manuscript with 0 chapters -> Initialize 1 fresh chapter
@@ -474,6 +490,10 @@ export function useManuscript() {
             dispatch({ type: 'LOAD_STATE', state: freshState });
             try {
               localStorage.setItem(currentStorageKey, JSON.stringify(freshState));
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(freshState));
+              window.dispatchEvent(
+                new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+              );
             } catch {}
           }
         })
@@ -485,24 +505,36 @@ export function useManuscript() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Auto-save to localStorage (debounced)
+  // Auto-save: INSTANT local storage & custom event sync + DEBOUCED Firestore sync
   useEffect(() => {
     if (!state.isDirty) return;
 
+    // 1. Save IMMEDIATELY to localStorage and notify all listeners (Liseuse, etc.)
+    try {
+      localStorage.setItem(currentStorageKey, JSON.stringify(state));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      window.dispatchEvent(
+        new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+      );
+      dispatch({ type: 'MARK_SAVED' });
+    } catch {
+      // Storage full — ignore
+    }
+
+    // 2. Debounced save to Firestore for cloud sync
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      try {
-        localStorage.setItem(currentStorageKey, JSON.stringify(state));
-        dispatch({ type: 'MARK_SAVED' });
-      } catch {
-        // Storage full — ignore
-      }
-    }, 1000);
+    if (user && manuscript?.id) {
+      saveTimerRef.current = setTimeout(() => {
+        saveAllChapters(user.uid, manuscript.id, state.chapters).catch((err) =>
+          console.error('Firestore save chapters error:', err)
+        );
+      }, 1000);
+    }
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [state, currentStorageKey]);
+  }, [state, currentStorageKey, currentManuscriptId, user, manuscript?.id]);
 
   // Force save on unmount
   useEffect(() => {
@@ -510,10 +542,14 @@ export function useManuscript() {
       if (stateRef.current.isDirty) {
         try {
           localStorage.setItem(currentStorageKey, JSON.stringify(stateRef.current));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+          window.dispatchEvent(
+            new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+          );
         } catch {}
       }
     };
-  }, [currentStorageKey]);
+  }, [currentStorageKey, currentManuscriptId]);
   // ── Convenience methods ──
 
   const activeChapter = state.chapters[state.activeChapterIndex] || state.chapters[0];

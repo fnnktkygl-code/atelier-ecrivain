@@ -91,6 +91,39 @@ export async function saveChapter(uid: string, manuscriptId: string, chapterIdx:
   await setDoc(mRef, { updatedAt: serverTimestamp() }, { merge: true });
 }
 
+export async function saveAllChapters(
+  uid: string,
+  manuscriptId: string,
+  chapters: { title: string; blocks: { content: string }[] }[]
+): Promise<void> {
+  const db = getDb();
+  const batch = writeBatch(db);
+
+  chapters.forEach((ch, idx) => {
+    const chRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${idx}`);
+    batch.set(chRef, {
+      title: ch.title,
+      paragraphs: ch.blocks.map((b) => b.content || ''),
+      order: idx,
+    });
+  });
+
+  const totalWords = chapters.reduce(
+    (sum, ch) =>
+      sum +
+      ch.blocks.reduce(
+        (s, b) => s + (b.content ? b.content.split(/\s+/).filter(Boolean).length : 0),
+        0
+      ),
+    0
+  );
+
+  const mRef = doc(doc(db, 'users', uid, 'manuscripts', manuscriptId).path ? db : db, 'users', uid, 'manuscripts', manuscriptId);
+  batch.set(mRef, { updatedAt: serverTimestamp(), wordCount: totalWords }, { merge: true });
+
+  await batch.commit();
+}
+
 // ── Notes ──
 export async function getNotes(uid: string, manuscriptId: string): Promise<Record<string, string>> {
   const db = getDb();
