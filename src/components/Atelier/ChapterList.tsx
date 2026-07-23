@@ -324,6 +324,7 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                                   <div className="kebab-wrap" onClick={(e) => e.stopPropagation()}>
                                     <button
                                       className="kebab-btn"
+                                      aria-label="Actions du chapitre"
                                       onClick={() => {
                                         setMenuIndex(menuIndex === i ? null : i);
                                         setConfirmDeleteIndex(null);
