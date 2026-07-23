@@ -1025,7 +1025,7 @@ export default function LiseusePage() {
                   const title = ch.title.includes('—') ? ch.title.split('—')[1]?.trim() : ch.title;
                   const hasContent = ch.paragraphs && ch.paragraphs.some((p: string) => p && p.trim().length > 0);
                   let parasHtml = hasContent
-                    ? ch.paragraphs.map((p: string) => `<p>${linkNotes(p)}</p>`).join('')
+                    ? ch.paragraphs.map(renderParagraph).filter(Boolean).join('')
                     : '<p style="font-style: italic; opacity: 0.6;">(Chapitre vide)</p>';
                   if (highlights.length > 0) parasHtml = applyHighlights(parasHtml, highlights);
                   return (
