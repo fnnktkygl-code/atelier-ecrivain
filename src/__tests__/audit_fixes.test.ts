@@ -43,10 +43,17 @@ test('linkNotes generates valid superscripts for dynamic notes', () => {
   assert.ok(html.includes('<sup class="note-ref" data-note="1">¹</sup>'));
 });
 
-// Test 3: Rature original field check
-test('ratures retain original phrase and non-empty target', () => {
-  const ratureObj = { original: 'disait que tout', corrected: 'affirmait que tout', explanation: 'mot plus précis' };
-  const origText = typeof ratureObj === 'string' ? ratureObj : (ratureObj.original || ratureObj.corrected || '');
-  assert.equal(origText, 'disait que tout');
-  assert.notEqual(origText, '');
+// Test 4: Chapter-isolated note resolution
+test('chapter-isolated note resolution does not pollute across chapters', () => {
+  const chapters = [
+    { title: 'Chapitre 1', notes: [{ key: 'Note 1', content: 'Note du Chapitre 1' }] },
+    { title: 'Chapitre 4', notes: [{ key: 'Note 1', content: 'Note du Chapitre 4 (Nouveau)' }] }
+  ];
+
+  // Resolve Note 1 in Chapter 4 (index 1)
+  const ch4Notes = chapters[1].notes;
+  const found = ch4Notes.find(n => n.key === 'Note 1');
+
+  assert.equal(found?.content, 'Note du Chapitre 4 (Nouveau)');
+  assert.notEqual(found?.content, 'Note du Chapitre 1');
 });

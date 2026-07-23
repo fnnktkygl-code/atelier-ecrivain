@@ -13,16 +13,20 @@ const SUP_MAP: Record<string, string> = {
 };
 
 function linkNotes(text: string, chapterNotes: any[] = []): string {
-  const notesLookup: Record<string, string> = { ...NOTES };
-  if (Array.isArray(chapterNotes)) {
+  const notesLookup: Record<string, string> = {};
+
+  if (Array.isArray(chapterNotes) && chapterNotes.length > 0) {
     chapterNotes.forEach((n, idx) => {
       const num = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
       notesLookup[num] = n.content;
     });
+  } else {
+    Object.assign(notesLookup, NOTES);
   }
 
   return text.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => {
     const num = m.split('').map((c) => SUP_MAP[c] || c).join('');
+    if (!notesLookup[num]) return m;
     return `<sup class="note-ref" data-note="${num}" tabindex="0" role="button" aria-label="Voir la note ${num}">${m}</sup>`;
   });
 }
@@ -351,26 +355,61 @@ export default function LiseusePage() {
     setCurrentPage((p) => (p <= 0 ? p : p - 1));
   }, []);
 
+  // Helper to resolve note text strictly scoped to the chapter column
+  const getNoteContentFromRef = useCallback((refEl: HTMLElement): { num: string; text: string } | null => {
+    const num = refEl.dataset.note || '';
+    if (!num) return null;
+
+    const chapterCol = refEl.closest('.col-chapter') as HTMLElement | null;
+    const chIndexStr = chapterCol?.dataset.chapter;
+    const chIndex = chIndexStr !== undefined ? parseInt(chIndexStr, 10) : -1;
+
+    let noteText: string | undefined;
+
+    // 1. Try matching in the specific chapter containing this note
+    if (chIndex >= 0 && chapters && chapters[chIndex]) {
+      const ch = chapters[chIndex];
+      if (ch.notes && Array.isArray(ch.notes) && ch.notes.length > 0) {
+        const found = ch.notes.find((n: any, idx: number) => {
+          const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+          return nNum === num;
+        });
+        if (found) noteText = found.content;
+      }
+    }
+
+    // 2. Fallback: search all custom chapter notes
+    if (!noteText && chapters) {
+      for (const ch of chapters) {
+        if (ch.notes && Array.isArray(ch.notes) && ch.notes.length > 0) {
+          const found = ch.notes.find((n: any, idx: number) => {
+            const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+            return nNum === num;
+          });
+          if (found) {
+            noteText = found.content;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Fallback to static demo NOTES only if no custom notes exist
+    if (!noteText) {
+      noteText = NOTES[num];
+    }
+
+    return noteText ? { num, text: noteText } : null;
+  }, [chapters]);
+
   // Keyboard
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const activeEl = document.activeElement as HTMLElement | null;
       if (activeEl && activeEl.classList.contains('note-ref') && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
-        const num = activeEl.dataset.note || '';
-        let noteText = NOTES[num];
-        if (!noteText && chapters) {
-          for (const ch of chapters) {
-            if (ch.notes && Array.isArray(ch.notes)) {
-              const found = ch.notes.find((n: any, idx: number) => {
-                const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
-                return nNum === num;
-              });
-              if (found) { noteText = found.content; break; }
-            }
-          }
-        }
-        if (noteText) setNotePopup({ num, text: noteText });
+        const res = getNoteContentFromRef(activeEl);
+        if (res) setNotePopup(res);
         return;
       }
       if (scrollMode) return;
@@ -380,7 +419,7 @@ export default function LiseusePage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [scrollMode, goNext, goPrev, chapters]);
+  }, [scrollMode, goNext, goPrev, getNoteContentFromRef]);
 
   // Touch swipe
   useEffect(() => {
