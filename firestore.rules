@@ -7,9 +7,14 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Helper function to prevent payload abuse (max 1MB per document write)
+    // Helper function to prevent payload abuse
     function isValidPayload() {
       return request.resource == null || request.resource.data.keys().size() < 100;
+    }
+
+    // Shared system quotas for multi-user real-time tracking
+    match /system/{document=**} {
+      allow read, write: if request.auth != null && isValidPayload();
     }
 
     // User data scoped strictly by UID
