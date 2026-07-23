@@ -261,6 +261,26 @@ export default function LoginPage() {
           <p className="landing-cta-sub">
             Gratuit · Connexion sécurisée via Google · Vos données restent privées
           </p>
+
+          {/* RGPD & AI Privacy Transparency Card */}
+          <div
+            style={{
+              marginTop: 14,
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              fontSize: 11.5,
+              color: 'var(--text-soft)',
+              maxWidth: 440,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              textAlign: 'left',
+              lineHeight: '1.45',
+            }}
+          >
+            🛡️ <strong>Transparence & RGPD :</strong> Vos dictées vocales sont traitées en toute confidentialité via l&apos;API Google IA rattachée à votre session. Aucune donnée n&apos;est revendue ni réentraînée. Vous gardez le contrôle total (exportation & suppression à tout moment).
+          </div>
         </div>
 
         {/* ── How it Works ── */}
