@@ -236,7 +236,7 @@ export default function LiseusePage() {
   const loadManuscript = useCallback(() => {
     let loaded = false;
     try {
-      let stored = localStorage.getItem(`atelier-manuscrit-${currentManuscriptId}`);
+      let stored = localStorage.getItem(`atelier-manuscrit-v4-${currentManuscriptId}`);
       if (!stored) {
         stored = localStorage.getItem('atelier-manuscrit-v1');
       }

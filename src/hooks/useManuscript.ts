@@ -507,7 +507,7 @@ function undoableReducer(state: UndoableState, action: ManuscriptAction | { type
 export function useManuscript() {
   const { user, manuscript } = useAuth();
   const currentManuscriptId = manuscript?.id || 'default';
-  const currentStorageKey = `atelier-manuscrit-${currentManuscriptId}`;
+  const currentStorageKey = `atelier-manuscrit-v4-${currentManuscriptId}`;
 
   const [undoState, dispatch] = useReducer(undoableReducer, undefined, () => ({
     past: [],
