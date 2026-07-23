@@ -60,12 +60,15 @@ export default function AtelierPage() {
     const reviews: PendingReview[] = [];
 
     if (ds.result.ratures && ds.result.ratures.length > 0) {
-      ds.result.ratures.forEach((r) => {
+      ds.result.ratures.forEach((r: any) => {
+        const origText = typeof r === 'string' ? r : (r.original || r.corrected || '');
+        const suggText = typeof r === 'string' ? r : (r.corrected || r.original || '');
         reviews.push({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           type: 'rature',
-          original: typeof r === 'string' ? '' : r,
-          suggestion: typeof r === 'string' ? r : '',
+          original: origText,
+          suggestion: suggText,
+          explanation: typeof r === 'string' ? undefined : r.explanation,
           status: 'pending',
         });
       });

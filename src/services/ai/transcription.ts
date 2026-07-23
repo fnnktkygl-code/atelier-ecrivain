@@ -201,41 +201,11 @@ export async function transcribeAudio(
   return { ...result, modelUsed };
 }
 
-/**
- * Fact-check a passage of text
- */
+import { verifyTextFactCheck } from '../ai-router/services/factCheck';
+
 export async function factCheck(text: string): Promise<VerificationItem[]> {
-  if (!isFirebaseConfigured()) {
-    throw new Error('Firebase n\'est pas configuré.');
-  }
-
-  const { result } = await generateWithFallback(
-    {
-      responseMimeType: 'application/json',
-      maxOutputTokens: 4096,
-    },
-    SYSTEM_PROMPT_FACTCHECK,
-    async (model, modelName) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI FactCheck] Exécution avec le modèle : ${modelName}`);
-      }
-      const apiResult = await model.generateContent(
-        `Vérifie les faits dans ce passage de manuscrit :\n\n${text}`
-      );
-      const responseText = apiResult.response.text();
-      try {
-        return JSON.parse(responseText) as VerificationItem[];
-      } catch {
-        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as VerificationItem[];
-        }
-        return [];
-      }
-    }
-  );
-
-  return result;
+  const res = await verifyTextFactCheck(text);
+  return res.verifications;
 }
 
 /**

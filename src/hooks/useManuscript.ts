@@ -352,14 +352,8 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
             });
           }
 
-          // 3. Fallback: If still not replaced, update the last active block in chapter
-          if (!replaced && ch.blocks.length > 0) {
-            const lastIdx = ch.blocks.length - 1;
-            ch.blocks[lastIdx] = {
-              ...ch.blocks[lastIdx],
-              content: replacementText,
-            };
-          }
+          // 3. Safe fallback: If not replaced automatically, do NOT overwrite any block.
+          // The note/citation is preserved in Notes and the review is archived safely.
         }
 
         // 4. Create the corresponding note in ch.notes

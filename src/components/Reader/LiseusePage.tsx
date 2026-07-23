@@ -220,6 +220,7 @@ export default function LiseusePage() {
           const formatted = parsed.chapters.map((ch: any) => ({
             title: ch.title || 'Chapitre sans titre',
             paragraphs: ch.blocks ? ch.blocks.map((b: any) => (b && b.content) || '') : [],
+            notes: ch.notes || [],
           }));
           setChapters(formatted);
           loaded = true;
@@ -236,6 +237,7 @@ export default function LiseusePage() {
             const formatted = fsChapters.map((ch: any) => ({
               title: ch.title || 'Chapitre sans titre',
               paragraphs: ch.paragraphs || [],
+              notes: ch.notes || [],
             }));
             setChapters(formatted);
           }
@@ -351,15 +353,34 @@ export default function LiseusePage() {
 
   // Keyboard
   useEffect(() => {
-    if (scrollMode) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goNext(); }
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (activeEl && activeEl.classList.contains('note-ref') && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        const num = activeEl.dataset.note || '';
+        let noteText = NOTES[num];
+        if (!noteText && chapters) {
+          for (const ch of chapters) {
+            if (ch.notes && Array.isArray(ch.notes)) {
+              const found = ch.notes.find((n: any, idx: number) => {
+                const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+                return nNum === num;
+              });
+              if (found) { noteText = found.content; break; }
+            }
+          }
+        }
+        if (noteText) setNotePopup({ num, text: noteText });
+        return;
+      }
+      if (scrollMode) return;
+      if (e.key === 'ArrowRight' || (e.key === ' ' && !activeEl?.classList.contains('note-ref'))) { e.preventDefault(); goNext(); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
       if (e.key === 'Escape') { setNotePopup(null); setSelPopup(null); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [scrollMode, goNext, goPrev]);
+  }, [scrollMode, goNext, goPrev, chapters]);
 
   // Touch swipe
   useEffect(() => {
