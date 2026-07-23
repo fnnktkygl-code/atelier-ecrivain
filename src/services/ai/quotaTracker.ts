@@ -1,8 +1,8 @@
 import { getDb } from '@/services/firebase/firestore';
 import { doc, setDoc, onSnapshot, increment } from 'firebase/firestore';
 
-const MAX_RPM = 15; // Requests per minute
-const MAX_RPD = 1500; // Requests per day
+const MAX_RPM = 15; // Requests per minute (5 req/min per model × 3 fallback models)
+const MAX_RPD = 60; // Requests per day (20 req/day per model × 3 fallback models)
 const STORAGE_KEY = 'atelier_gemini_quota_v1';
 
 interface QuotaData {
