@@ -1,5 +1,7 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# Instructions & Directives — Atelier de l'Écrivain
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+- **Stack Technique** : Next.js (App Router, Export Statique `output: 'export'`), React, TypeScript strict, Firebase (Auth, Firestore, Storage, App Check).
+- **Directives de Sécurité** :
+  1. Respecter strictement la moindre privilège sur les règles de sécurité Firestore (`firestore.rules`) et Storage (`storage.rules`).
+  2. Systématiquement assainir et échapper le contenu HTML dynamique (prévention XSS).
+  3. Aucune clé d'API privée ni secret de service account ne doit être présent dans le code bundle client.
