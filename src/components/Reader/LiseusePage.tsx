@@ -236,9 +236,16 @@ export default function LiseusePage() {
   const loadManuscript = useCallback(() => {
     let loaded = false;
     try {
-      let stored = localStorage.getItem(`atelier-manuscrit-v4-${currentManuscriptId}`);
-      if (!stored) {
-        stored = localStorage.getItem('atelier-manuscrit-v1');
+      const keysToTry = [
+        `atelier-manuscrit-v4-${currentManuscriptId}`,
+        `atelier-manuscrit-${currentManuscriptId}`,
+        'atelier-manuscrit-default',
+        'atelier-manuscrit-v1',
+      ];
+      let stored: string | null = null;
+      for (const k of keysToTry) {
+        stored = localStorage.getItem(k);
+        if (stored) break;
       }
       if (stored) {
         const parsed = JSON.parse(stored);

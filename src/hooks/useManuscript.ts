@@ -524,9 +524,20 @@ export function useManuscript() {
     let loaded = false;
     let targetState: ManuscriptState | null = null;
 
-    // 1. Try local storage for current manuscript ID
+    // 1. Try local storage for current manuscript ID (with fallbacks to preserve user created chapters)
     try {
-      const saved = localStorage.getItem(currentStorageKey);
+      const keysToTry = [
+        currentStorageKey,
+        `atelier-manuscrit-${currentManuscriptId}`,
+        `atelier-manuscrit-v1`,
+        `atelier-manuscrit-default`,
+      ];
+      let saved: string | null = null;
+      for (const key of keysToTry) {
+        saved = localStorage.getItem(key);
+        if (saved) break;
+      }
+
       if (saved) {
         const parsed = JSON.parse(saved) as ManuscriptState;
         if (parsed.chapters && parsed.chapters.length > 0) {
