@@ -1,19 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getQuotaStatus } from '@/services/ai/quotaTracker';
+import { loadModelQuota } from '@/services/ai-router/quota/quotaStore';
+import { getPacificDateString } from '@/services/ai-router/quota/resetSchedule';
 
 export default function QuotaBadge() {
-  const [status, setStatus] = useState(getQuotaStatus());
   const [hasCustomKey, setHasCustomKey] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [dictationDayCount, setDictationDayCount] = useState(0);
 
   useEffect(() => {
     const update = () => {
-      setStatus(getQuotaStatus());
       if (typeof window !== 'undefined') {
         setHasCustomKey(!!localStorage.getItem('atelier_user_gemini_key'));
       }
+      const q36 = loadModelQuota('gemini-3.6-flash', 'generation');
+      const q35 = loadModelQuota('gemini-3.5-flash', 'generation');
+      const q25 = loadModelQuota('gemini-2.5-flash', 'generation');
+      setDictationDayCount(q36.dayCount + q35.dayCount + q25.dayCount);
     };
     update();
     window.addEventListener('atelier_quota_updated', update);
@@ -23,6 +27,9 @@ export default function QuotaBadge() {
       clearInterval(interval);
     };
   }, []);
+
+  const totalLimit = 60; // 20 RPD x 3 models
+  const remaining = Math.max(0, totalLimit - dictationDayCount);
 
   return (
     <div
@@ -44,11 +51,11 @@ export default function QuotaBadge() {
           fontSize: 9.5,
           fontWeight: 600,
           fontFamily: 'var(--font-sans)',
-          color: hasCustomKey ? '#27ae60' : status.isWarning ? '#e53e3e' : 'var(--text-soft)',
+          color: hasCustomKey ? '#27ae60' : remaining < 10 ? '#e53e3e' : 'var(--text-soft)',
           whiteSpace: 'nowrap',
           padding: '1px 6px',
           borderRadius: 6,
-          background: status.isWarning ? 'rgba(229,62,62,0.1)' : 'var(--surface-2, rgba(0,0,0,0.04))',
+          background: remaining < 10 ? 'rgba(229,62,62,0.1)' : 'var(--surface-2, rgba(0,0,0,0.04))',
           border: '1px solid var(--border)',
           cursor: 'pointer',
           transition: 'all 0.2s ease',
@@ -61,14 +68,14 @@ export default function QuotaBadge() {
             width: 5,
             height: 5,
             borderRadius: '50%',
-            background: status.isWarning ? '#e53e3e' : '#27ae60',
+            background: remaining < 10 ? '#e53e3e' : '#27ae60',
             display: 'inline-block',
             flexShrink: 0,
-            boxShadow: status.isWarning ? '0 0 5px #e53e3e' : '0 0 4px #27ae60',
+            boxShadow: remaining < 10 ? '0 0 5px #e53e3e' : '0 0 4px #27ae60',
           }}
         />
         <span style={{ whiteSpace: 'nowrap' }}>
-          {hasCustomKey ? 'Clé Dédiée' : `${status.minuteRemaining}/${status.minuteLimit} req.`}
+          {hasCustomKey ? 'Clé Dédiée' : `${remaining}/${totalLimit} req.`}
         </span>
       </div>
 
@@ -79,7 +86,7 @@ export default function QuotaBadge() {
             bottom: 'calc(100% + 8px)',
             right: 0,
             zIndex: 9999,
-            width: 240,
+            width: 250,
             padding: '10px 12px',
             background: 'var(--surface, #faf7f2)',
             border: '1px solid var(--border, rgba(0,0,0,0.12))',
@@ -93,16 +100,17 @@ export default function QuotaBadge() {
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--accent, #8a5a34)' }}>
-            {hasCustomKey ? '🔑 Quota Gemini (Clé Dédiée)' : '🟢 Quota Individuel Google'}
+            {hasCustomKey ? '🔑 Quota Gemini (Clé Dédiée)' : '🟢 Quota Multi-Modèles Gemini'}
           </div>
           {hasCustomKey ? (
-            <div>• Clé personnelle active (Quota Illimité)<br />• Dictées aujourd&apos;hui : {status.dayCount}</div>
+            <div>• Clé personnelle active (Quota Illimité)<br />• Dictées aujourd&apos;hui : {dictationDayCount}</div>
           ) : (
             <div>
-              • <strong>Minute :</strong> {status.minuteRemaining}/{status.minuteLimit} requêtes disponibles<br />
-              • <strong>Jour :</strong> {status.dayRemaining}/{status.dayLimit} requêtes disponibles<br />
+              • <strong>Dictée Vocale :</strong> {remaining}/{totalLimit} req. aujourd&apos;hui (3.6 / 3.5 / 2.5 Flash)<br />
+              • <strong>Recherche Sourcée :</strong> 1500 req/jour<br />
+              • <strong>Synthèse Vocale :</strong> 10 req/jour<br />
               <span style={{ fontSize: 10, color: 'var(--text-soft)', fontStyle: 'italic', marginTop: 4, display: 'block' }}>
-                Totalement indépendant des autres utilisateurs
+                Réinitialisation à minuit heure Pacifique ({getPacificDateString()})
               </span>
             </div>
           )}

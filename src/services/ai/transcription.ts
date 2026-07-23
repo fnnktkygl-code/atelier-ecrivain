@@ -66,8 +66,11 @@ const MODEL_FALLBACK_CHAIN = [
   'gemini-flash-latest',
 ];
 
+import { selectModel } from '../ai-router/router/selectModel';
+import { recordUsage } from '../ai-router/router/recordUsage';
+
 /**
- * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error
+ * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error using AI Router
  */
 async function generateWithFallback<T>(
   generationConfig: any,
@@ -78,9 +81,14 @@ async function generateWithFallback<T>(
   const app = getFirebaseApp();
   const ai = getAI(app, { backend: new GoogleAIBackend() });
 
+  const selection = await selectModel('dictation');
+  const chain = selection.modelId
+    ? [selection.modelId, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest']
+    : ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+
   let lastError: any = null;
 
-  for (const modelName of MODEL_FALLBACK_CHAIN) {
+  for (const modelName of chain) {
     try {
       const model = getGenerativeModel(ai, {
         model: modelName,
@@ -89,6 +97,7 @@ async function generateWithFallback<T>(
       });
 
       const res = await execute(model, modelName);
+      await recordUsage(modelName, 'generation', 'success');
       return { result: res, modelUsed: modelName };
     } catch (err: any) {
       lastError = err;
@@ -102,7 +111,8 @@ async function generateWithFallback<T>(
         errMsg.includes('is not supported');
 
       if (isQuotaOrNotFound) {
-        console.warn(`[AI Fallback] Modèle ${modelName} indisponible ou quota atteint (${errMsg}). Basculement vers le modèle suivant...`);
+        await recordUsage(modelName, 'generation', 'quota-error');
+        console.warn(`[AI Fallback] Modèle ${modelName} indisponible ou quota atteint. Basculement...`);
         continue;
       }
       throw err;

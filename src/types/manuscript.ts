@@ -53,8 +53,8 @@ export interface AIStructuredOutput {
 export interface VerificationItem {
   /** Texte de la vérification */
   text: string;
-  /** Statut : confirmé, à nuancer, erreur trouvée */
-  status: 'confirmed' | 'caution' | 'error';
+  /** Statut : confirmé, à nuancer, erreur trouvée, non vérifié */
+  status: 'confirmed' | 'caution' | 'error' | 'unverified';
   /** Source ou référence vérifiée */
   source?: string;
   /** Suggestion de correction */

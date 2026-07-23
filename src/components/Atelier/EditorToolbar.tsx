@@ -154,6 +154,19 @@ export default function EditorToolbar({
           </button>
         </Tooltip>
 
+        <Tooltip content="Exporter mon livre en PDF Éditorial (Couverture, Thèmes, Pagination)">
+          <button
+            className="btn-icon"
+            onClick={onExport}
+            style={{
+              width: 36, height: 36, fontSize: 16, color: 'var(--accent)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%'
+            }}
+          >
+            📖
+          </button>
+        </Tooltip>
+
         <Tooltip content={isFocusMode ? 'Quitter le mode concentration' : 'Mode concentration — masque la sidebar pour écrire sans distraction'}>
           <button
             className={`btn-icon ${isFocusMode ? 'active' : ''}`}
