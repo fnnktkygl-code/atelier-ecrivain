@@ -7,9 +7,19 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // User files scoped strictly by UID
+    // Helper function to restrict content types to safe media & json formats
+    function isAllowedContentType() {
+      return request.resource.contentType.matches('image/(png|jpeg|webp|gif)') ||
+             request.resource.contentType.matches('audio/(webm|mp4|mpeg|wav|ogg|m4a|x-m4a)') ||
+             request.resource.contentType == 'application/json';
+    }
+
+    // User files scoped strictly by UID with 10MB limit & content type validation
     match /users/{userId}/{allPaths=**} {
-      allow read, write: if isOwner(userId) && request.resource.size < 10 * 1024 * 1024; // 10MB max
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) &&
+                      request.resource.size < 10 * 1024 * 1024 &&
+                      isAllowedContentType();
     }
 
     // Deny all other access by default
