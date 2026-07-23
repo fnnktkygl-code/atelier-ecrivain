@@ -13,6 +13,8 @@ interface RecordButtonProps {
   error?: string | null;
 }
 
+import QuotaBadge from '@/components/Shared/QuotaBadge';
+
 export default function RecordButton({
   phase,
   level,
@@ -43,9 +45,12 @@ export default function RecordButton({
           🎙️
         </div>
         <div className="record-text-compact">
-          <span className="record-title-compact">
-            {phase === 'complete' ? '✅ Text inséré' : phase === 'error' ? '❌ Erreur' : 'Dictée vocale IA'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <span className="record-title-compact">
+              {phase === 'complete' ? '✅ Text inséré' : phase === 'error' ? '❌ Erreur' : 'Dictée vocale IA'}
+            </span>
+            <QuotaBadge />
+          </div>
           <span className="record-sub-compact">
             {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : 'Appuyez pour dicter'}
           </span>

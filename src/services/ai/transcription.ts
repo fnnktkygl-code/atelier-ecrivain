@@ -130,6 +130,8 @@ function checkRateLimit() {
   requestTimestamps.push(now);
 }
 
+import { recordApiRequest } from './quotaTracker';
+
 export async function transcribeAudio(
   audioBlob: Blob,
   context?: { currentChapter?: number; previousContent?: string }
@@ -141,6 +143,7 @@ export async function transcribeAudio(
   }
 
   checkRateLimit();
+  recordApiRequest();
 
   const audioBase64 = await blobToBase64(audioBlob);
 
