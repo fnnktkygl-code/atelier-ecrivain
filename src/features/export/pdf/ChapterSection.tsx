@@ -5,18 +5,17 @@ import { ExportTheme } from '../types/theme';
 import { PageSetup } from '../types/exportSettings';
 import { HeaderFooterDecoration } from './pageDecorations';
 
-function toRoman(num: number): string {
-  const lookup: Record<string, number> = {
-    M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1
-  };
-  let roman = '';
-  for (const i in lookup) {
-    while (num >= lookup[i]) {
-      roman += i;
-      num -= lookup[i];
-    }
+function getCleanTitle(title: string): { chapterPrefix?: string; cleanTitle: string } {
+  if (!title) return { cleanTitle: '' };
+  // Check if title starts with "Chapitre X — " or "Chapitre X: "
+  const match = title.match(/^(Chapitre\s+\d+|Chapter\s+\d+)\s*[—:-]?\s*(.*)$/i);
+  if (match) {
+    return {
+      chapterPrefix: match[1],
+      cleanTitle: match[2] || match[1],
+    };
   }
-  return roman || String(num);
+  return { cleanTitle: title };
 }
 
 export function ChapterSection({
@@ -37,64 +36,40 @@ export function ChapterSection({
   includeChapterNumbers: boolean;
 }) {
   const isCentered = theme.titlePageLayout === 'centered' || theme.chapterOpening === 'centered-number';
+  const { chapterPrefix, cleanTitle } = getCleanTitle(chapter.title);
 
   const styles = StyleSheet.create({
     page: {
-      paddingTop: Math.max(40, pageSetup.marginTopMm * 2.83),
-      paddingBottom: Math.max(40, pageSetup.marginBottomMm * 2.83),
+      paddingTop: Math.max(45, pageSetup.marginTopMm * 2.83),
+      paddingBottom: Math.max(45, pageSetup.marginBottomMm * 2.83),
       paddingLeft: pageSetup.marginInsideMm * 2.83,
       paddingRight: pageSetup.marginOutsideMm * 2.83,
       backgroundColor: '#ffffff',
     },
     titleContainer: {
-      marginTop: 24,
-      marginBottom: 28,
+      marginTop: 30,
+      marginBottom: 24,
       alignItems: isCentered ? 'center' : 'flex-start',
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.ruleLine || '#e5e7eb',
-      paddingBottom: 16,
     },
-    chapterNumberBanner: {
-      fontSize: 11,
+    chapterNumber: {
+      fontSize: 12,
       fontFamily: theme.fonts.heading,
       color: theme.colors.accent,
-      marginBottom: 8,
-      letterSpacing: 2,
+      marginBottom: 6,
       textTransform: 'uppercase',
-      fontWeight: 'bold',
+      letterSpacing: 1.5,
     },
     chapterTitle: {
-      fontSize: 22,
+      fontSize: 18,
       fontFamily: theme.fonts.heading,
       color: theme.colors.text,
       textAlign: isCentered ? 'center' : 'left',
       lineHeight: 1.3,
     },
     ornament: {
-      fontSize: 16,
+      fontSize: 14,
       color: theme.colors.accent,
-      marginTop: 10,
-    },
-    firstParagraphWrapper: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      marginBottom: 10,
-    },
-    dropCap: {
-      fontSize: 34,
-      fontFamily: theme.fonts.heading,
-      color: theme.colors.accent,
-      marginRight: 6,
-      lineHeight: 1,
-      fontWeight: 'bold',
-    },
-    firstParagraphBody: {
-      flex: 1,
-      fontSize: pageSetup.fontSizePt,
-      fontFamily: theme.fonts.body,
-      color: theme.colors.text,
-      lineHeight: pageSetup.lineHeight,
-      textAlign: pageSetup.justify ? 'justify' : 'left',
+      marginTop: 8,
     },
     paragraph: {
       fontSize: pageSetup.fontSizePt,
@@ -103,53 +78,31 @@ export function ChapterSection({
       lineHeight: pageSetup.lineHeight,
       textAlign: pageSetup.justify ? 'justify' : 'left',
       textIndent: pageSetup.firstLineIndentMm * 2.83,
-      marginBottom: 10,
+      marginBottom: 8,
     },
   });
-
-  const romanNumber = toRoman(index + 1);
 
   return (
     <Page size="A4" style={styles.page}>
       <HeaderFooterDecoration theme={theme} bookTitle={bookTitle} authorName={authorName} />
 
-      {/* Distinguished Chapter Opening */}
       <View style={styles.titleContainer}>
         {includeChapterNumbers && (
-          <Text style={styles.chapterNumberBanner}>
-            — C H A P I T R E   {romanNumber} —
+          <Text style={styles.chapterNumber}>
+            {chapterPrefix || `CHAPITRE ${index + 1}`}
           </Text>
         )}
-        <Text style={styles.chapterTitle}>{chapter.title}</Text>
+        <Text style={styles.chapterTitle}>{cleanTitle}</Text>
         {theme.ornamentGlyph && (
           <Text style={styles.ornament}>{theme.ornamentGlyph}</Text>
         )}
       </View>
 
-      {/* Paragraphs with Drop Cap Lettrine for Chapter Start */}
-      {chapter.paragraphs.map((p, pIdx) => {
-        if (!p || !p.trim()) return null;
-
-        // Apply Drop Cap Lettrine on first paragraph if theme supports it or chapterOpening is drop-cap
-        if (pIdx === 0 && (theme.chapterOpening === 'drop-cap' || index >= 0)) {
-          const cleanP = p.trim();
-          const firstLetter = cleanP.charAt(0);
-          const restOfP = cleanP.slice(1);
-
-          return (
-            <View key={pIdx} style={styles.firstParagraphWrapper}>
-              <Text style={styles.dropCap}>{firstLetter}</Text>
-              <Text style={styles.firstParagraphBody}>{restOfP}</Text>
-            </View>
-          );
-        }
-
-        return (
-          <Text key={pIdx} style={styles.paragraph}>
-            {p}
-          </Text>
-        );
-      })}
+      {chapter.paragraphs.map((p, pIdx) => (
+        <Text key={pIdx} style={styles.paragraph}>
+          {p}
+        </Text>
+      ))}
     </Page>
   );
 }

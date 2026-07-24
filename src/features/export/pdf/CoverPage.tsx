@@ -12,10 +12,13 @@ export function CoverPage({
   metadata: BookMetadata;
   theme: ExportTheme;
 }) {
+  const bg = coverConfig.background?.value || '#8a5a34';
+  const titleColor = coverConfig.titleColor || theme.colors.accent;
+
   const styles = StyleSheet.create({
     page: {
       padding: 0,
-      backgroundColor: coverConfig.background?.value || '#faf7f2',
+      backgroundColor: bg,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -29,21 +32,22 @@ export function CoverPage({
     title: {
       fontSize: 28,
       fontFamily: theme.fonts.heading,
-      color: coverConfig.titleColor || theme.colors.accent,
+      color: titleColor,
       textAlign: 'center',
       marginTop: 60,
     },
     subtitle: {
       fontSize: 14,
       fontFamily: theme.fonts.body,
-      color: theme.colors.text,
+      color: titleColor,
       textAlign: 'center',
       marginTop: 12,
+      opacity: 0.9,
     },
     author: {
       fontSize: 16,
       fontFamily: theme.fonts.heading,
-      color: theme.colors.text,
+      color: titleColor,
       marginBottom: 60,
     },
     coverImage: {
@@ -53,10 +57,12 @@ export function CoverPage({
     },
   });
 
-  if (coverConfig.mode === 'imported' && coverConfig.imageUrl) {
+  const fullImage = coverConfig.mode === 'imported' ? coverConfig.imageUrl : coverConfig.illustrationUrl;
+
+  if (fullImage) {
     return (
       <Page size="A4" style={styles.page}>
-        <Image src={coverConfig.imageUrl} style={styles.coverImage} />
+        <Image src={fullImage} style={styles.coverImage} />
       </Page>
     );
   }

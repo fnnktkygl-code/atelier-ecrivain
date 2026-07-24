@@ -39,11 +39,28 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     setIsGeneratingAi(true);
     setAiStatus('⚡ Génération de l\'illustration IA par Imagen 4 / Gemini en cours...');
 
-    const aiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=600&height=900&nologo=true&seed=${Date.now()}`;
+    try {
+      const aiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=600&height=900&nologo=true&seed=${Date.now()}`;
+      const res = await fetch(aiUrl);
+      if (!res.ok) throw new Error('Échec du téléchargement de l\'image');
+      const blob = await res.blob();
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        onChange({
+          ...coverConfig,
+          mode: 'generated',
+          illustrationUrl: dataUrl,
+          aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
+        });
+        setIsGeneratingAi(false);
+        setAiStatus('✨ Illustration IA générée avec succès !');
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      // Fallback: direct URL assignment if fetch blocked
+      const aiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=600&height=900&nologo=true&seed=${Date.now()}`;
       onChange({
         ...coverConfig,
         mode: 'generated',
@@ -51,19 +68,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
         aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
       });
       setIsGeneratingAi(false);
-      setAiStatus('✨ Illustration générée avec succès !');
-    };
-    img.onerror = () => {
-      onChange({
-        ...coverConfig,
-        mode: 'generated',
-        illustrationUrl: aiUrl,
-        aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
-      });
-      setIsGeneratingAi(false);
-      setAiStatus('✨ Illustration générée !');
-    };
-    img.src = aiUrl;
+      setAiStatus('✨ Illustration IA générée !');
+    }
   };
 
   return (
