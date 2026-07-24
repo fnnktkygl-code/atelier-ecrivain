@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CoverConfig, BookMetadata } from '../../types/bookMeta';
 
 interface CoverControlsProps {
   coverConfig: CoverConfig;
   metadata: BookMetadata;
   onChange: (updated: CoverConfig) => void;
+}
+
+export interface CoverHistoryItem {
+  id: string;
+  illustrationUrl: string;
+  prompt?: string;
+  createdAt: number;
 }
 
 const COLOR_PALETTES = [
@@ -21,6 +28,8 @@ const COLOR_PALETTES = [
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 const MAX_COVER_DIMENSION = 1600;
 const AI_GENERATION_TIMEOUT_MS = 25000;
+const COVER_HISTORY_STORAGE_KEY = 'atelier_cover_history_v1';
+const MAX_HISTORY_ITEMS = 12;
 
 function resizeImageDataUrl(dataUrl: string, maxDim: number, quality = 0.88): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -156,7 +165,71 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
   const [aiStatusIsError, setAiStatusIsError] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Cover History State
+  const [history, setHistory] = useState<CoverHistoryItem[]>([]);
+
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Load History from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COVER_HISTORY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setHistory(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Helper to save item to History
+  const addToHistory = (dataUrl: string, promptText?: string) => {
+    setHistory((prev) => {
+      // Filter out duplicate image DataURLs
+      const filtered = prev.filter((item) => item.illustrationUrl !== dataUrl);
+      const newItem: CoverHistoryItem = {
+        id: `cover-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        illustrationUrl: dataUrl,
+        prompt: promptText,
+        createdAt: Date.now(),
+      };
+      const updated = [newItem, ...filtered].slice(0, MAX_HISTORY_ITEMS);
+      try {
+        localStorage.setItem(COVER_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const removeFromHistory = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHistory((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      try {
+        localStorage.setItem(COVER_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const selectFromHistory = (item: CoverHistoryItem) => {
+    onChange({
+      ...coverConfig,
+      mode: 'generated',
+      illustrationUrl: item.illustrationUrl,
+      aiGeneration: item.prompt ? { prompt: item.prompt, provider: 'imagen-4' } : coverConfig.aiGeneration,
+    });
+    if (item.prompt) setPrompt(item.prompt);
+    setAiStatus('✨ Cover sélectionnée depuis votre historique !');
+  };
+
+  const clearAllHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem(COVER_HISTORY_STORAGE_KEY);
+    } catch {}
+  };
 
   const switchMode = (mode: CoverConfig['mode']) => {
     setAiStatus(null);
@@ -208,6 +281,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       });
 
       const resized = await resizeImageDataUrl(rawDataUrl, MAX_COVER_DIMENSION);
+      addToHistory(resized, 'Image importée');
       onChange({ ...coverConfig, mode: 'imported', imageUrl: resized, illustrationUrl: undefined });
     } catch {
       setUploadError("Impossible de traiter cette image. Essayez un autre fichier.");
@@ -250,7 +324,6 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       abortControllerRef.current = null;
     }
 
-    // Check if generation was cancelled during request
     if (controller.signal.aborted && !finalDataUrl) {
       return;
     }
@@ -267,6 +340,9 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       return;
     }
 
+    // Add generated DataURL to persistent history
+    addToHistory(finalDataUrl, prompt.trim());
+
     onChange({
       ...coverConfig,
       mode: 'generated',
@@ -278,8 +354,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     setAiStatusIsError(false);
     setAiStatus(
       usedFallback
-        ? '🎨 Service IA indisponible : une illustration de secours a été générée.'
-        : "✨ Illustration IA générée et appliquée à la couverture !"
+        ? '🎨 Service IA indisponible : une illustration de secours a été générée et enregistrée dans votre historique.'
+        : "✨ Illustration IA générée et enregistrée dans votre historique !"
     );
   };
 
@@ -471,6 +547,103 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
                 >
                   🗑️ Retirer
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* 📜 HISTORIQUE DES COUVERTURES / ILLUSTRATIONS */}
+          <div style={{ marginTop: 12, padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 700 }}>
+                📜 Historique des Couvertures ({history.length})
+              </label>
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllHistory}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Vider l'historique
+                </button>
+              )}
+            </div>
+
+            {history.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
+                Vos illustrations générées ou importées apparaîtront ici pour basculer facilement de l'une à l'autre.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
+                {history.map((item) => {
+                  const isSelected = coverConfig.illustrationUrl === item.illustrationUrl;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => selectFromHistory(item)}
+                      title={item.prompt ? `"${item.prompt}" - Clic pour réappliquer` : 'Réappliquer cette couverture'}
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: 90,
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        border: isSelected ? '3px solid #16a34a' : '1px solid var(--border)',
+                        boxShadow: isSelected ? '0 0 8px rgba(22, 163, 74, 0.5)' : 'none',
+                        transition: 'transform 0.15s ease',
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.illustrationUrl}
+                        alt="Couverture"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      {isSelected && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 4,
+                          left: 4,
+                          background: '#16a34a',
+                          color: '#fff',
+                          borderRadius: '50%',
+                          width: 18,
+                          height: 18,
+                          fontSize: 10,
+                          fontWeight: 900,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          ✓
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => removeFromHistory(item.id, e)}
+                        title="Supprimer cette couverture de l'historique"
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: 20,
+                          height: 20,
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
