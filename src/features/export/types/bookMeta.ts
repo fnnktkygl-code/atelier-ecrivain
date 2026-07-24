@@ -31,5 +31,5 @@ export interface CoverConfig {
   titleColor?: string;
   fontFamily?: string;
   illustrationUrl?: string;
-  aiGeneration?: { prompt: string; provider: 'imagen-4' } | null;
+  aiGeneration?: { prompt: string; provider: 'imagen-4' | 'procedural-fallback' } | null;
 }
