@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { CoverConfig, BookMetadata } from '../../types/bookMeta';
 
 interface CoverControlsProps {
@@ -18,13 +18,7 @@ const COLOR_PALETTES = [
   'linear-gradient(135deg, #064e3b 0%, #0284c7 100%)',
 ];
 
-// Covers only ever render at book-cover size (max ~1600x2400 for a crisp print),
-// so there's no reason to keep a 12MB phone photo as-is in state and in the
-// final PDF. Previously handleFileUpload stored the raw FileReader dataURL
-// unmodified: a big upload made the PDF export slow (react-pdf has to decode
-// the full-resolution image) and inflated the output file size for no visual
-// benefit, with no size/type guard at all.
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB raw upload guard
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 const MAX_COVER_DIMENSION = 1600;
 const AI_GENERATION_TIMEOUT_MS = 25000;
 
@@ -40,7 +34,7 @@ function resizeImageDataUrl(dataUrl: string, maxDim: number, quality = 0.88): Pr
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(dataUrl); // fall back to original rather than fail the upload
+        resolve(dataUrl);
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
@@ -162,13 +156,31 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
   const [aiStatusIsError, setAiStatusIsError] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const switchMode = (mode: CoverConfig['mode']) => {
-    // BUG FIXED: aiStatus / uploadError previously stuck around after switching
-    // modes, so a user could see "✨ Illustration IA générée..." still displayed
-    // after switching to "Image Importée" or back to a plain color cover.
     setAiStatus(null);
     setUploadError(null);
     onChange({ ...coverConfig, mode });
+  };
+
+  const handleRemoveIllustration = () => {
+    setAiStatus(null);
+    onChange({
+      ...coverConfig,
+      illustrationUrl: undefined,
+      aiGeneration: null,
+    });
+  };
+
+  const handleCancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGeneratingAi(false);
+    setAiStatusIsError(false);
+    setAiStatus('🚫 Génération annulée.');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,11 +225,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     let finalDataUrl = '';
     let usedFallback = false;
 
-    // BUG FIXED: the fetch to /api/generate-cover had no timeout. A slow or
-    // hanging API call left the button stuck on "⏳ Génération..." indefinitely
-    // with no way out for the user. An AbortController now guarantees we fall
-    // back to the procedural illustration within ~25s no matter what.
     const controller = new AbortController();
+    abortControllerRef.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), AI_GENERATION_TIMEOUT_MS);
 
     try {
@@ -235,9 +244,15 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
         }
       }
     } catch {
-      // Network error, timeout/abort, or bad JSON — fall through to procedural art.
+      // Aborted or network failure
     } finally {
       clearTimeout(timeoutId);
+      abortControllerRef.current = null;
+    }
+
+    // Check if generation was cancelled during request
+    if (controller.signal.aborted && !finalDataUrl) {
+      return;
     }
 
     if (!finalDataUrl) {
@@ -246,7 +261,6 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     }
 
     if (!finalDataUrl) {
-      // Both the API and the canvas fallback failed (e.g. no 2D context available).
       setIsGeneratingAi(false);
       setAiStatusIsError(true);
       setAiStatus("❌ La génération a échoué. Réessayez ou choisissez une image.");
@@ -376,22 +390,87 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
                   setPrompt(e.target.value);
                   if (aiStatus) setAiStatus(null);
                 }}
-                onKeyDown={(e) => e.key === 'Enter' && handleGenerateAiIllustration()}
+                onKeyDown={(e) => e.key === 'Enter' && !isGeneratingAi && handleGenerateAiIllustration()}
                 placeholder="Ex: Une ombre humaine qui tente de peindre un dieu à son image..."
                 style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
               />
-              <button
-                type="button"
-                onClick={handleGenerateAiIllustration}
-                disabled={isGeneratingAi || !prompt.trim()}
-                style={{ padding: '8px 16px', borderRadius: 6, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 700, cursor: isGeneratingAi ? 'wait' : 'pointer' }}
-              >
-                {isGeneratingAi ? '⏳ Génération...' : 'Générer'}
-              </button>
+
+              {!isGeneratingAi ? (
+                <button
+                  type="button"
+                  onClick={handleGenerateAiIllustration}
+                  disabled={!prompt.trim()}
+                  style={{ padding: '8px 16px', borderRadius: 6, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 700, cursor: prompt.trim() ? 'pointer' : 'not-allowed', opacity: prompt.trim() ? 1 : 0.6 }}
+                >
+                  Générer
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCancelGeneration}
+                  style={{ padding: '8px 14px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Annuler
+                </button>
+              )}
             </div>
+
             {aiStatus && (
               <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: isGeneratingAi ? 'var(--accent)' : aiStatusIsError ? '#dc2626' : '#16a34a' }}>
                 {aiStatus}
+              </div>
+            )}
+
+            {/* Aperçu miniature et bouton Supprimer l'illustration */}
+            {coverConfig.illustrationUrl && (
+              <div style={{
+                marginTop: 12,
+                padding: 10,
+                borderRadius: 8,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={coverConfig.illustrationUrl}
+                    alt="Aperçu illustration"
+                    style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border)' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                      ✨ Illustration active
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                      {coverConfig.aiGeneration?.prompt ? `"${coverConfig.aiGeneration.prompt}"` : 'Illustration générée'}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveIllustration}
+                  title="Retirer cette illustration et revenir au fond uni/dégradé"
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  🗑️ Retirer
+                </button>
               </div>
             )}
           </div>
