@@ -12,27 +12,18 @@ export function CoverCanvas({
   const bg = coverConfig.background?.value || '#8a5a34';
   const titleColor = coverConfig.titleColor || '#ffffff';
 
-  // Reset error when illustrationUrl changes
+  // Determine active background image (imported image or AI illustration)
+  const activeImage = coverConfig.mode === 'imported'
+    ? coverConfig.imageUrl
+    : coverConfig.illustrationUrl;
+
+  // Reset error when image changes
   useEffect(() => {
     setHasError(false);
-  }, [coverConfig.illustrationUrl]);
+  }, [activeImage]);
 
-  if (coverConfig.mode === 'imported' && coverConfig.imageUrl && !coverConfig.illustrationUrl) {
-    return (
-      <div style={{ width: 220, height: 320, borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverConfig.imageUrl} alt="Couverture" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      </div>
-    );
-  }
-
-  const showIllustration = Boolean(coverConfig.illustrationUrl && !hasError);
-  // BUG FIXED: previously, when the illustration image failed to load
-  // (`onError`), the component just silently fell back to a plain background
-  // with no explanation — a user who just generated AI art would see it
-  // vanish from the preview with no indication why, and no way to tell whether
-  // the export would also be missing it (it would).
-  const illustrationFailed = Boolean(coverConfig.illustrationUrl && hasError);
+  const showImage = Boolean(activeImage && !hasError);
+  const showText = !coverConfig.hideTextOverlay;
 
   return (
     <div
@@ -54,13 +45,13 @@ export function CoverCanvas({
         userSelect: 'none',
       }}
     >
-      {/* Background AI Illustration */}
-      {showIllustration && (
+      {/* Background Image Layer (Imported or AI Generated) */}
+      {showImage && activeImage && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={coverConfig.illustrationUrl}
-            alt=""
+            src={activeImage}
+            alt="Couverture"
             referrerPolicy="no-referrer"
             onError={() => setHasError(true)}
             style={{
@@ -72,54 +63,45 @@ export function CoverCanvas({
               zIndex: 1,
             }}
           />
-          {/* Dark Overlay for typography readability */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.85) 100%)',
-              zIndex: 2,
-            }}
-          />
+          {/* Scrim Overlay only if text overlay is active */}
+          {showText && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.85) 100%)',
+                zIndex: 2,
+              }}
+            />
+          )}
         </>
       )}
 
-      {illustrationFailed && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            right: 8,
-            zIndex: 4,
-            fontSize: 9,
-            fontWeight: 600,
-            padding: '4px 8px',
-            borderRadius: 6,
-            background: 'rgba(220, 38, 38, 0.9)',
-            color: '#fff',
-          }}
-        >
-          ⚠️ Illustration illisible — régénérez-la ou changez de couleur de fond.
+      {/* Independent Text Layer (Title, Subtitle, Author) */}
+      {showText ? (
+        <>
+          {/* Title & Subtitle */}
+          <div style={{ zIndex: 3, position: 'relative', marginTop: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'serif', textShadow: showImage ? '0 2px 4px rgba(0,0,0,0.9)' : 'none' }}>
+              {metadata.title || 'Titre du Livre'}
+            </div>
+            {metadata.subtitle && (
+              <div style={{ fontSize: 11, opacity: 0.9, marginTop: 6, fontFamily: 'sans-serif', textShadow: showImage ? '0 1px 3px rgba(0,0,0,0.9)' : 'none' }}>
+                {metadata.subtitle}
+              </div>
+            )}
+          </div>
+
+          {/* Author Name */}
+          <div style={{ zIndex: 3, position: 'relative', fontSize: 12, fontWeight: 600, fontFamily: 'sans-serif', marginBottom: 12, textShadow: showImage ? '0 1px 3px rgba(0,0,0,0.9)' : 'none' }}>
+            {metadata.authorName || 'Auteur'}
+          </div>
+        </>
+      ) : (
+        <div style={{ zIndex: 3, position: 'relative', margin: 'auto', fontSize: 10, fontStyle: 'italic', opacity: 0.7, background: 'rgba(0,0,0,0.4)', padding: '4px 8px', borderRadius: 4, color: '#fff' }}>
+          Texte masqué
         </div>
       )}
-
-      {/* Title & Subtitle */}
-      <div style={{ zIndex: 3, position: 'relative', marginTop: 12 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'serif', textShadow: '0 2px 4px rgba(0,0,0,0.9)' }}>
-          {metadata.title || 'Titre du Livre'}
-        </div>
-        {metadata.subtitle && (
-          <div style={{ fontSize: 11, opacity: 0.9, marginTop: 6, fontFamily: 'sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
-            {metadata.subtitle}
-          </div>
-        )}
-      </div>
-
-      {/* Author Name */}
-      <div style={{ zIndex: 3, position: 'relative', fontSize: 12, fontWeight: 600, fontFamily: 'sans-serif', marginBottom: 12, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
-        {metadata.authorName || 'Auteur'}
-      </div>
     </div>
   );
 }

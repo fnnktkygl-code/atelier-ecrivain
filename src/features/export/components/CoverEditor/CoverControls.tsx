@@ -61,7 +61,6 @@ function generateProceduralCoverArt(prompt: string): string {
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  // Background Cosmic Gradient
   const grad = ctx.createLinearGradient(0, 0, 600, 900);
   grad.addColorStop(0, '#0f0c20');
   grad.addColorStop(0.3, '#241442');
@@ -70,7 +69,6 @@ function generateProceduralCoverArt(prompt: string): string {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 600, 900);
 
-  // Stars / Celestial Dust
   for (let i = 0; i < 160; i++) {
     const x = Math.random() * 600;
     const y = Math.random() * 900;
@@ -82,7 +80,6 @@ function generateProceduralCoverArt(prompt: string): string {
     ctx.fill();
   }
 
-  // Divine Aura / Glowing Orbs in Center
   const auraGrad = ctx.createRadialGradient(300, 320, 20, 300, 320, 270);
   auraGrad.addColorStop(0, 'rgba(255, 230, 160, 0.95)');
   auraGrad.addColorStop(0.35, 'rgba(236, 72, 153, 0.65)');
@@ -93,7 +90,6 @@ function generateProceduralCoverArt(prompt: string): string {
   ctx.arc(300, 320, 270, 0, Math.PI * 2);
   ctx.fill();
 
-  // Divine Face / Halo Silhouette
   ctx.strokeStyle = 'rgba(255, 235, 180, 0.85)';
   ctx.lineWidth = 4;
   ctx.beginPath();
@@ -105,7 +101,6 @@ function generateProceduralCoverArt(prompt: string): string {
   ctx.arc(300, 280, 16, 0, Math.PI * 2);
   ctx.fill();
 
-  // Sunburst Rays of Light
   for (let i = 0; i < 14; i++) {
     const angle = (i * Math.PI) / 7;
     ctx.strokeStyle = 'rgba(255, 215, 120, 0.3)';
@@ -116,7 +111,6 @@ function generateProceduralCoverArt(prompt: string): string {
     ctx.stroke();
   }
 
-  // Human Shadow Silhouette at Bottom
   ctx.fillStyle = '#05030a';
   ctx.beginPath();
   ctx.arc(300, 640, 24, 0, Math.PI * 2);
@@ -128,7 +122,6 @@ function generateProceduralCoverArt(prompt: string): string {
   ctx.quadraticCurveTo(360, 715, 300, 664);
   ctx.fill();
 
-  // Reaching Arm
   ctx.strokeStyle = '#05030a';
   ctx.lineWidth = 16;
   ctx.lineCap = 'round';
@@ -137,7 +130,6 @@ function generateProceduralCoverArt(prompt: string): string {
   ctx.lineTo(385, 510);
   ctx.stroke();
 
-  // Glowing Brush Tip & Paint Burst
   const brushGrad = ctx.createRadialGradient(385, 510, 2, 385, 510, 35);
   brushGrad.addColorStop(0, '#ffffff');
   brushGrad.addColorStop(0.4, '#fbbf24');
@@ -147,7 +139,6 @@ function generateProceduralCoverArt(prompt: string): string {
   ctx.arc(385, 510, 35, 0, Math.PI * 2);
   ctx.fill();
 
-  // Golden Paint Arc connecting Shadow Brush to Divine Halo
   ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
   ctx.lineWidth = 7;
   ctx.beginPath();
@@ -165,12 +156,9 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
   const [aiStatusIsError, setAiStatusIsError] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Cover History State
   const [history, setHistory] = useState<CoverHistoryItem[]>([]);
-
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load History from localStorage on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COVER_HISTORY_STORAGE_KEY);
@@ -183,10 +171,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     } catch {}
   }, []);
 
-  // Helper to save item to History
   const addToHistory = (dataUrl: string, promptText?: string) => {
     setHistory((prev) => {
-      // Filter out duplicate image DataURLs
       const filtered = prev.filter((item) => item.illustrationUrl !== dataUrl);
       const newItem: CoverHistoryItem = {
         id: `cover-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -221,7 +207,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       aiGeneration: item.prompt ? { prompt: item.prompt, provider: 'imagen-4' } : coverConfig.aiGeneration,
     });
     if (item.prompt) setPrompt(item.prompt);
-    setAiStatus('✨ Cover sélectionnée depuis votre historique !');
+    setAiStatus('✨ Image appliquée depuis votre historique !');
   };
 
   const clearAllHistory = () => {
@@ -242,6 +228,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     onChange({
       ...coverConfig,
       illustrationUrl: undefined,
+      imageUrl: undefined,
       aiGeneration: null,
     });
   };
@@ -340,7 +327,6 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       return;
     }
 
-    // Add generated DataURL to persistent history
     addToHistory(finalDataUrl, prompt.trim());
 
     onChange({
@@ -354,17 +340,19 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     setAiStatusIsError(false);
     setAiStatus(
       usedFallback
-        ? '🎨 Service IA indisponible : une illustration de secours a été générée et enregistrée dans votre historique.'
-        : "✨ Illustration IA générée et enregistrée dans votre historique !"
+        ? '🎨 Service IA indisponible : une illustration de secours a été générée et enregistrée.'
+        : "✨ Illustration IA générée et enregistrée !"
     );
   };
 
+  const activeImage = coverConfig.mode === 'imported' ? coverConfig.imageUrl : coverConfig.illustrationUrl;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Mode Choice */}
+      {/* 1. SECTION IMAGE DE FOND / COUVERTURE */}
       <div>
         <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8 }}>
-          Mode de couverture :
+          1. Fond / Image de Couverture :
         </label>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -378,7 +366,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
               color: 'var(--text)',
             }}
           >
-            🎨 Graphique
+            🎨 Graphique / IA
           </button>
           <button
             type="button"
@@ -412,7 +400,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       {coverConfig.mode === 'imported' && (
         <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 8, border: '1px dashed var(--border)' }}>
           <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>
-            Sélectionner une image (PNG / JPG / WEBP) :
+            Sélectionner une image personnelle (PNG / JPG / WEBP) :
           </label>
           <input type="file" accept="image/*" onChange={handleFileUpload} style={{ fontSize: 12 }} />
           {uploadError && (
@@ -442,19 +430,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
             </div>
           </div>
 
-          {/* Couleur du titre */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600 }}>Couleur du texte :</label>
-            <input
-              type="color"
-              value={coverConfig.titleColor || '#ffffff'}
-              onChange={(e) => onChange({ ...coverConfig, titleColor: e.target.value })}
-              style={{ border: 'none', background: 'none', cursor: 'pointer', width: 32, height: 32 }}
-            />
-          </div>
-
           {/* Illustration IA */}
-          <div style={{ marginTop: 8, padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ marginTop: 4, padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
             <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>
               ✨ Illustration IA (Imagen 4 / Gemini) :
             </label>
@@ -467,7 +444,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
                   if (aiStatus) setAiStatus(null);
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && !isGeneratingAi && handleGenerateAiIllustration()}
-                placeholder="Ex: Une ombre humaine qui tente de peindre un dieu à son image..."
+                placeholder="Ex: Une ombre humaine qui tente de peindre un dieu..."
                 style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
               />
 
@@ -496,158 +473,192 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
                 {aiStatus}
               </div>
             )}
-
-            {/* Aperçu miniature et bouton Supprimer l'illustration */}
-            {coverConfig.illustrationUrl && (
-              <div style={{
-                marginTop: 12,
-                padding: 10,
-                borderRadius: 8,
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 10,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={coverConfig.illustrationUrl}
-                    alt="Aperçu illustration"
-                    style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border)' }}
-                  />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                      ✨ Illustration active
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
-                      {coverConfig.aiGeneration?.prompt ? `"${coverConfig.aiGeneration.prompt}"` : 'Illustration générée'}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleRemoveIllustration}
-                  title="Retirer cette illustration et revenir au fond uni/dégradé"
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    background: '#dc2626',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  🗑️ Retirer
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 📜 HISTORIQUE DES COUVERTURES / ILLUSTRATIONS */}
-          <div style={{ marginTop: 12, padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <label style={{ fontSize: 12, fontWeight: 700 }}>
-                📜 Historique des Couvertures ({history.length})
-              </label>
-              {history.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearAllHistory}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
-                >
-                  Vider l'historique
-                </button>
-              )}
-            </div>
-
-            {history.length === 0 ? (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
-                Vos illustrations générées ou importées apparaîtront ici pour basculer facilement de l'une à l'autre.
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
-                {history.map((item) => {
-                  const isSelected = coverConfig.illustrationUrl === item.illustrationUrl;
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => selectFromHistory(item)}
-                      title={item.prompt ? `"${item.prompt}" - Clic pour réappliquer` : 'Réappliquer cette couverture'}
-                      style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: 90,
-                        borderRadius: 6,
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        border: isSelected ? '3px solid #16a34a' : '1px solid var(--border)',
-                        boxShadow: isSelected ? '0 0 8px rgba(22, 163, 74, 0.5)' : 'none',
-                        transition: 'transform 0.15s ease',
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.illustrationUrl}
-                        alt="Couverture"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                      {isSelected && (
-                        <div style={{
-                          position: 'absolute',
-                          top: 4,
-                          left: 4,
-                          background: '#16a34a',
-                          color: '#fff',
-                          borderRadius: '50%',
-                          width: 18,
-                          height: 18,
-                          fontSize: 10,
-                          fontWeight: 900,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          ✓
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => removeFromHistory(item.id, e)}
-                        title="Supprimer cette couverture de l'historique"
-                        style={{
-                          position: 'absolute',
-                          top: 4,
-                          right: 4,
-                          background: 'rgba(0, 0, 0, 0.75)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: 20,
-                          height: 20,
-                          fontSize: 11,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </>
+      )}
+
+      {/* Bouton Retirer l'image si une image est active */}
+      {activeImage && (
+        <div style={{
+          padding: 10,
+          borderRadius: 8,
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeImage}
+              alt="Aperçu"
+              style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border)' }}
+            />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                ✨ Image de fond active
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                {coverConfig.aiGeneration?.prompt ? `"${coverConfig.aiGeneration.prompt}"` : coverConfig.mode === 'imported' ? 'Image importée' : 'Illustration'}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRemoveIllustration}
+            title="Retirer cette image et revenir à un fond couleur/dégradé"
+            style={{
+              padding: '6px 12px',
+              borderRadius: 6,
+              background: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            🗑️ Retirer l'image
+          </button>
+        </div>
+      )}
+
+      {/* 2. SECTION GESTION INDÉPENDANTE DU TEXTE */}
+      {coverConfig.mode !== 'none' && (
+        <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ fontSize: 13, fontWeight: 700, display: 'block' }}>
+            2. Réglage du Texte (Indépendant de l'image) :
+          </label>
+
+          {/* Interrupteur Afficher / Masquer le texte */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+            <input
+              type="checkbox"
+              checked={!coverConfig.hideTextOverlay}
+              onChange={(e) => onChange({ ...coverConfig, hideTextOverlay: !e.target.checked })}
+              style={{ cursor: 'pointer', width: 16, height: 16 }}
+            />
+            <span>Afficher le Titre et l'Auteur par-dessus l'image</span>
+          </label>
+
+          {/* Couleur du texte */}
+          {!coverConfig.hideTextOverlay && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>Couleur du texte :</label>
+              <input
+                type="color"
+                value={coverConfig.titleColor || '#ffffff'}
+                onChange={(e) => onChange({ ...coverConfig, titleColor: e.target.value })}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', width: 32, height: 32 }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. HISTORIQUE DES COUVERTURES */}
+      {coverConfig.mode === 'generated' && (
+        <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <label style={{ fontSize: 12, fontWeight: 700 }}>
+              📜 Historique des Couvertures ({history.length})
+            </label>
+            {history.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAllHistory}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Vider l'historique
+              </button>
+            )}
+          </div>
+
+          {history.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
+              Vos illustrations générées ou importées apparaîtront ici pour basculer facilement de l'une à l'autre.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
+              {history.map((item) => {
+                const isSelected = activeImage === item.illustrationUrl;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => selectFromHistory(item)}
+                    title={item.prompt ? `"${item.prompt}" - Clic pour réappliquer` : 'Réappliquer cette couverture'}
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: 90,
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      border: isSelected ? '3px solid #16a34a' : '1px solid var(--border)',
+                      boxShadow: isSelected ? '0 0 8px rgba(22, 163, 74, 0.5)' : 'none',
+                      transition: 'transform 0.15s ease',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.illustrationUrl}
+                      alt="Couverture"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    {isSelected && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 4,
+                        left: 4,
+                        background: '#16a34a',
+                        color: '#fff',
+                        borderRadius: '50%',
+                        width: 18,
+                        height: 18,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        ✓
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => removeFromHistory(item.id, e)}
+                      title="Supprimer cette couverture de l'historique"
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        background: 'rgba(0, 0, 0, 0.75)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: 20,
+                        height: 20,
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

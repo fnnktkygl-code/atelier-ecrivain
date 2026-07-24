@@ -3,10 +3,10 @@ export interface BookMetadata {
   subtitle?: string;
   authorName: string;
   penName?: string;
-  epigraph?: string; // citation d'ouverture
+  epigraph?: string;
   dedication?: string;
   acknowledgments?: string;
-  backCoverBlurb?: string; // 4e de couverture
+  backCoverBlurb?: string;
   isbn?: string;
   publisher?: string;
   publisherLogoUrl?: string;
@@ -17,10 +17,10 @@ export interface BookMetadata {
 
 export interface FrontBackMatterSection {
   id: string;
-  placement: 'front' | 'back'; // avant ou après les chapitres
+  placement: 'front' | 'back';
   kind: 'preface' | 'foreword' | 'afterword' | 'appendix' | 'glossary' | 'custom';
   title: string;
-  content: string; // markdown simple
+  content: string;
   order: number;
 }
 
@@ -31,5 +31,6 @@ export interface CoverConfig {
   titleColor?: string;
   fontFamily?: string;
   illustrationUrl?: string;
+  hideTextOverlay?: boolean; // Toggles whether title/subtitle/author text is rendered over background
   aiGeneration?: { prompt: string; provider: 'imagen-4' | 'procedural-fallback' } | null;
 }
