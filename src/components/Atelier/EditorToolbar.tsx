@@ -41,6 +41,7 @@ interface EditorToolbarProps {
   isSpeechPaused?: boolean;
   onToggleSpeech?: () => void;
   onStopSpeech?: () => void;
+  onExportPdf?: () => void;
 }
 
 export default function EditorToolbar({
@@ -69,6 +70,7 @@ export default function EditorToolbar({
   isSpeechPaused = false,
   onToggleSpeech,
   onStopSpeech,
+  onExportPdf,
 }: EditorToolbarProps) {
   const formatSaveTime = (ts: number | null) => {
     if (!ts) return '';
@@ -165,7 +167,7 @@ export default function EditorToolbar({
         <Tooltip content="Exporter mon livre en PDF Éditorial (Couverture, Thèmes, Pagination)">
           <button
             className="btn-icon"
-            onClick={onExport}
+            onClick={onExportPdf || onExport}
             style={{
               width: 36, height: 36, fontSize: 16, color: 'var(--accent)',
               background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%'

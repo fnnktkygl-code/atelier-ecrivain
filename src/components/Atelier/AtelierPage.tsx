@@ -14,6 +14,7 @@ import { useManuscript } from '@/hooks/useManuscript';
 import { useDictation } from '@/hooks/useDictation';
 import { useSpeech } from '@/hooks/useSpeech';
 import type { TextBlock, PendingReview } from '@/types/editor';
+import { ExportWizard } from '@/features/export/components/ExportWizard';
 import ChapterList from './ChapterList';
 import Editor from './Editor';
 import EditorToolbar from './EditorToolbar';
@@ -35,6 +36,7 @@ export default function AtelierPage() {
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [isPdfWizardOpen, setIsPdfWizardOpen] = useState(false);
 
   const handleToggleSpeech = useCallback(() => {
     if (speech.isPlaying) {
@@ -183,6 +185,7 @@ export default function AtelierPage() {
               activeIndex={ms.activeChapterIndex}
               dispatch={dispatch}
               onCloseSidebar={() => setShowMobileSidebar(false)}
+              onOpenPdfExport={() => setIsPdfWizardOpen(true)}
             />
 
             {/* Record area at bottom */}
@@ -272,6 +275,7 @@ export default function AtelierPage() {
             isSpeechPaused={speech.isPaused}
             onToggleSpeech={handleToggleSpeech}
             onStopSpeech={speech.stop}
+            onExportPdf={() => setIsPdfWizardOpen(true)}
           />
 
           {/* Dictation Status Bar (Always visible during recording/processing) */}
@@ -376,6 +380,15 @@ export default function AtelierPage() {
           onClose={() => setIsNotesOpen(false)}
         />
       </div>
+
+      {/* ── Studio Édition Couverture & Export PDF ── */}
+      <ExportWizard
+        manuscriptId="default"
+        manuscriptTitle={activeChapter?.title || 'Mon Livre'}
+        chapters={ms.chapters}
+        isOpen={isPdfWizardOpen}
+        onClose={() => setIsPdfWizardOpen(false)}
+      />
     </div>
   );
 }

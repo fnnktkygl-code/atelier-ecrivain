@@ -21,9 +21,10 @@ interface ChapterListProps {
   activeIndex: number;
   dispatch: React.Dispatch<ManuscriptAction>;
   onCloseSidebar?: () => void;
+  onOpenPdfExport?: () => void;
 }
 
-export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar }: ChapterListProps) {
+export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar, onOpenPdfExport }: ChapterListProps) {
   const { manuscript, manuscripts, selectManuscript, createManuscript, renameManuscript, deleteManuscript } = useAuth();
 
   // Expanded manuscript accordion state (defaults to active manuscript ID)
@@ -389,6 +390,34 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
         ) : (
           <button className="btn-new-manuscript" onClick={() => setIsCreatingManuscript(true)}>
             ＋ Nouveau manuscrit
+          </button>
+        )}
+
+        {/* Button to Open PDF & Cover Studio */}
+        {onOpenPdfExport && (
+          <button
+            className="btn-pdf-export-sidebar"
+            onClick={onOpenPdfExport}
+            style={{
+              width: '100%',
+              marginTop: 10,
+              padding: '10px 14px',
+              background: 'linear-gradient(135deg, var(--accent) 0%, #b8860b 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>🎨</span> Édition Couverture & Export PDF
           </button>
         )}
       </div>
