@@ -421,7 +421,15 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
                 <button
                   key={color}
                   type="button"
-                  onClick={() => onChange({ ...coverConfig, background: { type: color.includes('gradient') ? 'gradient' : 'color', value: color } })}
+                  onClick={() => {
+                    setAiStatus(null);
+                    onChange({
+                      ...coverConfig,
+                      illustrationUrl: undefined,
+                      imageUrl: undefined,
+                      background: { type: color.includes('gradient') ? 'gradient' : 'color', value: color },
+                    });
+                  }}
                   style={{
                     width: 28, height: 28, borderRadius: '50%', background: color, border: '2px solid var(--border)', cursor: 'pointer',
                   }}
