@@ -264,8 +264,8 @@ export function ExportWizard({
 
             {step === 4 && (
               <StepTheme
-                selectedThemeId={settings.themeId}
-                onChange={(th) => handleSaveAndPersist(metadata, sections, coverConfig, { ...settings, themeId: th })}
+                settings={settings}
+                onChange={(s) => handleSaveAndPersist(metadata, sections, coverConfig, s)}
               />
             )}
 

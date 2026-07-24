@@ -26,9 +26,18 @@ export interface PageSetup {
   justify: boolean;
 }
 
+export interface CustomThemeOverrides {
+  accentColor?: string;
+  textColor?: string;
+  ruleColor?: string;
+  chapterTitleAlignment?: 'centered' | 'left-aligned';
+  showOrnament?: boolean;
+}
+
 export interface ExportSettings {
   id: string;
   themeId: ThemeId;
+  customTheme?: CustomThemeOverrides;
   page: PageSetup;
   includeToc: boolean;
   includeChapterNumbers: boolean;

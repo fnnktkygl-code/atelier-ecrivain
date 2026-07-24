@@ -1,5 +1,5 @@
 import { ExportTheme } from '../types/theme';
-import { ThemeId } from '../types/exportSettings';
+import { ThemeId, CustomThemeOverrides } from '../types/exportSettings';
 
 export const THEME_REGISTRY: Record<ThemeId, ExportTheme> = {
   classique: {
@@ -112,4 +112,20 @@ export const THEME_REGISTRY: Record<ThemeId, ExportTheme> = {
 
 export function getTheme(id: ThemeId): ExportTheme {
   return THEME_REGISTRY[id] || THEME_REGISTRY.classique;
+}
+
+export function resolveTheme(id: ThemeId, customTheme?: CustomThemeOverrides): ExportTheme {
+  const base = getTheme(id);
+  if (!customTheme) return base;
+
+  return {
+    ...base,
+    colors: {
+      text: customTheme.textColor || base.colors.text,
+      accent: customTheme.accentColor || base.colors.accent,
+      ruleLine: customTheme.ruleColor || customTheme.accentColor || base.colors.ruleLine,
+    },
+    titlePageLayout: customTheme.chapterTitleAlignment || base.titlePageLayout,
+    ornamentGlyph: customTheme.showOrnament !== false ? base.ornamentGlyph : undefined,
+  };
 }
