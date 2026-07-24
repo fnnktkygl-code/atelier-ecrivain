@@ -257,7 +257,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       ...coverConfig,
       mode: 'generated',
       illustrationUrl: finalDataUrl,
-      aiGeneration: { prompt: prompt.trim(), provider: usedFallback ? 'procedural-fallback' : 'imagen-4' },
+      aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
     });
 
     setIsGeneratingAi(false);
