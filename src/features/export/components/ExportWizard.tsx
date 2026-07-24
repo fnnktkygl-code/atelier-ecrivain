@@ -1,13 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { EditableChapter } from '@/types/editor';
 import { BookMetadata, CoverConfig, FrontBackMatterSection } from '../types/bookMeta';
 import { ExportSettings, ThemeId } from '../types/exportSettings';
-import { DEFAULT_EXPORT_SETTINGS, loadExportSettings, saveExportSettings } from '../services/exportStorage';
+import { ExportHistoryEntry } from '../types/job';
+import {
+  DEFAULT_EXPORT_SETTINGS,
+  loadExportSettings,
+  saveExportSettings,
+  loadBookMetadata,
+  saveBookMetadata,
+  loadExportHistory,
+  addExportHistoryEntry,
+} from '../services/exportStorage';
 import { generatePdf } from '../services/generatePdf';
-import { CoverCanvas } from './CoverEditor/CoverCanvas';
-import { THEME_REGISTRY } from '../themes/registry';
+
+import { StepMetadata } from './steps/StepMetadata';
+import { StepFrontBackMatter } from './steps/StepFrontBackMatter';
+import { StepCover } from './steps/StepCover';
+import { StepTheme } from './steps/StepTheme';
+import { StepLayout } from './steps/StepLayout';
+import { StepReview } from './steps/StepReview';
 
 interface ExportWizardProps {
   manuscriptId: string;
@@ -17,6 +31,15 @@ interface ExportWizardProps {
   onClose: () => void;
 }
 
+const STEPS = [
+  { id: 1, title: 'Métadonnées', icon: '📝' },
+  { id: 2, title: 'Liminaires & Textes', icon: '📄' },
+  { id: 3, title: 'Couverture', icon: '🎨' },
+  { id: 4, title: 'Thème Éditorial', icon: '✒️' },
+  { id: 5, title: 'Mise en Page', icon: '📐' },
+  { id: 6, title: 'Génération PDF', icon: '⚡' },
+];
+
 export function ExportWizard({
   manuscriptId,
   manuscriptTitle,
@@ -25,11 +48,14 @@ export function ExportWizard({
   onClose,
 }: ExportWizardProps) {
   const [step, setStep] = useState<number>(1);
+
   const [metadata, setMetadata] = useState<BookMetadata>({
     title: manuscriptTitle || 'Mon Livre',
     authorName: 'Auteur',
     copyrightYear: new Date().getFullYear(),
   });
+
+  const [sections, setSections] = useState<FrontBackMatterSection[]>([]);
 
   const [coverConfig, setCoverConfig] = useState<CoverConfig>({
     mode: 'none',
@@ -37,24 +63,64 @@ export function ExportWizard({
     titleColor: '#ffffff',
   });
 
-  const [settings, setSettings] = useState<ExportSettings>(() =>
-    loadExportSettings(manuscriptId)
-  );
+  const [settings, setSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
+  const [history, setHistory] = useState<ExportHistoryEntry[]>([]);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      const savedMeta = loadBookMetadata(manuscriptId, manuscriptTitle);
+      setMetadata(savedMeta.metadata);
+      setSections(savedMeta.sections);
+      setCoverConfig(savedMeta.coverConfig);
+      setSettings(loadExportSettings(manuscriptId));
+      setHistory(loadExportHistory(manuscriptId));
+    }
+  }, [isOpen, manuscriptId, manuscriptTitle]);
+
   if (!isOpen) return null;
+
+  const handleSaveAndPersist = (
+    newMeta = metadata,
+    newSec = sections,
+    newCover = coverConfig,
+    newSet = settings
+  ) => {
+    setMetadata(newMeta);
+    setSections(newSec);
+    setCoverConfig(newCover);
+    setSettings(newSet);
+    saveBookMetadata(manuscriptId, newMeta, newSec, newCover);
+    saveExportSettings(manuscriptId, newSet);
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMsg(null);
     try {
-      saveExportSettings(manuscriptId, settings);
-      const pdfBlob = await generatePdf(chapters, metadata, coverConfig, settings);
+      handleSaveAndPersist();
+      const pdfBlob = await generatePdf(chapters, metadata, coverConfig, settings, sections);
       const url = URL.createObjectURL(pdfBlob);
       setGeneratedPdfUrl(url);
+
+      const totalWords = chapters.reduce(
+        (sum, ch) => sum + ch.blocks.reduce((s, b) => s + (b.content ? b.content.split(/\s+/).length : 0), 0),
+        0
+      );
+
+      const newEntry: ExportHistoryEntry = {
+        id: `exp-${Date.now()}`,
+        createdAt: Date.now(),
+        title: metadata.title || 'Manuscrit',
+        themeId: settings.themeId,
+        pageFormat: settings.page.format,
+        wordCount: totalWords,
+      };
+      addExportHistoryEntry(manuscriptId, newEntry);
+      setHistory(loadExportHistory(manuscriptId));
     } catch (err: any) {
       setErrorMsg(err?.message || 'Erreur lors de la génération du PDF.');
     } finally {
@@ -68,7 +134,7 @@ export function ExportWizard({
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'rgba(0,0,0,0.65)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -77,11 +143,11 @@ export function ExportWizard({
     >
       <div
         style={{
-          width: '90%',
-          maxWidth: 960,
-          height: '85vh',
+          width: '95%',
+          maxWidth: 1040,
+          height: '88vh',
           background: 'var(--surface, #faf7f2)',
-          borderRadius: 12,
+          borderRadius: 14,
           boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
           display: 'flex',
           flexDirection: 'column',
@@ -100,15 +166,19 @@ export function ExportWizard({
             background: 'var(--surface-2)',
           }}
         >
-          <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-              📖 Exporter mon livre en PDF Éditorial
-            </h2>
-            <div style={{ fontSize: 12, color: 'var(--text-soft)', marginTop: 2 }}>
-              Étape {step} sur 4 — {step === 1 ? 'Métadonnées' : step === 2 ? 'Couverture' : step === 3 ? 'Thème Graphique' : 'Génération & Rendu'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 20 }}>📖</span>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+                Studio « Exporter mon Livre en PDF »
+              </h2>
+              <div style={{ fontSize: 12, color: 'var(--text-soft)', marginTop: 2 }}>
+                Document de conception conforme • Rendu éditorial haut de gamme (100% Client)
+              </div>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             style={{
               background: 'none',
@@ -122,212 +192,139 @@ export function ExportWizard({
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* Main Form Area */}
+        {/* Body: Sidebar Steps + Form */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* Step Navigation Sidebar */}
+          <div
+            style={{
+              width: 220,
+              borderRight: '1px solid var(--border)',
+              background: 'var(--surface-2)',
+              padding: '16px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            {STEPS.map((s) => {
+              const isActive = step === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setStep(s.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: isActive ? 'var(--accent-glow)' : 'transparent',
+                    color: isActive ? 'var(--accent)' : 'var(--text)',
+                    fontWeight: isActive ? 700 : 500,
+                    fontSize: 13,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>{s.icon}</span>
+                  <span>{s.title}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Form Content Area */}
           <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
             {step === 1 && (
-              <div>
-                <h3 style={{ marginTop: 0, fontSize: 16 }}>1. Métadonnées du Livre</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    Titre de l&apos;ouvrage *
-                    <input
-                      type="text"
-                      value={metadata.title}
-                      onChange={(e) => setMetadata({ ...metadata, title: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', marginTop: 4, borderRadius: 6, border: '1px solid var(--border)' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    Sous-titre (optionnel)
-                    <input
-                      type="text"
-                      value={metadata.subtitle || ''}
-                      onChange={(e) => setMetadata({ ...metadata, subtitle: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', marginTop: 4, borderRadius: 6, border: '1px solid var(--border)' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    Nom d&apos;auteur ou Pseudonyme *
-                    <input
-                      type="text"
-                      value={metadata.authorName}
-                      onChange={(e) => setMetadata({ ...metadata, authorName: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', marginTop: 4, borderRadius: 6, border: '1px solid var(--border)' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    Dédicace (optionnel)
-                    <textarea
-                      value={metadata.dedication || ''}
-                      onChange={(e) => setMetadata({ ...metadata, dedication: e.target.value })}
-                      rows={3}
-                      style={{ width: '100%', padding: '8px 12px', marginTop: 4, borderRadius: 6, border: '1px solid var(--border)' }}
-                    />
-                  </label>
-                </div>
-              </div>
+              <StepMetadata
+                metadata={metadata}
+                onChange={(m) => handleSaveAndPersist(m, sections, coverConfig, settings)}
+              />
             )}
 
             {step === 2 && (
-              <div>
-                <h3 style={{ marginTop: 0, fontSize: 16 }}>2. Couverture</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>Mode de Couverture :</label>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <button
-                      className={`pill ${coverConfig.mode === 'none' ? 'active' : ''}`}
-                      onClick={() => setCoverConfig({ ...coverConfig, mode: 'none' })}
-                    >
-                      Sans Couverture
-                    </button>
-                    <button
-                      className={`pill ${coverConfig.mode === 'generated' ? 'active' : ''}`}
-                      onClick={() => setCoverConfig({ ...coverConfig, mode: 'generated' })}
-                    >
-                      Création Manuelle
-                    </button>
-                  </div>
-
-                  {coverConfig.mode === 'generated' && (
-                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <label style={{ fontSize: 12 }}>Couleur de Fond :</label>
-                      <input
-                        type="color"
-                        value={coverConfig.background?.value || '#8a5a34'}
-                        onChange={(e) =>
-                          setCoverConfig({
-                            ...coverConfig,
-                            background: { type: 'color', value: e.target.value },
-                          })
-                        }
-                        style={{ width: 60, height: 36, border: 'none', cursor: 'pointer' }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <StepFrontBackMatter
+                metadata={metadata}
+                sections={sections}
+                onUpdateMetadata={(m) => handleSaveAndPersist(m, sections, coverConfig, settings)}
+                onUpdateSections={(sec) => handleSaveAndPersist(metadata, sec, coverConfig, settings)}
+              />
             )}
 
             {step === 3 && (
-              <div>
-                <h3 style={{ marginTop: 0, fontSize: 16 }}>3. Thème Graphique</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                  {Object.values(THEME_REGISTRY).map((t) => (
-                    <div
-                      key={t.id}
-                      onClick={() => setSettings({ ...settings, themeId: t.id })}
-                      style={{
-                        padding: 12,
-                        borderRadius: 8,
-                        border: `2px solid ${settings.themeId === t.id ? 'var(--accent)' : 'var(--border)'}`,
-                        background: settings.themeId === t.id ? 'rgba(138,90,52,0.08)' : 'var(--surface-2)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: 13, color: t.colors.accent }}>{t.label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-soft)', marginTop: 4 }}>
-                        Police: {t.fonts.body} • Style: {t.chapterOpening}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <StepCover
+                coverConfig={coverConfig}
+                metadata={metadata}
+                onChange={(c) => handleSaveAndPersist(metadata, sections, c, settings)}
+              />
             )}
 
             {step === 4 && (
-              <div>
-                <h3 style={{ marginTop: 0, fontSize: 16 }}>4. Génération du PDF</h3>
-                <div style={{ textAlign: 'center', padding: '30px 20px' }}>
-                  {!generatedPdfUrl ? (
-                    <div>
-                      <p style={{ fontSize: 14, color: 'var(--text-soft)', marginBottom: 20 }}>
-                        Prêt à générer votre manuscrit ({chapters.length} chapitres) au format PDF éditorial.
-                      </p>
-                      <button
-                        onClick={handleGenerate}
-                        disabled={isGenerating}
-                        className="btn btn-primary"
-                        style={{ padding: '12px 28px', fontSize: 15, fontWeight: 700 }}
-                      >
-                        {isGenerating ? '⏳ Génération en cours...' : '⚡ Générer le PDF'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ fontSize: 40, marginBottom: 10 }}>🎉</div>
-                      <h4 style={{ margin: 0, fontSize: 18, color: '#27ae60' }}>PDF généré avec succès !</h4>
-                      <p style={{ fontSize: 13, color: 'var(--text-soft)', margin: '8px 0 20px 0' }}>
-                        Votre manuscrit est prêt pour le téléchargement.
-                      </p>
-                      <a
-                        href={generatedPdfUrl}
-                        download={`${metadata.title || 'manuscrit'}.pdf`}
-                        className="btn btn-primary"
-                        style={{ padding: '12px 28px', fontSize: 15, textDecoration: 'none', display: 'inline-block' }}
-                      >
-                        📥 Télécharger le PDF
-                      </a>
-                    </div>
-                  )}
-
-                  {errorMsg && (
-                    <div style={{ color: '#e53e3e', fontSize: 13, marginTop: 16 }}>
-                      ⚠️ {errorMsg}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <StepTheme
+                selectedThemeId={settings.themeId}
+                onChange={(th) => handleSaveAndPersist(metadata, sections, coverConfig, { ...settings, themeId: th })}
+              />
             )}
-          </div>
 
-          {/* Right Preview Side Panel */}
-          <div
-            style={{
-              width: 280,
-              borderLeft: '1px solid var(--border)',
-              background: 'var(--surface-2)',
-              padding: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <CoverCanvas coverConfig={coverConfig} metadata={metadata} />
-            <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-soft)', textAlign: 'center' }}>
-              Aperçu en direct de la couverture
-            </div>
+            {step === 5 && (
+              <StepLayout
+                settings={settings}
+                onChange={(s) => handleSaveAndPersist(metadata, sections, coverConfig, s)}
+              />
+            )}
+
+            {step === 6 && (
+              <StepReview
+                metadata={metadata}
+                sections={sections}
+                coverConfig={coverConfig}
+                settings={settings}
+                isGenerating={isGenerating}
+                generatedPdfUrl={generatedPdfUrl}
+                errorMsg={errorMsg}
+                history={history}
+                onGenerate={handleGenerate}
+              />
+            )}
           </div>
         </div>
 
         {/* Footer Navigation */}
         <div
           style={{
-            padding: '12px 24px',
+            padding: '14px 24px',
             borderTop: '1px solid var(--border)',
+            background: 'var(--surface-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'var(--surface-2)',
           }}
         >
           <button
+            type="button"
+            className="btn btn-secondary"
             onClick={() => setStep((s) => Math.max(1, s - 1))}
             disabled={step === 1}
-            className="btn btn-ghost"
-            style={{ opacity: step === 1 ? 0.5 : 1 }}
+            style={{ padding: '8px 16px', fontSize: 13 }}
           >
-            ← Précédent
+            ‹ Précédent
           </button>
+
+          <span style={{ fontSize: 12, opacity: 0.6 }}>
+            Étape {step} sur {STEPS.length}
+          </span>
+
           <button
-            onClick={() => setStep((s) => Math.min(4, s + 1))}
-            disabled={step === 4}
+            type="button"
             className="btn btn-primary"
-            style={{ opacity: step === 4 ? 0.5 : 1 }}
+            onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))}
+            disabled={step === STEPS.length}
+            style={{ padding: '8px 18px', fontSize: 13, background: 'var(--accent)' }}
           >
-            Suivant →
+            Suivant ›
           </button>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { CoverPage } from './CoverPage';
 import { TitlePage } from './TitlePage';
 import { CopyrightPage } from './CopyrightPage';
 import { DedicacePage } from './DedicacePage';
+import { FrontMatterPage } from './FrontMatterPage';
 import { ChapterSection } from './ChapterSection';
 
 export function BookDocument({
@@ -25,6 +26,9 @@ export function BookDocument({
   theme: ExportTheme;
   frontBackSections?: FrontBackMatterSection[];
 }) {
+  const frontSections = frontBackSections.filter((s) => s.placement === 'front');
+  const backSections = frontBackSections.filter((s) => s.placement === 'back');
+
   return (
     <Document title={metadata.title} author={metadata.authorName}>
       {/* 1. Cover */}
@@ -43,7 +47,12 @@ export function BookDocument({
         <DedicacePage dedication={metadata.dedication} theme={theme} />
       )}
 
-      {/* 5. Chapters */}
+      {/* 5. Front Matter (Préface, Avant-propos...) */}
+      {frontSections.map((sec) => (
+        <FrontMatterPage key={sec.id} section={sec} theme={theme} />
+      ))}
+
+      {/* 6. Chapters */}
       {chapters.map((ch, idx) => (
         <ChapterSection
           key={ch.id || idx}
@@ -55,6 +64,11 @@ export function BookDocument({
           authorName={metadata.authorName}
           includeChapterNumbers={settings.includeChapterNumbers}
         />
+      ))}
+
+      {/* 7. Back Matter (Postface, Annexes, Glossaire, Bio...) */}
+      {backSections.map((sec) => (
+        <FrontMatterPage key={sec.id} section={sec} theme={theme} />
       ))}
     </Document>
   );
