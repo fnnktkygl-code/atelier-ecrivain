@@ -431,6 +431,7 @@ export default function LiseusePage() {
   }, []);
 
   // Helper to resolve note text strictly scoped to the chapter column
+  // Helper to resolve note text strictly scoped to the chapter column
   const getNoteContentFromRef = useCallback((refEl: HTMLElement): { num: string; text: string } | null => {
     const num = refEl.dataset.note || '';
     if (!num) return null;
@@ -445,33 +446,34 @@ export default function LiseusePage() {
     if (chIndex >= 0 && chapters && chapters[chIndex]) {
       const ch = chapters[chIndex];
       if (ch.notes && Array.isArray(ch.notes) && ch.notes.length > 0) {
+        const noteIdx = parseInt(num, 10) - 1;
         const found = ch.notes.find((n: any, idx: number) => {
           const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
-          return nNum === num;
-        });
-        if (found) noteText = found.content;
-      }
-    }
+          return nNum === num || idx === noteIdx;
+        }) || ch.notes[noteIdx];
 
-    // 2. Fallback: search all custom chapter notes
-    if (!noteText && chapters) {
-      for (const ch of chapters) {
-        if (ch.notes && Array.isArray(ch.notes) && ch.notes.length > 0) {
-          const found = ch.notes.find((n: any, idx: number) => {
-            const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
-            return nNum === num;
-          });
-          if (found) {
-            noteText = found.content;
-            break;
-          }
+        if (found) {
+          noteText = typeof found === 'string' ? found : (found.content || found.text);
         }
       }
     }
 
-    // 3. Fallback to static demo NOTES only if no custom notes exist
-    if (!noteText) {
-      noteText = NOTES[num];
+    // 2. Only if chapter column was NOT found at all, search across chapters
+    if (!noteText && chIndex === -1 && chapters) {
+      for (const ch of chapters) {
+        if (ch.notes && Array.isArray(ch.notes) && ch.notes.length > 0) {
+          const noteIdx = parseInt(num, 10) - 1;
+          const found = ch.notes.find((n: any, idx: number) => {
+            const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
+            return nNum === num || idx === noteIdx;
+          }) || ch.notes[noteIdx];
+
+          if (found) {
+            noteText = typeof found === 'string' ? found : (found.content || found.text);
+            break;
+          }
+        }
+      }
     }
 
     return noteText ? { num, text: noteText } : null;
@@ -610,29 +612,13 @@ export default function LiseusePage() {
       const ref = (e.target as HTMLElement).closest('.note-ref') as HTMLElement | null;
       if (ref) {
         e.stopPropagation();
-        const num = ref.dataset.note || '';
-        let noteText = NOTES[num];
-        if (!noteText && chapters) {
-          // Check in current chapters' notes
-          for (const ch of chapters) {
-            if (ch.notes && Array.isArray(ch.notes)) {
-              const found = ch.notes.find((n: any, idx: number) => {
-                const nNum = n.key ? String(n.key).replace(/\D/g, '') || String(idx + 1) : String(idx + 1);
-                return nNum === num;
-              });
-              if (found) {
-                noteText = found.content;
-                break;
-              }
-            }
-          }
-        }
-        if (noteText) setNotePopup({ num, text: noteText });
+        const res = getNoteContentFromRef(ref);
+        if (res) setNotePopup(res);
       }
     };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
-  }, [chapters]);
+  }, [getNoteContentFromRef]);
 
   // ── Translation ──
   const colWidthPx = colWidthRef.current;
