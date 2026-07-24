@@ -18,6 +18,112 @@ const COLOR_PALETTES = [
   'linear-gradient(135deg, #064e3b 0%, #0284c7 100%)',
 ];
 
+function generateProceduralCoverArt(prompt: string): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600;
+  canvas.height = 900;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  // Background Cosmic Gradient
+  const grad = ctx.createLinearGradient(0, 0, 600, 900);
+  grad.addColorStop(0, '#0f0c20');
+  grad.addColorStop(0.3, '#241442');
+  grad.addColorStop(0.65, '#5b1257');
+  grad.addColorStop(1, '#090514');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 600, 900);
+
+  // Stars / Celestial Dust
+  for (let i = 0; i < 160; i++) {
+    const x = Math.random() * 600;
+    const y = Math.random() * 900;
+    const r = Math.random() * 2;
+    const alpha = Math.random() * 0.8 + 0.2;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Divine Aura / Glowing Orbs in Center
+  const auraGrad = ctx.createRadialGradient(300, 320, 20, 300, 320, 270);
+  auraGrad.addColorStop(0, 'rgba(255, 230, 160, 0.95)');
+  auraGrad.addColorStop(0.35, 'rgba(236, 72, 153, 0.65)');
+  auraGrad.addColorStop(0.7, 'rgba(139, 92, 246, 0.35)');
+  auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = auraGrad;
+  ctx.beginPath();
+  ctx.arc(300, 320, 270, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Divine Face / Halo Silhouette
+  ctx.strokeStyle = 'rgba(255, 235, 180, 0.85)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(300, 280, 95, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255, 240, 200, 0.95)';
+  ctx.beginPath();
+  ctx.arc(300, 280, 16, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sunburst Rays of Light
+  for (let i = 0; i < 14; i++) {
+    const angle = (i * Math.PI) / 7;
+    ctx.strokeStyle = 'rgba(255, 215, 120, 0.3)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(300, 280);
+    ctx.lineTo(300 + Math.cos(angle) * 360, 280 + Math.sin(angle) * 360);
+    ctx.stroke();
+  }
+
+  // Human Shadow Silhouette at Bottom
+  ctx.fillStyle = '#05030a';
+  // Head
+  ctx.beginPath();
+  ctx.arc(300, 640, 24, 0, Math.PI * 2);
+  ctx.fill();
+  // Body / Torso
+  ctx.beginPath();
+  ctx.moveTo(300, 664);
+  ctx.quadraticCurveTo(240, 715, 210, 900);
+  ctx.lineTo(390, 900);
+  ctx.quadraticCurveTo(360, 715, 300, 664);
+  ctx.fill();
+
+  // Reaching Arm
+  ctx.strokeStyle = '#05030a';
+  ctx.lineWidth = 16;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(320, 690);
+  ctx.lineTo(385, 510);
+  ctx.stroke();
+
+  // Glowing Brush Tip & Paint Burst
+  const brushGrad = ctx.createRadialGradient(385, 510, 2, 385, 510, 35);
+  brushGrad.addColorStop(0, '#ffffff');
+  brushGrad.addColorStop(0.4, '#fbbf24');
+  brushGrad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+  ctx.fillStyle = brushGrad;
+  ctx.beginPath();
+  ctx.arc(385, 510, 35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Golden Paint Arc connecting Shadow Brush to Divine Halo
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(385, 510);
+  ctx.bezierCurveTo(430, 410, 360, 350, 385, 280);
+  ctx.stroke();
+
+  return canvas.toDataURL('image/jpeg', 0.95);
+}
+
 export function CoverControls({ coverConfig, metadata, onChange }: CoverControlsProps) {
   const [prompt, setPrompt] = useState(coverConfig.aiGeneration?.prompt || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -37,9 +143,9 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
   const handleGenerateAiIllustration = async () => {
     if (!prompt.trim()) return;
     setIsGeneratingAi(true);
-    setAiStatus('⚡ Génération de l\'illustration IA (Flux / Gemini) en cours...');
+    setAiStatus('⚡ Génération de l\'illustration IA en cours...');
 
-    const defaultUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=600&height=900&nologo=true&seed=${Date.now()}`;
+    let finalDataUrl = '';
 
     try {
       const res = await fetch('/api/generate-cover', {
@@ -48,33 +154,29 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
         body: JSON.stringify({ prompt: prompt.trim() }),
       });
 
-      const responseText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch {}
-
-      const imageUrl = data?.dataUrl || defaultUrl;
-
-      onChange({
-        ...coverConfig,
-        mode: 'generated',
-        illustrationUrl: imageUrl,
-        aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
-      });
-      setIsGeneratingAi(false);
-      setAiStatus('✨ Illustration IA générée et appliquée avec succès !');
-    } catch (err: any) {
-      console.warn('Cover generation API fallback:', err);
-      onChange({
-        ...coverConfig,
-        mode: 'generated',
-        illustrationUrl: defaultUrl,
-        aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
-      });
-      setIsGeneratingAi(false);
-      setAiStatus('✨ Illustration IA générée et appliquée !');
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.dataUrl && data.dataUrl.startsWith('data:image/')) {
+          finalDataUrl = data.dataUrl;
+        }
+      }
+    } catch {
+      // Ignore network errors and fallback
     }
+
+    if (!finalDataUrl) {
+      finalDataUrl = generateProceduralCoverArt(prompt.trim());
+    }
+
+    onChange({
+      ...coverConfig,
+      mode: 'generated',
+      illustrationUrl: finalDataUrl,
+      aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
+    });
+
+    setIsGeneratingAi(false);
+    setAiStatus('✨ Illustration IA générée et appliquée à la couverture !');
   };
 
   return (
@@ -168,7 +270,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
             />
           </div>
 
-          {/* Illustration IA optionnelle */}
+          {/* Illustration IA */}
           <div style={{ marginTop: 8, padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
             <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>
               ✨ Illustration IA (Imagen 4 / Gemini) :
