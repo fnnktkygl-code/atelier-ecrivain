@@ -400,8 +400,18 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
             });
           }
 
-          // 3. Safe fallback: If not replaced automatically, do NOT overwrite any block.
-          // The note/citation is preserved in Notes and the review is archived safely.
+          // 3. Fallback: If not matched by target or keyword, append replacement text to the last block
+          if (!replaced && replacementText && ch.blocks.length > 0) {
+            const lastIdx = ch.blocks.length - 1;
+            const lastBlock = ch.blocks[lastIdx];
+            const updatedContent = lastBlock.content
+              ? `${lastBlock.content}\n\n${replacementText}`
+              : replacementText;
+            ch.blocks = ch.blocks.map((b, idx) =>
+              idx === lastIdx ? { ...b, content: updatedContent } : b
+            );
+            replaced = true;
+          }
         }
 
         // 4. Create the corresponding note in ch.notes
@@ -563,8 +573,16 @@ export function useManuscript() {
           if (raw) {
             const parsed = JSON.parse(raw) as ManuscriptState;
             if (parsed.chapters && parsed.chapters.length > 0) {
-              if (!bestState || parsed.chapters.length > bestState.chapters.length) {
+              if (!bestState) {
                 bestState = parsed;
+              } else if (parsed.chapters.length > bestState.chapters.length) {
+                bestState = parsed;
+              } else if (parsed.chapters.length === bestState.chapters.length) {
+                const currentSaved = parsed.lastSaved || 0;
+                const bestSaved = bestState.lastSaved || 0;
+                if (currentSaved >= bestSaved) {
+                  bestState = parsed;
+                }
               }
             }
           }
@@ -588,7 +606,16 @@ export function useManuscript() {
     if (loaded && targetState && !cancelled) {
       dispatch({ type: 'LOAD_STATE', state: targetState });
       try {
-        localStorage.setItem(currentStorageKey, JSON.stringify(targetState));
+        const keysToSync = [
+          currentStorageKey,
+          `atelier-manuscrit-${currentManuscriptId}`,
+          'atelier-manuscrit-default',
+          'atelier-manuscrit-v1',
+        ];
+        const serialized = JSON.stringify(targetState);
+        keysToSync.forEach((k) => {
+          try { localStorage.setItem(k, serialized); } catch {}
+        });
         window.dispatchEvent(
           new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
         );
@@ -714,7 +741,17 @@ export function useManuscript() {
 
     // 1. Save IMMEDIATELY to localStorage and notify all listeners (Liseuse, etc.)
     try {
-      localStorage.setItem(currentStorageKey, JSON.stringify(state));
+      const stateToSave = { ...state, lastSaved: Date.now() };
+      const serialized = JSON.stringify(stateToSave);
+      const keysToSync = [
+        currentStorageKey,
+        `atelier-manuscrit-${currentManuscriptId}`,
+        'atelier-manuscrit-default',
+        'atelier-manuscrit-v1',
+      ];
+      keysToSync.forEach((k) => {
+        try { localStorage.setItem(k, serialized); } catch {}
+      });
       window.dispatchEvent(
         new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
       );

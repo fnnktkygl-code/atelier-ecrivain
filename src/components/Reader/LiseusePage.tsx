@@ -291,8 +291,16 @@ export default function LiseusePage() {
           if (raw) {
             const p = JSON.parse(raw);
             if (p && p.chapters && Array.isArray(p.chapters) && p.chapters.length > 0) {
-              if (!bestParsed || p.chapters.length > bestParsed.chapters.length) {
+              if (!bestParsed) {
                 bestParsed = p;
+              } else if (p.chapters.length > bestParsed.chapters.length) {
+                bestParsed = p;
+              } else if (p.chapters.length === bestParsed.chapters.length) {
+                const pSaved = p.lastSaved || 0;
+                const bestSaved = bestParsed.lastSaved || 0;
+                if (pSaved >= bestSaved) {
+                  bestParsed = p;
+                }
               }
             }
           }
