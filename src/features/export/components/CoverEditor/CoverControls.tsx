@@ -54,63 +54,80 @@ function resizeImageDataUrl(dataUrl: string, maxDim: number, quality = 0.88): Pr
   });
 }
 
-function generateProceduralCoverArt(prompt: string): string {
+function generateProceduralCoverArt(prompt: string, seed = Math.floor(Math.random() * 1000000)): string {
   const canvas = document.createElement('canvas');
   canvas.width = 600;
   canvas.height = 900;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
+  // Seed-based pseudo-random generator
+  const seededRandom = (offset: number) => {
+    const x = Math.sin(seed + offset) * 10000;
+    return x - Math.floor(x);
+  };
+
+  const hue1 = Math.floor(seededRandom(1) * 360);
+  const hue2 = (hue1 + 120 + Math.floor(seededRandom(2) * 90)) % 360;
+  const hue3 = (hue2 + 90 + Math.floor(seededRandom(3) * 60)) % 360;
+
   const grad = ctx.createLinearGradient(0, 0, 600, 900);
-  grad.addColorStop(0, '#0f0c20');
-  grad.addColorStop(0.3, '#241442');
-  grad.addColorStop(0.65, '#5b1257');
-  grad.addColorStop(1, '#090514');
+  grad.addColorStop(0, `hsl(${hue1}, 50%, 10%)`);
+  grad.addColorStop(0.35, `hsl(${hue2}, 55%, 18%)`);
+  grad.addColorStop(0.7, `hsl(${hue3}, 60%, 25%)`);
+  grad.addColorStop(1, '#05030a');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 600, 900);
 
-  for (let i = 0; i < 160; i++) {
-    const x = Math.random() * 600;
-    const y = Math.random() * 900;
-    const r = Math.random() * 2;
-    const alpha = Math.random() * 0.8 + 0.2;
+  // Seeded Stars / Particles
+  for (let i = 0; i < 180; i++) {
+    const x = seededRandom(i * 3 + 10) * 600;
+    const y = seededRandom(i * 3 + 11) * 900;
+    const r = seededRandom(i * 3 + 12) * 2.5 + 0.5;
+    const alpha = seededRandom(i * 3 + 13) * 0.8 + 0.2;
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  const auraGrad = ctx.createRadialGradient(300, 320, 20, 300, 320, 270);
-  auraGrad.addColorStop(0, 'rgba(255, 230, 160, 0.95)');
-  auraGrad.addColorStop(0.35, 'rgba(236, 72, 153, 0.65)');
-  auraGrad.addColorStop(0.7, 'rgba(139, 92, 246, 0.35)');
+  // Seeded Aura
+  const auraX = 200 + seededRandom(100) * 200;
+  const auraY = 220 + seededRandom(101) * 200;
+  const auraGrad = ctx.createRadialGradient(auraX, auraY, 20, auraX, auraY, 280);
+  auraGrad.addColorStop(0, `hsla(${hue2}, 90%, 75%, 0.95)`);
+  auraGrad.addColorStop(0.4, `hsla(${hue3}, 80%, 55%, 0.65)`);
+  auraGrad.addColorStop(0.75, `hsla(${hue1}, 70%, 40%, 0.3)`);
   auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = auraGrad;
   ctx.beginPath();
-  ctx.arc(300, 320, 270, 0, Math.PI * 2);
+  ctx.arc(auraX, auraY, 280, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(255, 235, 180, 0.85)';
+  // Seeded Geometric Rings & Rays
+  ctx.strokeStyle = `hsla(${hue2}, 90%, 85%, 0.85)`;
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.arc(300, 280, 95, 0, Math.PI * 2);
+  ctx.arc(auraX, auraY - 30, 95, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(255, 240, 200, 0.95)';
+  ctx.fillStyle = `hsla(${hue2}, 100%, 90%, 0.95)`;
   ctx.beginPath();
-  ctx.arc(300, 280, 16, 0, Math.PI * 2);
+  ctx.arc(auraX, auraY - 30, 16, 0, Math.PI * 2);
   ctx.fill();
 
-  for (let i = 0; i < 14; i++) {
-    const angle = (i * Math.PI) / 7;
-    ctx.strokeStyle = 'rgba(255, 215, 120, 0.3)';
-    ctx.lineWidth = 3;
+  const numRays = 12 + Math.floor(seededRandom(200) * 8);
+  for (let i = 0; i < numRays; i++) {
+    const angle = (i * Math.PI * 2) / numRays + seededRandom(300 + i);
+    ctx.strokeStyle = `hsla(${hue2}, 100%, 80%, 0.35)`;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(300, 280);
-    ctx.lineTo(300 + Math.cos(angle) * 360, 280 + Math.sin(angle) * 360);
+    ctx.moveTo(auraX, auraY - 30);
+    ctx.lineTo(auraX + Math.cos(angle) * 380, (auraY - 30) + Math.sin(angle) * 380);
     ctx.stroke();
   }
 
+  // Silhouette & Brush Arc
   ctx.fillStyle = '#05030a';
   ctx.beginPath();
   ctx.arc(300, 640, 24, 0, Math.PI * 2);
@@ -132,18 +149,18 @@ function generateProceduralCoverArt(prompt: string): string {
 
   const brushGrad = ctx.createRadialGradient(385, 510, 2, 385, 510, 35);
   brushGrad.addColorStop(0, '#ffffff');
-  brushGrad.addColorStop(0.4, '#fbbf24');
-  brushGrad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+  brushGrad.addColorStop(0.4, `hsl(${hue2}, 90%, 60%)`);
+  brushGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = brushGrad;
   ctx.beginPath();
   ctx.arc(385, 510, 35, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
+  ctx.strokeStyle = `hsl(${hue2}, 90%, 65%)`;
   ctx.lineWidth = 7;
   ctx.beginPath();
   ctx.moveTo(385, 510);
-  ctx.bezierCurveTo(430, 410, 360, 350, 385, 280);
+  ctx.bezierCurveTo(430 + seededRandom(500) * 40, 410, 360 - seededRandom(501) * 40, 350, auraX, auraY);
   ctx.stroke();
 
   return canvas.toDataURL('image/jpeg', 0.95);
@@ -281,8 +298,9 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     if (!prompt.trim()) return;
     setIsGeneratingAi(true);
     setAiStatusIsError(false);
-    setAiStatus('⚡ Génération de l\'illustration IA en cours...');
+    setAiStatus('⚡ Génération d\'une nouvelle variante en cours...');
 
+    const currentSeed = Math.floor(Math.random() * 10000000);
     let finalDataUrl = '';
     let usedFallback = false;
 
@@ -294,7 +312,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       const res = await fetch('/api/generate-cover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+        body: JSON.stringify({ prompt: prompt.trim(), seed: currentSeed }),
         signal: controller.signal,
       });
 
@@ -316,7 +334,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     }
 
     if (!finalDataUrl) {
-      finalDataUrl = generateProceduralCoverArt(prompt.trim());
+      finalDataUrl = generateProceduralCoverArt(prompt.trim(), currentSeed);
       usedFallback = true;
     }
 
@@ -327,7 +345,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       return;
     }
 
-    addToHistory(finalDataUrl, prompt.trim());
+    const variantLabel = `Variante #${(currentSeed % 99) + 1} - "${prompt.trim()}"`;
+    addToHistory(finalDataUrl, variantLabel);
 
     onChange({
       ...coverConfig,
@@ -340,8 +359,8 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     setAiStatusIsError(false);
     setAiStatus(
       usedFallback
-        ? '🎨 Service IA indisponible : une illustration de secours a été générée et enregistrée.'
-        : "✨ Illustration IA générée et enregistrée !"
+        ? '🎨 Variante artistique de secours générée et ajoutée à l\'historique !'
+        : '✨ Nouvelle variante IA générée et ajoutée à l\'historique !'
     );
   };
 
