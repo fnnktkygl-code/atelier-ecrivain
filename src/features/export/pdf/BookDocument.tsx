@@ -49,7 +49,13 @@ export function BookDocument({
 
       {/* 5. Front Matter (Préface, Avant-propos...) */}
       {frontSections.map((sec) => (
-        <FrontMatterPage key={sec.id} section={sec} theme={theme} />
+        <FrontMatterPage
+          key={sec.id}
+          section={sec}
+          theme={theme}
+          bookTitle={metadata.title}
+          authorName={metadata.authorName}
+        />
       ))}
 
       {/* 6. Chapters */}
@@ -68,7 +74,13 @@ export function BookDocument({
 
       {/* 7. Back Matter (Postface, Annexes, Glossaire, Bio...) */}
       {backSections.map((sec) => (
-        <FrontMatterPage key={sec.id} section={sec} theme={theme} />
+        <FrontMatterPage
+          key={sec.id}
+          section={sec}
+          theme={theme}
+          bookTitle={metadata.title}
+          authorName={metadata.authorName}
+        />
       ))}
     </Document>
   );

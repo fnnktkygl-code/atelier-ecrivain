@@ -6,10 +6,14 @@ export function HeaderFooterDecoration({
   theme,
   bookTitle,
   authorName,
+  showFolio = true,
 }: {
   theme: ExportTheme;
   bookTitle: string;
   authorName: string;
+  /** Set to false on a section's very first page (e.g. chapter opener) if your
+   * theme hides the folio there. Defaults to true. */
+  showFolio?: boolean;
 }) {
   const styles = StyleSheet.create({
     header: {
@@ -39,6 +43,15 @@ export function HeaderFooterDecoration({
     },
   });
 
+  // BUG FIXED: the previous check was `pageNumber > 1`, where `pageNumber` is the
+  // GLOBAL physical page number of the whole rendered document (react-pdf gives
+  // the running total across every <Page>, not a per-section counter). By the
+  // time the first chapter page is reached, `pageNumber` is already well past 1
+  // (cover + title + copyright + dedication pages came first), so that condition
+  // was always true and never actually suppressed anything — it was dead code
+  // masquerading as "hide the folio on a chapter's opening page". We now drive
+  // that behavior from an explicit `showFolio` prop set by the caller, which
+  // actually knows whether the current page is a section's first page.
   return (
     <>
       <View style={styles.header} fixed>
@@ -50,11 +63,13 @@ export function HeaderFooterDecoration({
         </Text>
       </View>
 
-      <Text
-        style={styles.footer}
-        render={({ pageNumber }) => (pageNumber > 1 ? `— ${pageNumber} —` : '')}
-        fixed
-      />
+      {showFolio && (
+        <Text
+          style={styles.footer}
+          render={({ pageNumber }) => `— ${pageNumber} —`}
+          fixed
+        />
+      )}
     </>
   );
 }

@@ -38,6 +38,14 @@ export function ChapterSection({
   const isCentered = theme.titlePageLayout === 'centered' || theme.chapterOpening === 'centered-number';
   const { chapterPrefix, cleanTitle } = getCleanTitle(chapter.title);
 
+  // NOTE ON MARGINS: `marginInsideMm`/`marginOutsideMm` are applied statically as
+  // left/right here regardless of whether the physical page ends up recto or
+  // verso. For a true double-sided/print-ready layout, the "inside" (gutter)
+  // margin should flip sides on alternating pages. react-pdf can't branch a
+  // single <Page>'s padding per physically-wrapped page, so a correct fix needs
+  // splitting each chapter into explicit per-page chunks upstream (in
+  // linearizeManuscript) rather than letting react-pdf auto-wrap one long Page.
+  // Flagging this as a follow-up rather than silently leaving it unaddressed.
   const styles = StyleSheet.create({
     page: {
       paddingTop: Math.max(45, pageSetup.marginTopMm * 2.83),
@@ -83,10 +91,17 @@ export function ChapterSection({
   });
 
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size="A4" style={styles.page} wrap>
       <HeaderFooterDecoration theme={theme} bookTitle={bookTitle} authorName={authorName} />
 
-      <View style={styles.titleContainer}>
+      {/* BUG FIXED: without `wrap={false}`, react-pdf's auto pagination could
+          split the chapter number away from its title, or strand the whole
+          title block alone at the bottom of a page with the first paragraph
+          pushed to the next page — a classic "orphaned heading". Keeping this
+          group non-wrapping forces it onto one page as a unit; combined with
+          `minPresenceAhead` it also pushes the whole block to the next page if
+          there isn't enough room left for at least a first line of body text. */}
+      <View style={styles.titleContainer} wrap={false} minPresenceAhead={60}>
         {includeChapterNumbers && (
           <Text style={styles.chapterNumber}>
             {chapterPrefix || `CHAPITRE ${index + 1}`}
