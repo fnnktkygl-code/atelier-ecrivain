@@ -246,10 +246,28 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
       const blocks = [...ch.blocks];
-      const insertAt = action.afterBlockIndex !== null
-        ? action.afterBlockIndex + 1
-        : blocks.length;
-      blocks.splice(insertAt, 0, ...action.blocks);
+
+      const textToAppend = action.blocks.map((b) => b.content).filter(Boolean).join(' ');
+
+      if (textToAppend) {
+        if (action.afterBlockIndex !== null && blocks[action.afterBlockIndex]) {
+          const targetBlock = blocks[action.afterBlockIndex];
+          const updatedContent = targetBlock.content
+            ? `${targetBlock.content} ${textToAppend}`
+            : textToAppend;
+          blocks[action.afterBlockIndex] = { ...targetBlock, content: updatedContent };
+        } else if (blocks.length > 0) {
+          const lastIdx = blocks.length - 1;
+          const lastBlock = blocks[lastIdx];
+          const updatedContent = lastBlock.content
+            ? `${lastBlock.content} ${textToAppend}`
+            : textToAppend;
+          blocks[lastIdx] = { ...lastBlock, content: updatedContent };
+        } else {
+          blocks.push(makeBlock(textToAppend, 'dictation'));
+        }
+      }
+
       ch.blocks = blocks;
       chapters[action.chapterIndex] = ch;
       return { ...state, chapters, isDirty: true, insertionPoint: null };
@@ -352,89 +370,54 @@ function manuscriptReducer(state: ManuscriptState, action: ManuscriptAction): Ma
 
       if (review && review.status === 'pending') {
         const targetNoteNum = ch.notes.length + 1;
-        let supChar = '';
+        const supChar = toSuperscript(targetNoteNum);
 
-        // If source exists or suggestion is factual, prepare superscript digit
-        if (review.source || review.type === 'correction') {
-          supChar = toSuperscript(targetNoteNum);
+        // 1. Attach ONLY the superscript marker (e.g. ¹) to target phrase in story block, without modifying author story text
+        const target = review.original ? review.original.trim() : '';
+        let marked = false;
+
+        if (target && target.length > 2) {
+          ch.blocks = ch.blocks.map((block) => {
+            if (!marked && block.content.includes(target)) {
+              marked = true;
+              return {
+                ...block,
+                content: block.content.replace(target, `${target}${supChar}`),
+              };
+            }
+            return block;
+          });
         }
 
-        let replacementText = review.suggestion ? review.suggestion.trim() : '';
-        if (supChar && replacementText && !/[⁰¹²³⁴⁵⁶⁷⁸⁹]$/.test(replacementText)) {
-          replacementText = `${replacementText} ${supChar}`;
+        // If target phrase was not matched, attach superscript marker to end of paragraph
+        if (!marked && ch.blocks.length > 0) {
+          const lastIdx = ch.blocks.length - 1;
+          const lastBlock = ch.blocks[lastIdx];
+          const updatedContent = lastBlock.content ? `${lastBlock.content}${supChar}` : supChar;
+          ch.blocks = ch.blocks.map((b, idx) =>
+            idx === lastIdx ? { ...b, content: updatedContent } : b
+          );
         }
 
-        let replaced = false;
+        // 2. Add full verified citation/source/correction into Notes panel (ch.notes)
+        const noteKey = `Note ${targetNoteNum}`;
+        const noteContent = review.source
+          ? `${review.suggestion || review.original} — Source : ${review.source}`
+          : `${review.suggestion || review.original}${review.explanation ? ` (${review.explanation})` : ''}`;
 
-        if (replacementText) {
-          const target = review.original ? review.original.trim() : '';
-
-          // 1. Try exact string match in chapter blocks
-          if (target && target.length > 2) {
-            ch.blocks = ch.blocks.map((block) => {
-              if (!replaced && block.content.includes(target)) {
-                replaced = true;
-                return {
-                  ...block,
-                  content: block.content.replace(target, replacementText),
-                };
-              }
-              return block;
-            });
-          }
-
-          // 2. Try matching key phrases in blocks (e.g. "interprétation", "philosophe", "écrivain")
-          if (!replaced && target) {
-            const keywords = ['interprétation', 'philosophe', 'écrivain', 'disait', 'citation'];
-            const matchedKeyword = keywords.find((kw) => target.toLowerCase().includes(kw));
-
-            ch.blocks = ch.blocks.map((block) => {
-              if (!replaced && matchedKeyword && block.content.toLowerCase().includes(matchedKeyword)) {
-                replaced = true;
-                return {
-                  ...block,
-                  content: replacementText,
-                };
-              }
-              return block;
-            });
-          }
-
-          // 3. Fallback: If not matched by target or keyword, append replacement text to the last block
-          if (!replaced && replacementText && ch.blocks.length > 0) {
-            const lastIdx = ch.blocks.length - 1;
-            const lastBlock = ch.blocks[lastIdx];
-            const updatedContent = lastBlock.content
-              ? `${lastBlock.content}\n\n${replacementText}`
-              : replacementText;
-            ch.blocks = ch.blocks.map((b, idx) =>
-              idx === lastIdx ? { ...b, content: updatedContent } : b
-            );
-            replaced = true;
-          }
+        if (!ch.notes.some((n) => n.content === noteContent)) {
+          ch.notes = [
+            ...ch.notes,
+            {
+              id: uid(),
+              key: noteKey,
+              content: noteContent,
+              source: 'ai',
+            },
+          ];
         }
 
-        // 4. Create the corresponding note in ch.notes
-        if (review.source || review.explanation || review.suggestion) {
-          const noteKey = `Note ${targetNoteNum}`;
-          const noteContent = review.source
-            ? `${review.suggestion || review.original} — Source : ${review.source}`
-            : `${review.suggestion || review.original} ${review.explanation ? `(${review.explanation})` : ''}`;
-
-          if (!ch.notes.some((n) => n.content === noteContent)) {
-            ch.notes = [
-              ...ch.notes,
-              {
-                id: uid(),
-                key: noteKey,
-                content: noteContent,
-                source: 'ai',
-              },
-            ];
-          }
-        }
-
-        // 5. Mark review status as accepted
+        // 3. Mark review status as accepted
         ch.pendingReviews = ch.pendingReviews.map((r) =>
           r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
         );
