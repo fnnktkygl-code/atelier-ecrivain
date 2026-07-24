@@ -10,7 +10,7 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { getChapters, saveAllChapters, getDb } from '@/services/firebase/firestore';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 import type {
   ManuscriptState,
   ManuscriptAction,
@@ -605,8 +605,8 @@ export function useManuscript() {
       } catch {}
     }
 
-    // 2. Fallback to Firestore if logged in and not yet loaded locally
-    if (!loaded && user && manuscript?.id) {
+    // 2. Fetch from Firestore if logged in (merge/sync with cloud)
+    if (user && manuscript?.id) {
       getChapters(user.uid, manuscript.id)
         .then((fsChapters) => {
           if (cancelled) return;
@@ -615,7 +615,7 @@ export function useManuscript() {
             const rawChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
               id: ch.id || `ch-${idx}`,
               title: ch.title || `Chapitre ${idx + 1}`,
-              blocks: (ch.paragraphs || []).map((p) => ({
+              blocks: (ch as any).blocks || (ch.paragraphs || []).map((p) => ({
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 content: p,
                 type: 'paragraph' as const,
@@ -628,52 +628,29 @@ export function useManuscript() {
 
             const editableChapters = normalizeChapterNotesAndSuperscripts(rawChapters);
 
-            const newState: ManuscriptState = {
-              chapters: editableChapters,
-              activeChapterIndex: 0,
-              insertionPoint: null,
-              lastSaved: null,
-              isDirty: false,
-            };
-            dispatch({ type: 'LOAD_STATE', state: newState });
-            try {
-              localStorage.setItem(currentStorageKey, JSON.stringify(newState));
-              window.dispatchEvent(
-                new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
-              );
-            } catch {}
-          } else {
-            // New manuscript with 0 chapters -> Initialize 1 fresh chapter
-            const freshState: ManuscriptState = {
-              chapters: [
-                {
-                  id: 'ch-1',
-                  title: 'Chapitre 1',
-                  blocks: [
-                    {
-                      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                      content: '',
-                      type: 'paragraph',
-                      source: 'manual',
-                      createdAt: Date.now(),
-                    },
-                  ],
-                  notes: [],
-                  pendingReviews: [],
-                },
-              ],
-              activeChapterIndex: 0,
-              insertionPoint: null,
-              lastSaved: null,
-              isDirty: false,
-            };
-            dispatch({ type: 'LOAD_STATE', state: freshState });
-            try {
-              localStorage.setItem(currentStorageKey, JSON.stringify(freshState));
-              window.dispatchEvent(
-                new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
-              );
-            } catch {}
+            // Compare cloud vs local chapter count: keep whichever is larger / newer and push to cloud if local is ahead
+            if (!targetState || editableChapters.length >= targetState.chapters.length) {
+              const newState: ManuscriptState = {
+                chapters: editableChapters,
+                activeChapterIndex: 0,
+                insertionPoint: null,
+                lastSaved: Date.now(),
+                isDirty: false,
+              };
+              dispatch({ type: 'LOAD_STATE', state: newState });
+              try {
+                localStorage.setItem(currentStorageKey, JSON.stringify(newState));
+                window.dispatchEvent(
+                  new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+                );
+              } catch {}
+            } else if (targetState && targetState.chapters.length > editableChapters.length) {
+              // Local state has newly created chapters not yet in Firestore -> Push local to Cloud!
+              saveAllChapters(user.uid, manuscript.id, targetState.chapters).catch(console.error);
+            }
+          } else if (targetState && targetState.chapters.length > 0) {
+            // Cloud has 0 chapters -> Initialize cloud with local chapters!
+            saveAllChapters(user.uid, manuscript.id, targetState.chapters).catch(console.error);
           }
         })
         .catch(() => {});
@@ -688,7 +665,7 @@ export function useManuscript() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // ── Multi-device / Multi-tab Conflict Listener ──
+  // ── Multi-device Real-Time Firestore Synchronization Listener ──
   const lastCloudSaveTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
@@ -696,27 +673,66 @@ export function useManuscript() {
     let unsub: (() => void) | null = null;
     try {
       const db = getDb();
-      const mRef = doc(db, 'users', user.uid, 'manuscripts', manuscript.id);
-      unsub = onSnapshot(mRef, (snapshot) => {
-        if (!snapshot.exists()) return;
-        const data = snapshot.data();
-        const remoteTime = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
-        if (remoteTime > lastCloudSaveTimeRef.current + 5000 && stateRef.current.isDirty) {
-          console.warn('[Conflict Warning] Des modifications à distance ont été enregistrées sur un autre appareil.');
-          window.dispatchEvent(
-            new CustomEvent('atelier_sync_conflict', {
-              detail: { manuscriptId: manuscript.id, remoteTime },
-            })
-          );
+      const q = query(
+        collection(db, 'users', user.uid, 'manuscripts', manuscript.id, 'chapters'),
+        orderBy('order')
+      );
+
+      unsub = onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) return;
+
+        // Skip applying remote snapshot if local state is currently dirty (being edited) unless chapter count changed
+        const remoteCount = snapshot.docs.length;
+        const localCount = stateRef.current.chapters.length;
+
+        if (stateRef.current.isDirty && remoteCount === localCount) {
+          return;
+        }
+
+        const staticChapters = migrateFromStatic();
+        const rawChapters: EditableChapter[] = snapshot.docs.map((docSnap, idx) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id || `ch-${idx}`,
+            title: data.title || `Chapitre ${idx + 1}`,
+            blocks: data.blocks || (data.paragraphs || []).map((p: string) => ({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              content: p,
+              type: 'paragraph' as const,
+              source: 'original' as const,
+              createdAt: Date.now(),
+            })),
+            notes: data.notes && data.notes.length > 0 ? data.notes : staticChapters[idx]?.notes || [],
+            pendingReviews: data.pendingReviews || [],
+          };
+        });
+
+        const editableChapters = normalizeChapterNotesAndSuperscripts(rawChapters);
+
+        // Only update if remote state actually differs from current state
+        if (JSON.stringify(editableChapters) !== JSON.stringify(stateRef.current.chapters)) {
+          const newState: ManuscriptState = {
+            ...stateRef.current,
+            chapters: editableChapters,
+            isDirty: false,
+            lastSaved: Date.now(),
+          };
+          dispatch({ type: 'LOAD_STATE', state: newState });
+          try {
+            localStorage.setItem(currentStorageKey, JSON.stringify(newState));
+            window.dispatchEvent(
+              new CustomEvent('atelier_manuscript_updated', { detail: { manuscriptId: currentManuscriptId } })
+            );
+          } catch {}
         }
       });
     } catch (e) {
-      console.warn('Conflict listener setup failed:', e);
+      console.warn('Real-time cloud sync listener setup failed:', e);
     }
     return () => {
       if (unsub) unsub();
     };
-  }, [user, manuscript?.id]);
+  }, [user, manuscript?.id, currentStorageKey, currentManuscriptId]);
 
   // Auto-save: INSTANT local storage & custom event sync + DEBOUCED Firestore sync
   useEffect(() => {
