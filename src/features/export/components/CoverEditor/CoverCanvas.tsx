@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CoverConfig, BookMetadata } from '../../types/bookMeta';
 
 export function CoverCanvas({
@@ -8,7 +8,6 @@ export function CoverCanvas({
   coverConfig: CoverConfig;
   metadata: BookMetadata;
 }) {
-  const [imgError, setImgError] = useState(false);
   const bg = coverConfig.background?.value || '#8a5a34';
   const titleColor = coverConfig.titleColor || '#ffffff';
 
@@ -42,13 +41,12 @@ export function CoverCanvas({
       }}
     >
       {/* Background AI Illustration */}
-      {coverConfig.illustrationUrl && !imgError && (
+      {coverConfig.illustrationUrl && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={coverConfig.illustrationUrl}
             alt="Illustration IA"
-            onError={() => setImgError(true)}
             style={{
               position: 'absolute',
               inset: 0,
