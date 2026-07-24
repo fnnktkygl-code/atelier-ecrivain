@@ -35,6 +35,8 @@ interface EditorToolbarProps {
   onToggleNotes: () => void;
   onToggleFocus: () => void;
   onStartDictation?: () => void;
+  onAnalyzeText?: () => void;
+  isAnalyzingText?: boolean;
   dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
   onToggleSidebar?: () => void;
   isSpeechPlaying?: boolean;
@@ -64,6 +66,8 @@ export default function EditorToolbar({
   onToggleNotes,
   onToggleFocus,
   onStartDictation,
+  onAnalyzeText,
+  isAnalyzingText = false,
   dictationPhase = 'idle',
   onToggleSidebar,
   isSpeechPlaying = false,
@@ -114,6 +118,26 @@ export default function EditorToolbar({
                 {dictationPhase === 'recording' || dictationPhase === 'processing' ? '🔴' : '🎙️'}
               </button>
             </Tooltip>
+            {onAnalyzeText && (
+              <Tooltip content="Analyser le texte rédigé au clavier (Ratures, Fact-check & Notes IA)">
+                <button
+                  className="btn-icon"
+                  onClick={onAnalyzeText}
+                  disabled={isAnalyzingText}
+                  style={{
+                    width: 36, height: 36, fontSize: 16,
+                    color: isAnalyzingText ? 'var(--accent)' : 'var(--text)',
+                    background: isAnalyzingText ? 'var(--accent-glow)' : 'var(--surface-2)',
+                    border: isAnalyzingText ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    borderRadius: '50%',
+                    cursor: isAnalyzingText ? 'wait' : 'pointer',
+                    animation: isAnalyzingText ? 'pulse 1.5s infinite' : 'none',
+                  }}
+                >
+                  {isAnalyzingText ? '⚡' : '✨'}
+                </button>
+              </Tooltip>
+            )}
             <div className="editor-toolbar-divider" />
           </>
         )}

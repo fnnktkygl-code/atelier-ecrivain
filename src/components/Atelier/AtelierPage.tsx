@@ -4,7 +4,7 @@
  * Layout: Sidebar (chapters + record) | Editor | Review/Notes panels (drawer right)
  *
  * All state managed by useManuscript hook.
- * Dictation results insert at cursor position.
+ * Dictation & Manual Keyboard Text analysis powered by Gemini AI.
  */
 
 'use client';
@@ -15,6 +15,8 @@ import { useDictation } from '@/hooks/useDictation';
 import { useSpeech } from '@/hooks/useSpeech';
 import type { TextBlock, PendingReview } from '@/types/editor';
 import { ExportWizard } from '@/features/export/components/ExportWizard';
+import { analyzeWrittenText } from '@/services/ai/transcription';
+import { useAuth } from '@/components/Auth/AuthProvider';
 import ChapterList from './ChapterList';
 import Editor from './Editor';
 import EditorToolbar from './EditorToolbar';
@@ -23,6 +25,7 @@ import NotesPanel from './NotesPanel';
 import RecordButton from './RecordButton';
 
 export default function AtelierPage() {
+  const { manuscript: activeManuscript } = useAuth();
   const manuscript = useManuscript();
   const { state: ms, activeChapter, dispatch, wordCount, totalWordCount, pendingReviewCount } = manuscript;
 
@@ -37,6 +40,7 @@ export default function AtelierPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [isPdfWizardOpen, setIsPdfWizardOpen] = useState(false);
+  const [isAnalyzingText, setIsAnalyzingText] = useState(false);
 
   const handleToggleSpeech = useCallback(() => {
     if (speech.isPlaying) {
@@ -50,6 +54,82 @@ export default function AtelierPage() {
       speech.speak(`${activeChapter?.title || ''}.\n\n${textToRead}`);
     }
   }, [speech, activeChapter]);
+
+  // Analyze text typed directly via keyboard
+  const handleAnalyzeWrittenText = useCallback(async () => {
+    const chapterContent = activeChapter?.blocks.map((b) => b.content).join('\n\n') || '';
+    if (!chapterContent.trim()) {
+      alert('Veuillez d\'abord rédiger du texte dans ce chapitre avant de lancer l\'analyse IA.');
+      return;
+    }
+
+    setIsAnalyzingText(true);
+    try {
+      const res = await analyzeWrittenText(chapterContent, { currentChapter: ms.activeChapterIndex });
+      
+      const reviews: PendingReview[] = [];
+
+      if (res.ratures && res.ratures.length > 0) {
+        res.ratures.forEach((r: any) => {
+          const origText = typeof r === 'string' ? r : (r.original || r.corrected || '');
+          const suggText = typeof r === 'string' ? r : (r.corrected || r.original || '');
+          reviews.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: 'rature',
+            original: origText,
+            suggestion: suggText,
+            explanation: typeof r === 'string' ? undefined : r.explanation,
+            status: 'pending',
+          });
+        });
+      }
+
+      if (res.corrections && res.corrections.length > 0) {
+        res.corrections.forEach((c) => {
+          reviews.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: 'correction',
+            original: c.text,
+            suggestion: c.suggestion || '',
+            source: c.source,
+            explanation: c.status === 'confirmed' ? 'Vérifié ✓' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
+            status: 'pending',
+          });
+        });
+      }
+
+      if (reviews.length > 0) {
+        dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
+        setIsReviewOpen(true);
+      }
+
+      if (res.notes) {
+        Object.entries(res.notes).forEach(([, content]) => {
+          dispatch({
+            type: 'ADD_NOTE',
+            chapterIndex: ms.activeChapterIndex,
+            content,
+          });
+        });
+        setIsNotesOpen(true);
+      }
+
+      if (res.floatingNotes && res.floatingNotes.length > 0) {
+        res.floatingNotes.forEach((content) => {
+          dispatch({
+            type: 'ADD_NOTE',
+            chapterIndex: ms.activeChapterIndex,
+            content: `💡 Idée : ${content}`,
+          });
+        });
+        setIsNotesOpen(true);
+      }
+    } catch (err: any) {
+      alert(`Erreur d'analyse IA : ${err?.message || err}`);
+    } finally {
+      setIsAnalyzingText(false);
+    }
+  }, [activeChapter, ms.activeChapterIndex, dispatch]);
 
   // When dictation completes, insert results into the manuscript
   useEffect(() => {
@@ -138,115 +218,76 @@ export default function AtelierPage() {
         e.preventDefault();
         setShowSearch((v) => !v);
       }
-      if (e.key === 'Escape' && showSearch) {
-        setShowSearch(false);
-        setSearchQuery('');
-      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [manuscript]);
 
   const handleToggleReview = useCallback(() => {
-    setIsReviewOpen((v) => !v);
-    if (!isReviewOpen) setIsNotesOpen(false);
-  }, [isReviewOpen]);
+    setIsReviewOpen((prev) => !prev);
+    if (isNotesOpen) setIsNotesOpen(false);
+  }, [isNotesOpen]);
 
   const handleToggleNotes = useCallback(() => {
-    setIsNotesOpen((v) => !v);
-    if (!isNotesOpen) setIsReviewOpen(false);
-  }, [isNotesOpen]);
+    setIsNotesOpen((prev) => !prev);
+    if (isReviewOpen) setIsReviewOpen(false);
+  }, [isReviewOpen]);
 
   const rightPanelOpen = isReviewOpen || isNotesOpen;
 
   return (
-    <div className={`atelier ${isFocusMode ? 'focus-mode' : ''}`}>
+    <div className={`atelier-layout ${isFocusMode ? 'focus-mode' : ''}`}>
+      {/* ── Overlay mobile sidebar ── */}
+      {showMobileSidebar && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+
+      {/* ── Left Sidebar (Chapters + Record) ── */}
+      <aside className={`atelier-sidebar ${showMobileSidebar ? 'mobile-visible' : ''}`}>
+        <div className="atelier-sidebar-header">
+          <h1 className="atelier-logo">
+            <span className="atelier-logo-icon">✒️</span>
+            <span>L'Atelier</span>
+          </h1>
+          <button
+            className="mobile-sidebar-close"
+            onClick={() => setShowMobileSidebar(false)}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="atelier-sidebar-content">
+          <ChapterList
+            chapters={ms.chapters}
+            activeIndex={ms.activeChapterIndex}
+            dispatch={dispatch}
+            onCloseSidebar={() => setShowMobileSidebar(false)}
+            onOpenPdfExport={() => setIsPdfWizardOpen(true)}
+          />
+        </div>
+
+        <div className="atelier-sidebar-footer">
+          <RecordButton
+            phase={ds.phase}
+            level={ds.level}
+            time={dictation.formatTime(ds.duration)}
+            onStart={dictation.startRecording}
+            onStop={dictation.stopRecording}
+            onPause={dictation.pauseRecording}
+            onResume={dictation.resumeRecording}
+            onCancel={dictation.cancelRecording}
+            onReset={dictation.reset}
+            error={ds.error}
+          />
+        </div>
+      </aside>
+
+      {/* ── Content area ── */}
       <div className="atelier-content">
-        {/* ── Sidebar ── */}
-        {!isFocusMode && (
-          <>
-            {showMobileSidebar && (
-              <div 
-                onClick={() => setShowMobileSidebar(false)}
-                style={{
-                  position: 'fixed',
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  backgroundColor: 'rgba(0,0,0,0.5)',
-                  backdropFilter: 'blur(4px)',
-                  zIndex: 9998
-                }}
-              />
-            )}
-            <div
-              className={`atelier-sidebar ${showMobileSidebar ? 'mobile-open' : ''}`}
-            >
-            <ChapterList
-              chapters={ms.chapters}
-              activeIndex={ms.activeChapterIndex}
-              dispatch={dispatch}
-              onCloseSidebar={() => setShowMobileSidebar(false)}
-              onOpenPdfExport={() => setIsPdfWizardOpen(true)}
-            />
-
-            {/* Record area at bottom */}
-            <div className="sidebar-record-area">
-              {/* Insertion point indicator */}
-              {ms.insertionPoint !== null && (
-                <div className="insertion-indicator" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>🎙️ La dictée s&apos;insérera après le bloc {ms.insertionPoint + 1}</span>
-                  <button
-                    onClick={() => dispatch({ type: 'SET_INSERTION_POINT', blockIndex: null })}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 'bold', padding: '0 4px' }}
-                    title="Annuler le point d'insertion"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              {!ds.firebaseConfigured && ds.phase === 'idle' && (
-                <div className="sidebar-firebase-warning">
-                  ⚠️ Mode démo — configurez Firebase dans <code>.env.local</code>
-                </div>
-              )}
-
-              <RecordButton
-                phase={ds.phase}
-                level={ds.level}
-                time={dictation.formatTime(ds.duration)}
-                onStart={dictation.startRecording}
-                onPause={dictation.pauseRecording}
-                onResume={dictation.resumeRecording}
-                onStop={dictation.stopRecording}
-                onCancel={dictation.cancelRecording}
-                onReset={dictation.reset}
-                error={ds.error}
-              />
-
-              {/* Processing indicator */}
-              {ds.phase === 'processing' && (
-                <div className="processing-indicator">
-                  <span className="processing-spinner" />
-                  Analyse par Gemini en cours...
-                </div>
-              )}
-
-              {/* Summary after dictation */}
-              {ds.summary && ds.phase === 'complete' && (
-                <div className="dictation-summary">
-                  ✨ {ds.summary}
-                  {ds.usedModel && (
-                    <span className="dictation-model-badge" title={`Modèle IA utilisé : ${ds.usedModel}`}>
-                      • {ds.usedModel}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          </>
-        )}
-
         {/* ── Main editor area ── */}
         <div className={`atelier-main ${rightPanelOpen ? 'with-panel' : ''}`}>
           <EditorToolbar
@@ -269,6 +310,8 @@ export default function AtelierPage() {
             onToggleNotes={handleToggleNotes}
             onToggleFocus={() => setIsFocusMode(!isFocusMode)}
             onStartDictation={dictation.startRecording}
+            onAnalyzeText={handleAnalyzeWrittenText}
+            isAnalyzingText={isAnalyzingText}
             dictationPhase={ds.phase}
             onToggleSidebar={() => setShowMobileSidebar(!showMobileSidebar)}
             isSpeechPlaying={speech.isPlaying}
@@ -318,8 +361,8 @@ export default function AtelierPage() {
           {/* Search bar */}
           {showSearch && (
             <div style={{
-              padding: '8px 20px', display: 'flex', gap: 8, alignItems: 'center',
-              background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px',
+              background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
             }}>
               <span style={{ fontSize: 14 }}>🔍</span>
               <input
@@ -329,26 +372,23 @@ export default function AtelierPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
                 style={{
-                  flex: 1, background: 'var(--hover)', border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '6px 12px',
-                  fontFamily: "'Source Serif 4', serif", fontSize: 14,
-                  color: 'var(--text)', outline: 'none',
+                  flex: 1, padding: '4px 8px', border: '1px solid var(--border)',
+                  borderRadius: 4, background: 'var(--surface)', color: 'var(--text)',
+                  fontSize: 13, outline: 'none',
                 }}
               />
               <button
+                className="btn btn-ghost"
                 onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-                style={{
-                  background: 'none', border: 'none', color: 'var(--text-soft)',
-                  cursor: 'pointer', fontSize: 16,
-                }}
+                style={{ fontSize: 12, padding: '2px 8px' }}
               >
                 ✕
               </button>
             </div>
           )}
 
-          <div className="atelier-editor">
-            {activeChapter && (
+          <div className="atelier-editor-container">
+            {activeChapter ? (
               <Editor
                 chapter={activeChapter}
                 chapterIndex={ms.activeChapterIndex}
@@ -359,11 +399,15 @@ export default function AtelierPage() {
                 onStartDictation={dictation.startRecording}
                 dictationPhase={ds.phase}
               />
+            ) : (
+              <div className="atelier-empty-state">
+                <p>Aucun chapitre sélectionné.</p>
+              </div>
             )}
           </div>
         </div>
 
-        {/* ── Right panel (Review or Notes) ── */}
+        {/* ── Right Panel: Review / Corrections ── */}
         <ReviewPanel
           reviews={activeChapter?.pendingReviews || []}
           chapterIndex={ms.activeChapterIndex}
@@ -372,6 +416,7 @@ export default function AtelierPage() {
           onClose={() => setIsReviewOpen(false)}
         />
 
+        {/* ── Right Panel: Notes ── */}
         <NotesPanel
           notes={activeChapter?.notes || []}
           chapterIndex={ms.activeChapterIndex}
@@ -381,10 +426,10 @@ export default function AtelierPage() {
         />
       </div>
 
-      {/* ── Studio Édition Couverture & Export PDF ── */}
+      {/* ── PDF Export Wizard Modal ── */}
       <ExportWizard
-        manuscriptId="default"
-        manuscriptTitle={activeChapter?.title || 'Mon Livre'}
+        manuscriptId={activeManuscript?.id || 'default-manuscript'}
+        manuscriptTitle={activeManuscript?.title || 'Mon Livre'}
         chapters={ms.chapters}
         isOpen={isPdfWizardOpen}
         onClose={() => setIsPdfWizardOpen(false)}

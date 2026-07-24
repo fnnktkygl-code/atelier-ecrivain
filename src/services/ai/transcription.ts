@@ -209,6 +209,53 @@ export async function factCheck(text: string): Promise<VerificationItem[]> {
 }
 
 /**
+ * Analyze text written via keyboard (ratures, corrections, factcheck, notes)
+ */
+export async function analyzeWrittenText(
+  text: string,
+  context?: { currentChapter?: number }
+): Promise<TranscriptionResult> {
+  if (!isFirebaseConfigured()) {
+    throw new Error('Firebase n\'est pas configuré. Ajoutez votre configuration dans .env.local');
+  }
+
+  checkRateLimit();
+  recordApiRequest();
+
+  let contextPrompt = `Analyse et structure ce texte rédigé au clavier par l'auteur. Extrais les ratures/suggestions d'amélioration de style, les éléments à vérifier (fact-check), les notes explicatives de marge et les idées flottantes :\n\n« ${text} »`;
+
+  if (context?.currentChapter !== undefined) {
+    contextPrompt += `\nChapitre en cours : Chapitre ${context.currentChapter + 1}.`;
+  }
+
+  const { result, modelUsed } = await generateWithFallback(
+    {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 8192,
+    },
+    SYSTEM_PROMPT_TRANSCRIPTION,
+    async (model, modelName) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[AI Text Analysis] Exécution avec le modèle : ${modelName}`);
+      }
+      const apiResult = await model.generateContent([contextPrompt]);
+      const responseText = apiResult.response.text();
+      try {
+        return JSON.parse(responseText) as TranscriptionResult;
+      } catch {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]) as TranscriptionResult;
+        }
+        throw new Error('Impossible de parser la réponse de Gemini. Réponse : ' + responseText.slice(0, 200));
+      }
+    }
+  );
+
+  return { ...result, modelUsed };
+}
+
+/**
  * Streaming transcription — sends audio and streams back the structured result
  */
 export async function transcribeAudioStream(
