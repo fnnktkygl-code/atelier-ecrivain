@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CoverConfig, BookMetadata } from '../../types/bookMeta';
 
 export function CoverCanvas({
@@ -8,8 +8,14 @@ export function CoverCanvas({
   coverConfig: CoverConfig;
   metadata: BookMetadata;
 }) {
+  const [hasError, setHasError] = useState(false);
   const bg = coverConfig.background?.value || '#8a5a34';
   const titleColor = coverConfig.titleColor || '#ffffff';
+
+  // Reset error when illustrationUrl changes
+  useEffect(() => {
+    setHasError(false);
+  }, [coverConfig.illustrationUrl]);
 
   if (coverConfig.mode === 'imported' && coverConfig.imageUrl && !coverConfig.illustrationUrl) {
     return (
@@ -19,6 +25,8 @@ export function CoverCanvas({
       </div>
     );
   }
+
+  const showIllustration = Boolean(coverConfig.illustrationUrl && !hasError);
 
   return (
     <div
@@ -41,12 +49,14 @@ export function CoverCanvas({
       }}
     >
       {/* Background AI Illustration */}
-      {coverConfig.illustrationUrl && (
+      {showIllustration && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={coverConfig.illustrationUrl}
-            alt="Illustration IA"
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setHasError(true)}
             style={{
               position: 'absolute',
               inset: 0,
@@ -61,7 +71,7 @@ export function CoverCanvas({
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.85) 100%)',
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.85) 100%)',
               zIndex: 2,
             }}
           />

@@ -1,75 +1,50 @@
 import { NextResponse } from 'next/server';
 
-
-
-function enhancePromptForAI(frenchPrompt: string): string {
-  let p = frenchPrompt.toLowerCase();
-
-  const map: Record<string, string> = {
-    'ombre': 'shadow',
-    'humaine': 'human',
-    'humain': 'human',
-    'peindre': 'paint',
-    'dieu': 'god',
-    'image': 'image',
-    'tente de': 'trying to',
-    'livre': 'book',
-    'couverture': 'cover',
-    'sombre': 'dark',
-    'ciel': 'sky',
-    'étoiles': 'stars',
-    'étoile': 'star',
-    'forêt': 'forest',
-    'château': 'castle',
-    'homme': 'man',
-    'femme': 'woman',
-    'visage': 'face',
-    'lumière': 'light',
-  };
-
-  let translated = p;
-  Object.keys(map).forEach((fr) => {
-    translated = translated.replace(new RegExp(`\\b${fr}\\b`, 'gi'), map[fr]);
-  });
-
-  return `${translated}, cinematic book cover artwork, highly detailed digital painting, dramatic lighting, masterpiece, 8k resolution`;
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const prompt = body?.prompt || 'Book cover illustration';
-
-    const enhancedPrompt = enhancePromptForAI(prompt.trim());
+    const prompt = (body?.prompt || 'Book cover illustration').trim();
     const seed = Math.floor(Math.random() * 1000000);
 
-    const aiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=600&height=900&model=flux&nologo=true&seed=${seed}`;
+    const endpoints = [
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=900&model=flux&nologo=true&seed=${seed}`,
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=900&nologo=true&seed=${seed}`,
+    ];
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    for (const url of endpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const res = await fetch(aiUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      },
-    });
-    clearTimeout(timeoutId);
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          },
+        });
+        clearTimeout(timeoutId);
 
-    if (res.ok) {
-      const arrayBuffer = await res.arrayBuffer();
-      if (arrayBuffer.byteLength > 1000) {
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        const contentType = res.headers.get('content-type') || 'image/jpeg';
-        return NextResponse.json({ dataUrl: `data:${contentType};base64,${base64}` });
+        if (res.ok) {
+          const arrayBuffer = await res.arrayBuffer();
+          if (arrayBuffer.byteLength > 2000) {
+            const base64 = Buffer.from(arrayBuffer).toString('base64');
+            const contentType = res.headers.get('content-type') || 'image/jpeg';
+            return NextResponse.json({ dataUrl: `data:${contentType};base64,${base64}` });
+          }
+        }
+      } catch {
+        // Retry next
       }
     }
 
-    return NextResponse.json({ dataUrl: aiUrl });
+    // High quality thematic art fallback if Pollinations times out
+    const unsplashUrl = `https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&h=900&fit=crop&q=80`;
+    const fallbackRes = await fetch(unsplashUrl);
+    const arrayBuffer = await fallbackRes.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    return NextResponse.json({ dataUrl: `data:image/jpeg;base64,${base64}` });
   } catch (err: any) {
     console.error('API Generate Cover Error:', err);
-    const seed = Math.floor(Math.random() * 1000000);
-    const fallbackUrl = `https://image.pollinations.ai/prompt/book%20cover%20artwork?width=600&height=900&nologo=true&seed=${seed}`;
-    return NextResponse.json({ dataUrl: fallbackUrl });
+    return NextResponse.json({ error: err?.message || 'Erreur lors de la génération' }, { status: 500 });
   }
 }
