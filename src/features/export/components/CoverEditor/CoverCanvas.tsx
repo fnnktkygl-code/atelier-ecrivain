@@ -11,7 +11,7 @@ export function CoverCanvas({
   const bg = coverConfig.background?.value || '#8a5a34';
   const titleColor = coverConfig.titleColor || '#ffffff';
 
-  if (coverConfig.mode === 'imported' && coverConfig.imageUrl) {
+  if (coverConfig.mode === 'imported' && coverConfig.imageUrl && !coverConfig.illustrationUrl) {
     return (
       <div style={{ width: 220, height: 320, borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -27,7 +27,9 @@ export function CoverCanvas({
         height: 320,
         borderRadius: 8,
         background: bg,
-        padding: 24,
+        position: 'relative',
+        overflow: 'hidden',
+        padding: 20,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -38,17 +40,48 @@ export function CoverCanvas({
         userSelect: 'none',
       }}
     >
-      <div>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'serif', marginTop: 20 }}>
+      {/* Background AI Illustration */}
+      {coverConfig.illustrationUrl && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={coverConfig.illustrationUrl}
+            alt="Illustration IA"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              zIndex: 1,
+            }}
+          />
+          {/* Dark Overlay for typography readability */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.85) 100%)',
+              zIndex: 2,
+            }}
+          />
+        </>
+      )}
+
+      {/* Title & Subtitle */}
+      <div style={{ zIndex: 3, position: 'relative', marginTop: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'serif', textShadow: '0 2px 4px rgba(0,0,0,0.9)' }}>
           {metadata.title || 'Titre du Livre'}
         </div>
         {metadata.subtitle && (
-          <div style={{ fontSize: 11, opacity: 0.9, marginTop: 6, fontFamily: 'sans-serif' }}>
+          <div style={{ fontSize: 11, opacity: 0.9, marginTop: 6, fontFamily: 'sans-serif', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
             {metadata.subtitle}
           </div>
         )}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'sans-serif', marginBottom: 16 }}>
+
+      {/* Author Name */}
+      <div style={{ zIndex: 3, position: 'relative', fontSize: 12, fontWeight: 600, fontFamily: 'sans-serif', marginBottom: 12, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
         {metadata.authorName || 'Auteur'}
       </div>
     </div>

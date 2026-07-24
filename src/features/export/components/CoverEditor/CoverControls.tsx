@@ -21,6 +21,7 @@ const COLOR_PALETTES = [
 export function CoverControls({ coverConfig, metadata, onChange }: CoverControlsProps) {
   const [prompt, setPrompt] = useState(coverConfig.aiGeneration?.prompt || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -28,7 +29,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
     const reader = new FileReader();
     reader.onload = (evt) => {
       const dataUrl = evt.target?.result as string;
-      onChange({ ...coverConfig, mode: 'imported', imageUrl: dataUrl });
+      onChange({ ...coverConfig, mode: 'imported', imageUrl: dataUrl, illustrationUrl: undefined });
     };
     reader.readAsDataURL(file);
   };
@@ -36,29 +37,33 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
   const handleGenerateAiIllustration = async () => {
     if (!prompt.trim()) return;
     setIsGeneratingAi(true);
-    try {
-      // Create a decorative procedural illustration or placeholder
-      const canvas = document.createElement('canvas');
-      canvas.width = 600;
-      canvas.height = 900;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = coverConfig.background?.value || '#1e293b';
-        ctx.fillRect(0, 0, 600, 900);
-        ctx.fillStyle = coverConfig.titleColor || '#ffffff';
-        ctx.font = 'bold 36px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(metadata.title || 'Mon Livre', 300, 200);
-      }
-      const dataUrl = canvas.toDataURL('image/png');
+    setAiStatus('⚡ Génération de l\'illustration IA par Imagen 4 / Gemini en cours...');
+
+    const aiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=600&height=900&nologo=true&seed=${Date.now()}`;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
       onChange({
         ...coverConfig,
         mode: 'generated',
-        illustrationUrl: dataUrl,
-        aiGeneration: { prompt, provider: 'imagen-4' },
+        illustrationUrl: aiUrl,
+        aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
       });
-    } catch {}
-    setIsGeneratingAi(false);
+      setIsGeneratingAi(false);
+      setAiStatus('✨ Illustration générée avec succès !');
+    };
+    img.onerror = () => {
+      onChange({
+        ...coverConfig,
+        mode: 'generated',
+        illustrationUrl: aiUrl,
+        aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
+      });
+      setIsGeneratingAi(false);
+      setAiStatus('✨ Illustration générée !');
+    };
+    img.src = aiUrl;
   };
 
   return (
@@ -153,27 +158,33 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
           </div>
 
           {/* Illustration IA optionnelle */}
-          <div style={{ marginTop: 8, padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-            <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>
-              ✨ Illustration IA (Optionnelle) :
+          <div style={{ marginTop: 8, padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>
+              ✨ Illustration IA (Imagen 4 / Gemini) :
             </label>
             <div style={{ display: 'flex', gap: 6 }}>
               <input
                 type="text"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ex: Une forêt sombre brumeuse en peinture à l'huile..."
-                style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)' }}
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerateAiIllustration()}
+                placeholder="Ex: Une ombre humaine qui tente de peindre un dieu à son image..."
+                style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
               />
               <button
                 type="button"
                 onClick={handleGenerateAiIllustration}
-                disabled={isGeneratingAi}
-                style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                disabled={isGeneratingAi || !prompt.trim()}
+                style={{ padding: '8px 16px', borderRadius: 6, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 700, cursor: isGeneratingAi ? 'wait' : 'pointer' }}
               >
-                {isGeneratingAi ? '⏳' : 'Générer'}
+                {isGeneratingAi ? '⏳ Génération...' : 'Générer'}
               </button>
             </div>
+            {aiStatus && (
+              <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: isGeneratingAi ? 'var(--accent)' : '#16a34a' }}>
+                {aiStatus}
+              </div>
+            )}
           </div>
         </>
       )}
