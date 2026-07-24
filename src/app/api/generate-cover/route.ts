@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+
+
 function enhancePromptForAI(frenchPrompt: string): string {
   let p = frenchPrompt.toLowerCase();
 
@@ -23,7 +25,6 @@ function enhancePromptForAI(frenchPrompt: string): string {
     'femme': 'woman',
     'visage': 'face',
     'lumière': 'light',
-    'dieu à son image': 'god in human image',
   };
 
   let translated = p;
@@ -36,53 +37,39 @@ function enhancePromptForAI(frenchPrompt: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
-    if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ error: 'Prompt requis' }, { status: 400 });
-    }
+    const body = await req.json().catch(() => ({}));
+    const prompt = body?.prompt || 'Book cover illustration';
 
     const enhancedPrompt = enhancePromptForAI(prompt.trim());
     const seed = Math.floor(Math.random() * 1000000);
 
-    // Try Flux AI model first via Pollinations server-side
-    const urls = [
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=600&height=900&model=flux&nologo=true&seed=${seed}`,
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=600&height=900&nologo=true&seed=${seed}`,
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=600&height=900&nologo=true&seed=${seed}`,
-    ];
+    const aiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=600&height=900&model=flux&nologo=true&seed=${seed}`;
 
-    let lastError = null;
-    for (const url of urls) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-          },
-        });
-        clearTimeout(timeoutId);
+    const res = await fetch(aiUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      },
+    });
+    clearTimeout(timeoutId);
 
-        if (res.ok) {
-          const arrayBuffer = await res.arrayBuffer();
-          if (arrayBuffer.byteLength > 1000) {
-            const base64 = Buffer.from(arrayBuffer).toString('base64');
-            const contentType = res.headers.get('content-type') || 'image/jpeg';
-            const dataUrl = `data:${contentType};base64,${base64}`;
-            return NextResponse.json({ dataUrl });
-          }
-        }
-      } catch (err: any) {
-        lastError = err;
-        console.warn('AI provider retry:', url, err?.message);
+    if (res.ok) {
+      const arrayBuffer = await res.arrayBuffer();
+      if (arrayBuffer.byteLength > 1000) {
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        const contentType = res.headers.get('content-type') || 'image/jpeg';
+        return NextResponse.json({ dataUrl: `data:${contentType};base64,${base64}` });
       }
     }
 
-    throw lastError || new Error('Erreur de génération d\'image');
+    return NextResponse.json({ dataUrl: aiUrl });
   } catch (err: any) {
     console.error('API Generate Cover Error:', err);
-    return NextResponse.json({ error: err?.message || 'Erreur lors de la génération server-side' }, { status: 500 });
+    const seed = Math.floor(Math.random() * 1000000);
+    const fallbackUrl = `https://image.pollinations.ai/prompt/book%20cover%20artwork?width=600&height=900&nologo=true&seed=${seed}`;
+    return NextResponse.json({ dataUrl: fallbackUrl });
   }
 }
