@@ -18,35 +18,6 @@ const COLOR_PALETTES = [
   'linear-gradient(135deg, #064e3b 0%, #0284c7 100%)',
 ];
 
-function generateProceduralCoverSvg(prompt: string, title: string): string {
-  const hash = prompt.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hue1 = hash % 360;
-  const hue2 = (hash + 120) % 360;
-  const color1 = `hsl(${hue1}, 65%, 25%)`;
-  const color2 = `hsl(${hue2}, 75%, 15%)`;
-  const accentColor = `hsl(${(hash + 60) % 360}, 80%, 65%)`;
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
-    <defs>
-      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="${color1}" />
-        <stop offset="100%" stop-color="${color2}" />
-      </linearGradient>
-      <radialGradient id="glow" cx="50%" cy="40%" r="50%">
-        <stop offset="0%" stop-color="${accentColor}" stop-opacity="0.6" />
-        <stop offset="100%" stop-color="${color2}" stop-opacity="0" />
-      </radialGradient>
-    </defs>
-    <rect width="600" height="900" fill="url(#bg)" />
-    <circle cx="300" cy="380" r="240" fill="url(#glow)" />
-    <path d="M 150 480 Q 300 220 450 480 T 150 480" fill="none" stroke="${accentColor}" stroke-width="4" opacity="0.6" />
-    <circle cx="300" cy="380" r="140" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.3" />
-    <circle cx="300" cy="380" r="80" fill="none" stroke="${accentColor}" stroke-width="1.5" opacity="0.5" />
-  </svg>`;
-
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 export function CoverControls({ coverConfig, metadata, onChange }: CoverControlsProps) {
   const [prompt, setPrompt] = useState(coverConfig.aiGeneration?.prompt || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -66,7 +37,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
   const handleGenerateAiIllustration = async () => {
     if (!prompt.trim()) return;
     setIsGeneratingAi(true);
-    setAiStatus('⚡ Génération de l\'illustration IA par Imagen 4 / Gemini en cours...');
+    setAiStatus('⚡ Génération de l\'illustration IA (Flux / Gemini) en cours (5-15s)...');
 
     try {
       const res = await fetch('/api/generate-cover', {
@@ -85,21 +56,14 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
           aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
         });
         setIsGeneratingAi(false);
-        setAiStatus('✨ Illustration IA générée et appliquée !');
+        setAiStatus('✨ Illustration IA générée et appliquée avec succès !');
         return;
       }
-      throw new Error(data.error || 'Échec de génération');
-    } catch (err) {
-      console.warn('Backend cover API failed, using procedural AI artwork fallback', err);
-      const fallbackDataUrl = generateProceduralCoverSvg(prompt.trim(), metadata.title);
-      onChange({
-        ...coverConfig,
-        mode: 'generated',
-        illustrationUrl: fallbackDataUrl,
-        aiGeneration: { prompt: prompt.trim(), provider: 'imagen-4' },
-      });
+      throw new Error(data.error || 'Échec de la génération de l\'image');
+    } catch (err: any) {
+      console.error('AI cover generation error:', err);
       setIsGeneratingAi(false);
-      setAiStatus('✨ Illustration artistique IA générée !');
+      setAiStatus(`⚠️ Erreur : ${err?.message || 'Serveur IA temporairement indisponible'}`);
     }
   };
 
@@ -218,7 +182,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
               </button>
             </div>
             {aiStatus && (
-              <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: isGeneratingAi ? 'var(--accent)' : '#16a34a' }}>
+              <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: isGeneratingAi ? 'var(--accent)' : aiStatus.startsWith('⚠️') ? '#dc2626' : '#16a34a' }}>
                 {aiStatus}
               </div>
             )}
