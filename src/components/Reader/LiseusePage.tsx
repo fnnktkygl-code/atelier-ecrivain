@@ -7,6 +7,7 @@ import { useAuth } from '@/components/Auth/AuthProvider';
 import { useTheme } from '@/components/Shared/ThemeProvider';
 import { getChapters } from '@/services/firebase/firestore';
 import { normalizeChapterNotesAndSuperscripts } from '@/hooks/useManuscript';
+import { useSpeech } from '@/hooks/useSpeech';
 
 const SUP_MAP: Record<string, string> = {
   '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
@@ -240,6 +241,7 @@ export default function LiseusePage() {
   const { user, manuscript } = useAuth();
   const { theme, setTheme } = useTheme();
   const currentManuscriptId = manuscript?.id || 'default';
+  const speech = useSpeech();
 
   const [chapters, setChapters] = useState<any[]>(() => {
     const rawChapters = CHAPTERS.map((ch, idx) => ({
@@ -642,6 +644,23 @@ export default function LiseusePage() {
     });
     return lastCI;
   })();
+
+  const handleToggleSpeech = useCallback(() => {
+    if (speech.isPlaying) {
+      if (speech.isPaused) {
+        speech.resume();
+      } else {
+        speech.pause();
+      }
+    } else {
+      const activeCh = chapters[currentChapterIndex] || chapters[0];
+      if (activeCh && activeCh.paragraphs) {
+        const title = activeCh.title || '';
+        const body = activeCh.paragraphs.join('\n\n');
+        speech.speak(`${title}.\n\n${body}`);
+      }
+    }
+  }, [speech, chapters, currentChapterIndex]);
 
   const progressPct = totalPages > 1 ? ((currentPage + 1) / totalPages) * 100 : 100;
   const canPrev = currentPage > 0;
@@ -1122,6 +1141,23 @@ export default function LiseusePage() {
               <div className="font-divider" />
               <button className="font-btn font-btn-large" onClick={() => updateSettings({ fontSize: Math.min(26, settings.fontSize + 1) })} title="Agrandir la police">A</button>
             </div>
+            {/* Audio playback / Audiobook Speech Synthesis */}
+            <button
+              className={`iconbtn-liseuse ${speech.isPlaying ? 'active' : ''}`}
+              onClick={handleToggleSpeech}
+              title={speech.isPlaying ? (speech.isPaused ? 'Reprendre la lecture audio' : 'Mettre en pause la lecture') : 'Écouter le chapitre actuel (Livre audio)'}
+            >
+              {speech.isPlaying ? (speech.isPaused ? '▶️' : '⏸️') : '🔊'}
+            </button>
+            {speech.isPlaying && (
+              <button
+                className="iconbtn-liseuse"
+                onClick={speech.stop}
+                title="Arrêter la lecture audio"
+              >
+                ⏹️
+              </button>
+            )}
             {/* Settings */}
             <button className="iconbtn-liseuse" onClick={() => setShowSettings(!showSettings)} title="Paramètres de lecture">
               ⚙️

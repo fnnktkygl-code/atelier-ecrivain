@@ -12,6 +12,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useManuscript } from '@/hooks/useManuscript';
 import { useDictation } from '@/hooks/useDictation';
+import { useSpeech } from '@/hooks/useSpeech';
 import type { TextBlock, PendingReview } from '@/types/editor';
 import ChapterList from './ChapterList';
 import Editor from './Editor';
@@ -26,6 +27,7 @@ export default function AtelierPage() {
 
   const dictation = useDictation(ms.activeChapterIndex);
   const { state: ds } = dictation;
+  const speech = useSpeech();
 
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
@@ -33,6 +35,19 @@ export default function AtelierPage() {
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  const handleToggleSpeech = useCallback(() => {
+    if (speech.isPlaying) {
+      if (speech.isPaused) {
+        speech.resume();
+      } else {
+        speech.pause();
+      }
+    } else {
+      const textToRead = activeChapter?.blocks.map((b) => b.content).join('\n\n') || '';
+      speech.speak(`${activeChapter?.title || ''}.\n\n${textToRead}`);
+    }
+  }, [speech, activeChapter]);
 
   // When dictation completes, insert results into the manuscript
   useEffect(() => {
@@ -253,6 +268,10 @@ export default function AtelierPage() {
             onStartDictation={dictation.startRecording}
             dictationPhase={ds.phase}
             onToggleSidebar={() => setShowMobileSidebar(!showMobileSidebar)}
+            isSpeechPlaying={speech.isPlaying}
+            isSpeechPaused={speech.isPaused}
+            onToggleSpeech={handleToggleSpeech}
+            onStopSpeech={speech.stop}
           />
 
           {/* Dictation Status Bar (Always visible during recording/processing) */}

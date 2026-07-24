@@ -37,6 +37,10 @@ interface EditorToolbarProps {
   onStartDictation?: () => void;
   dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
   onToggleSidebar?: () => void;
+  isSpeechPlaying?: boolean;
+  isSpeechPaused?: boolean;
+  onToggleSpeech?: () => void;
+  onStopSpeech?: () => void;
 }
 
 export default function EditorToolbar({
@@ -61,6 +65,10 @@ export default function EditorToolbar({
   onStartDictation,
   dictationPhase = 'idle',
   onToggleSidebar,
+  isSpeechPlaying = false,
+  isSpeechPaused = false,
+  onToggleSpeech,
+  onStopSpeech,
 }: EditorToolbarProps) {
   const formatSaveTime = (ts: number | null) => {
     if (!ts) return '';
@@ -166,6 +174,38 @@ export default function EditorToolbar({
             📖
           </button>
         </Tooltip>
+
+        {onToggleSpeech && (
+          <Tooltip content={isSpeechPlaying ? (isSpeechPaused ? 'Reprendre la lecture audio' : 'Mettre en pause la lecture') : 'Écouter le chapitre (Lecture audio)'}>
+            <button
+              className={`btn-icon ${isSpeechPlaying ? 'active' : ''}`}
+              onClick={onToggleSpeech}
+              style={{
+                width: 36, height: 36, fontSize: 16,
+                color: isSpeechPlaying ? 'var(--accent)' : 'var(--text)',
+                background: isSpeechPlaying ? 'var(--accent-glow)' : 'var(--surface-2)',
+                border: isSpeechPlaying ? '1px solid var(--accent)' : '1px solid var(--border)',
+                borderRadius: '50%',
+              }}
+            >
+              {isSpeechPlaying ? (isSpeechPaused ? '▶️' : '⏸️') : '🔊'}
+            </button>
+          </Tooltip>
+        )}
+        {isSpeechPlaying && onStopSpeech && (
+          <Tooltip content="Arrêter la lecture audio">
+            <button
+              className="btn-icon"
+              onClick={onStopSpeech}
+              style={{
+                width: 36, height: 36, fontSize: 16, color: 'var(--danger, #ef4444)',
+                background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '50%',
+              }}
+            >
+              ⏹️
+            </button>
+          </Tooltip>
+        )}
 
         <Tooltip content={isFocusMode ? 'Quitter le mode concentration' : 'Mode concentration — masque la sidebar pour écrire sans distraction'}>
           <button
