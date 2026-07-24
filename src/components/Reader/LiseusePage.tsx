@@ -341,10 +341,7 @@ export default function LiseusePage() {
     loadManuscript();
 
     const handleStorage = (e: StorageEvent) => {
-      if (
-        e.key === `atelier-manuscrit-${currentManuscriptId}` ||
-        e.key === 'atelier-manuscrit-v1'
-      ) {
+      if (e.key && e.key.startsWith('atelier-manuscrit')) {
         loadManuscript();
       }
     };

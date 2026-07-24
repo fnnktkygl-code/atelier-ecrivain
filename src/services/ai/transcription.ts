@@ -159,10 +159,10 @@ export async function transcribeAudio(
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {
-    contextPrompt += ` L'auteur travaille actuellement sur le chapitre ${context.currentChapter + 1}.`;
+    contextPrompt += ` L'auteur poursuit la rédaction de son chapitre en cours (Chapitre ${context.currentChapter + 1}). Tout le texte dicté doit venir À LA SUITE de ce chapitre. Ne crée PAS de nouveau chapitre.`;
   }
   if (context?.previousContent) {
-    contextPrompt += ` Voici le contexte du texte précédent pour maintenir la cohérence : « ${context.previousContent.slice(-500)} »`;
+    contextPrompt += ` Voici le contexte du texte précédent pour maintenir la continuité : « ${context.previousContent.slice(-500)} »`;
   }
 
   const { result, modelUsed } = await generateWithFallback(
