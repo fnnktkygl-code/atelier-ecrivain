@@ -8,6 +8,7 @@ export type FeatureId =
   | 'tts' // lecture vocale de chapitre (Gemini TTS)
   | 'cover-generation' // illustration de couverture (Nano Banana Pro / Imagen 3)
   | 'translation' // traduction littéraire en direct
+  | 'deep-research' // recherche documentaire et historique approfondie multi-sources
   | 'global-analysis'; // analyse critique et cohérence narrative multi-chapitres
 
 export interface FeatureRequirement {
@@ -117,15 +118,30 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     ],
   },
 
-  // 8. Analyse globale et raisonnement narratif
+  // 8. Recherche documentaire approfondie & dossiers de contexte
+  'deep-research': {
+    requiredCapability: 'research',
+    requiredQuotaKind: 'generation',
+    degradeInsteadOfFallback: false,
+    chain: [
+      'deep-research-max-preview-04-2026', // SOTA recherche exhaustive & context gathering
+      'deep-research-preview-04-2026', // Recherche rapide & context gathering
+      'gemini-3.7-flash', // Fallback avec Google Search
+      'gemini-3.1-pro',
+      'gemini-2.5-pro',
+    ],
+  },
+
+  // 9. Analyse globale et raisonnement narratif
   'global-analysis': {
     requiredCapability: 'text',
     requiredQuotaKind: 'generation',
     degradeInsteadOfFallback: false,
     chain: [
+      'deep-research-max-preview-04-2026', // Analyse globale multi-chapitres
+      'deep-research-preview-04-2026',
       'gemini-3.1-pro', // Raisonnement littéraire profond
       'gemini-2.5-pro',
-      'deep-research-pro-preview',
       'gemini-3.7-flash',
     ],
   },

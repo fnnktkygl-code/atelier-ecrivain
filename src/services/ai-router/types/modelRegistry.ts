@@ -194,12 +194,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
   },
   {
-    id: 'deep-research-pro-preview',
-    name: 'Deep Research Pro Preview',
+    id: 'deep-research-max-preview-04-2026',
+    name: 'Deep Research Max Preview (SOTA)',
     family: 'agent',
     capabilities: ['research', 'text'],
     quotas: {
-      generation: { rpm: 2, rpd: 50, tpm: 250000 },
+      generation: { rpm: 5, rpd: 100, tpm: 500000 },
+      groundingSearch: { rpm: 5, rpd: 100, tpm: 250000 },
+    },
+  },
+  {
+    id: 'deep-research-preview-04-2026',
+    name: 'Deep Research Preview',
+    family: 'agent',
+    capabilities: ['research', 'text'],
+    quotas: {
+      generation: { rpm: 10, rpd: 200, tpm: 500000 },
+      groundingSearch: { rpm: 10, rpd: 200, tpm: 250000 },
+    },
+  },
+  {
+    id: 'antigravity-preview-05-2026',
+    name: 'Antigravity Agent Preview',
+    family: 'agent',
+    capabilities: ['research', 'text'],
+    quotas: {
+      generation: { rpm: 5, rpd: 100, tpm: 500000 },
     },
   },
 

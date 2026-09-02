@@ -13,11 +13,15 @@ import {
   IconEdit,
   IconTrash,
   IconCheck,
+  IconSparkles,
 } from '@/components/Shared/Icons';
+import { performDeepResearch, type DeepResearchResult } from '@/services/ai-router/services/deepResearch';
 
 interface NotesPanelProps {
   notes: EditableNote[];
   chapterIndex: number;
+  chapterTitle?: string;
+  manuscriptContext?: string;
   dispatch: React.Dispatch<ManuscriptAction>;
   isOpen: boolean;
   onClose: () => void;
@@ -26,6 +30,8 @@ interface NotesPanelProps {
 export default function NotesPanel({
   notes,
   chapterIndex,
+  chapterTitle,
+  manuscriptContext,
   dispatch,
   isOpen,
   onClose,
@@ -34,6 +40,13 @@ export default function NotesPanel({
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Deep Research state
+  const [showResearch, setShowResearch] = useState(false);
+  const [researchQuery, setResearchQuery] = useState('');
+  const [isResearching, setIsResearching] = useState(false);
+  const [researchResult, setResearchResult] = useState<DeepResearchResult | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (showAddForm && inputRef.current) {
@@ -51,6 +64,36 @@ export default function NotesPanel({
     setNewNoteContent('');
     setShowAddForm(false);
   }, [chapterIndex, dispatch, newNoteContent]);
+
+  const handleRunResearch = async () => {
+    const q = researchQuery.trim();
+    if (!q || isResearching) return;
+    setIsResearching(true);
+    setResearchError(null);
+    setResearchResult(null);
+
+    try {
+      const res = await performDeepResearch(q, {
+        currentChapterTitle: chapterTitle,
+        manuscriptContext,
+      });
+      setResearchResult(res);
+    } catch (err: unknown) {
+      setResearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsResearching(false);
+    }
+  };
+
+  const handleInsertResearchAsNote = (result: DeepResearchResult) => {
+    const sourcesStr = result.sources.length > 0 ? `\n\n📚 Sources : ${result.sources.map((s) => s.title).join(', ')}` : '';
+    const noteContent = `🔍 ${result.topic.toUpperCase()}\n${result.summary}\n\n• ${result.keyPoints.join('\n• ')}${sourcesStr}`;
+    dispatch({
+      type: 'ADD_NOTE',
+      chapterIndex,
+      content: noteContent,
+    });
+  };
 
   const handleUpdate = useCallback(
     (noteId: string, content: string) => {
@@ -89,8 +132,23 @@ export default function NotesPanel({
         </div>
         <div className="notes-panel-actions">
           <button
+            className={`btn-icon ${showResearch ? 'active' : ''}`}
+            onClick={() => {
+              setShowResearch((prev) => !prev);
+              setShowAddForm(false);
+            }}
+            title="Recherche documentaire approfondie (Deep Research)"
+            aria-label="Recherche documentaire"
+            style={{ color: showResearch ? 'var(--accent)' : 'inherit' }}
+          >
+            <IconSparkles size={16} strokeWidth={2} />
+          </button>
+          <button
             className="btn-icon"
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setShowAddForm(true);
+              setShowResearch(false);
+            }}
             title="Ajouter une note"
             aria-label="Ajouter une note"
           >
@@ -101,6 +159,132 @@ export default function NotesPanel({
           </button>
         </div>
       </div>
+
+      {/* Deep Research Section */}
+      {showResearch && (
+        <div
+          className="deep-research-panel"
+          style={{
+            padding: '12px 14px',
+            background: 'var(--surface-2)',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
+              <IconSparkles size={14} />
+              <span>Dossier Deep Research (Google 2026)</span>
+            </div>
+            <span style={{ fontSize: 10.5, color: 'var(--text-soft)', fontStyle: 'italic' }}>
+              Multi-sources & synthèses
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              className="note-textarea"
+              placeholder="Question historique, hadith, lieu, époque…"
+              value={researchQuery}
+              onChange={(e) => setResearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRunResearch()}
+              disabled={isResearching}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                fontSize: 12.5,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+              }}
+            />
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleRunResearch}
+              disabled={!researchQuery.trim() || isResearching}
+              style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              {isResearching ? (
+                <span>Recherche…</span>
+              ) : (
+                <>
+                  <IconSparkles size={13} />
+                  <span>Explorer</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {isResearching && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', fontSize: 11.5, color: 'var(--accent)' }}>
+              <span className="processing-spinner mini" />
+              <span>Deep Research explore les sources documentaires et compile le dossier…</span>
+            </div>
+          )}
+
+          {researchError && (
+            <div style={{ fontSize: 11.5, color: 'var(--japandi-terracotta)', padding: 6, background: 'rgba(229,62,62,0.08)', borderRadius: 4 }}>
+              {researchError}
+            </div>
+          )}
+
+          {researchResult && (
+            <div
+              style={{
+                marginTop: 4,
+                padding: 10,
+                background: 'var(--surface)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                fontSize: 12,
+                lineHeight: 1.45,
+              }}
+            >
+              <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+                📄 {researchResult.topic}
+              </div>
+              <div style={{ color: 'var(--text-soft)', marginBottom: 8 }}>
+                {researchResult.summary}
+              </div>
+              {researchResult.keyPoints.length > 0 && (
+                <ul style={{ margin: '0 0 8px 0', paddingLeft: 16, color: 'var(--text)' }}>
+                  {researchResult.keyPoints.map((pt, idx) => (
+                    <li key={idx} style={{ marginBottom: 3 }}>{pt}</li>
+                  ))}
+                </ul>
+              )}
+              {researchResult.sources.length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  📚 Sources : {researchResult.sources.map((s, i) => (
+                    <span key={i} style={{ marginRight: 6 }}>
+                      {s.uri ? (
+                        <a href={s.uri} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+                          {s.title}
+                        </a>
+                      ) : s.title}
+                      {i < researchResult.sources.length - 1 ? ',' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleInsertResearchAsNote(researchResult)}
+                  style={{ fontSize: 11.5 }}
+                >
+                  <IconPlus size={12} />
+                  <span>Insérer dans les notes</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add note form */}
       {showAddForm && (

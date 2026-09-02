@@ -488,6 +488,8 @@ export default function AtelierPage() {
         <NotesPanel
           notes={activeChapter?.notes || []}
           chapterIndex={ms.activeChapterIndex}
+          chapterTitle={activeChapter?.title}
+          manuscriptContext={activeChapter?.blocks.map((b) => b.content).join('\n\n')}
           dispatch={dispatch}
           isOpen={isNotesOpen}
           onClose={() => setIsNotesOpen(false)}
