@@ -146,6 +146,22 @@ export default function AtelierPage() {
     }
   }, [activeChapter, ms.activeChapterIndex, dispatch]);
 
+  // Deep-link support: Auto-arm dictation if requested via ?action=dictate
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('action') === 'dictate') {
+        window.history.replaceState({}, '', window.location.pathname);
+        if (ds.phase === 'idle') {
+          dictation.startRecording();
+          setTimeout(() => {
+            showFeedback('Microphone activé — Vous pouvez dicter librement.');
+          }, 100);
+        }
+      }
+    }
+  }, [ds.phase, dictation]);
+
   // When dictation completes, insert results into the manuscript
   useEffect(() => {
     if (ds.phase !== 'complete' || !ds.result) return;

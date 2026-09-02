@@ -13,162 +13,178 @@ import {
   IconChevronRight,
 } from '@/components/Shared/Icons';
 
-const LITERARY_QUOTES = [
+const LITERARY_SANCTUARY_QUOTES = [
   { text: 'Écrire, c’est aussi ne pas parler. C’est se taire. C’est hurler sans bruit.', author: 'Marguerite Duras' },
   { text: 'Ne cherchez pas à écrire bien, cherchez à écrire vrai.', author: 'Virginia Woolf' },
   { text: 'Le style est une question non de technique, mais de vision.', author: 'Marcel Proust' },
   { text: 'Créer, c’est vivre deux fois.', author: 'Albert Camus' },
   { text: 'Un livre doit être la hache qui brise la mer gelée en nous.', author: 'Franz Kafka' },
-  { text: 'La dictée préserve l’élan : vos repentirs et ratures orales nourrissent le texte sans briser votre souffle.', author: 'Atelier de l’Écrivain' },
+  { text: 'Dans le silence de l’encre, chaque mot posé est une pierre d’éternité.', author: 'Jun’ichirō Tanizaki' },
 ];
 
 export default function Dashboard() {
   const { user, loading, manuscript, penName, manuscripts } = useAuth();
-  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * LITERARY_QUOTES.length));
+  const [quoteIdx, setQuoteIdx] = useState(() => Math.floor(Math.random() * LITERARY_SANCTUARY_QUOTES.length));
 
   if (loading) {
     return (
       <div className="dash-loading-state">
         <span className="loading-spinner" />
-        <span>Préparation de votre sanctuaire d&apos;écriture…</span>
+        <span style={{ fontFamily: 'var(--font-serif-classic)', fontSize: '18px', fontStyle: 'italic', color: 'var(--text-soft)' }}>
+          Harmonisation du sanctuaire…
+        </span>
       </div>
     );
   }
 
-  // Non connecté → Vitrine d'accueil publique de luxe
   if (!user) {
     return <LoginPage />;
   }
 
   const displayName = penName || user.displayName?.split(' ')[0] || 'Écrivain';
 
-  // Salutation contextuelle poétique selon l'heure
+  // Moment de la journée selon les rituels de l'encre et du thé
   const hour = new Date().getHours();
-  const timeGreeting =
+  const timeRitual =
     hour >= 5 && hour < 12
-      ? "Encre de l'aube"
+      ? "L'Encre de l'Aube"
       : hour >= 12 && hour < 18
-      ? 'Studio littéraire'
+      ? 'La Clarté du Jour'
       : hour >= 18 && hour < 23
-      ? 'Écriture du crépuscule'
-      : 'Veilleuse de nuit';
+      ? 'Le Calme du Crépuscule'
+      : 'La Veilleuse Nocturne';
 
-  const currentQuote = LITERARY_QUOTES[quoteIndex] || LITERARY_QUOTES[0];
+  const currentQuote = LITERARY_SANCTUARY_QUOTES[quoteIdx];
 
   return (
-    <div className="home-dash">
-      <div className="home-dash-inner">
-        {/* ── 1. En-tête Poétique & Sérénité (Japandi Ma) ── */}
-        <header className="home-welcome">
-          <div className="home-welcome-meta">
-            <span className="home-welcome-eyebrow">{timeGreeting}</span>
-            <span className="home-welcome-dot" />
-            <span className="home-welcome-count">
-              {manuscripts.length} {manuscripts.length > 1 ? 'manuscrits' : 'manuscrit'}
+    <main className="sanctuary-wrapper">
+      <div className="sanctuary-inner">
+        {/* ── 1. En-tête Contemplatif (Principe du Ma) ── */}
+        <header className="sanctuary-header">
+          <div className="sanctuary-header-ritual">
+            <span className="sanctuary-ritual-tag">{timeRitual}</span>
+            <span className="sanctuary-ritual-dot" />
+            <span className="sanctuary-ritual-count">
+              {manuscripts.length} {manuscripts.length > 1 ? 'œuvres en gestation' : 'œuvre en cours'}
             </span>
           </div>
-          <h1 className="home-greeting">Bienvenue, {displayName}</h1>
-          <p className="home-sub">
-            Votre sanctuaire créatif est prêt. Reprenez votre fil narratif ou explorez une nouvelle voix.
+
+          <h1 className="sanctuary-greeting-title">
+            Paix à votre plume, <em>{displayName}</em>.
+          </h1>
+
+          <p className="sanctuary-header-sub">
+            Le sanctuaire est silencieux. Vos pensées peuvent s’épanouir sans obstacle.
           </p>
         </header>
 
-        {/* ── 2. Carte Héroïque : Le Manuscrit en Cours ── */}
+        {/* ── 2. Le Manuscrit Actif (Volume 3D & Noblesse Tactile) ── */}
         {manuscript ? (
-          <div className="hero-manuscript-card">
-            <div className="hero-book-cover-preview">
-              <div className="hero-book-spine" />
-              <div className="hero-book-cover-surface">
-                <IconFeather size={20} className="hero-book-icon" />
-                <span className="hero-book-cover-title">{manuscript.title}</span>
-                <span className="hero-book-cover-author">{displayName}</span>
+          <section className="sanctuary-hero-card" aria-label="Manuscrit en cours">
+            {/* Rendu 3D du Livre Japandi */}
+            <div className="book-3d-stage">
+              <div className="book-3d-volume">
+                <div className="book-3d-front">
+                  <div className="book-3d-groove" />
+                  <div className="book-3d-ribbon" />
+                  <IconFeather size={18} className="book-3d-feather" />
+                  <span className="book-3d-title">{manuscript.title}</span>
+                  <span className="book-3d-author">{displayName}</span>
+                </div>
+                <div className="book-3d-pages-edge" />
               </div>
             </div>
 
-            <div className="hero-manuscript-info">
-              <div className="hero-manuscript-status">
-                <span className="hero-status-dot" />
-                <span className="hero-status-label">Manuscrit en cours</span>
+            {/* Informations & Métriques d'art */}
+            <div className="sanctuary-hero-meta">
+              <div className="sanctuary-status-badge">
+                <span className="sanctuary-status-dot" />
+                <span>Manuscrit Actif</span>
               </div>
 
-              <h2 className="hero-manuscript-title">{manuscript.title}</h2>
+              <h2 className="sanctuary-hero-title">{manuscript.title}</h2>
 
-              <p className="hero-manuscript-details">
-                Poursuivez la rédaction, consultez les ratures de style assistées par IA ou explorez vos notes de marge.
+              <p className="sanctuary-hero-details">
+                Poursuivez la rédaction au point exact où vous l’avez laissée, dictez vos repentirs ou relisez vos chapitres.
               </p>
 
-              <div className="hero-manuscript-actions">
-                <Link href="/atelier" className="btn btn-primary hero-btn-write">
-                  <IconFeather size={16} strokeWidth={2} />
+              <div className="sanctuary-actions-group">
+                <Link href="/atelier" className="btn-sanctuary-primary" title="Continuer la rédaction dans l'Atelier">
+                  <IconFeather size={15} strokeWidth={2} />
                   <span>Reprendre l&apos;écriture</span>
                 </Link>
-                <Link href="/liseuse" className="btn btn-secondary hero-btn-read">
-                  <IconBook size={16} strokeWidth={1.8} />
-                  <span>Mode Liseuse</span>
+                <Link href="/atelier?action=dictate" className="btn-sanctuary-secondary" title="Armer immédiatement la dictée vocale">
+                  <IconMic size={15} strokeWidth={1.8} />
+                  <span>Dictée instantanée</span>
+                </Link>
+                <Link href="/liseuse" className="btn-sanctuary-tertiary" title="Feuilleter en mode liseuse">
+                  <IconBook size={15} strokeWidth={1.8} />
+                  <span>Liseuse</span>
                 </Link>
               </div>
             </div>
-          </div>
+          </section>
         ) : (
-          <div className="hero-manuscript-card empty">
-            <div className="hero-manuscript-info" style={{ textAlign: 'center', width: '100%', alignItems: 'center' }}>
-              <IconCompass size={32} strokeWidth={1.5} className="empty-hero-icon" />
-              <h2 className="hero-manuscript-title">Aucun manuscrit sélectionné</h2>
-              <p className="hero-manuscript-details">
-                Commencez un nouvel ouvrage ou importez vos notes pour démarrer votre session.
+          <section className="sanctuary-hero-card empty">
+            <div className="empty-sanctuary-content">
+              <IconCompass size={36} strokeWidth={1.5} className="empty-hero-icon" />
+              <h2 className="sanctuary-hero-title">Une feuille vierge attend votre voix</h2>
+              <p className="sanctuary-hero-details">
+                Commencez un nouvel ouvrage ou explorez les outils de l&apos;Atelier.
               </p>
-              <Link href="/atelier" className="btn btn-primary" style={{ marginTop: 8 }}>
-                <IconFeather size={16} />
-                <span>Ouvrir l&apos;Atelier</span>
+              <Link href="/atelier" className="btn-sanctuary-primary" style={{ marginTop: 8 }}>
+                <IconFeather size={15} strokeWidth={2} />
+                <span>Ouvrir l&apos;Atelier d&apos;écriture</span>
               </Link>
             </div>
-          </div>
+          </section>
         )}
 
-        {/* ── 3. Piliers d'Action Rapide ── */}
-        <div className="home-quick-pillars">
-          <Link href="/atelier" className="pillar-card">
-            <div className="pillar-icon-box">
-              <IconMic size={20} strokeWidth={2} />
+        {/* ── 3. Portails de Création (Deux Piliers Épurés) ── */}
+        <div className="sanctuary-pillars-grid">
+          <Link href="/atelier?action=dictate" className="sanctuary-portal-card" title="Lancer une dictée vocale sans détour">
+            <div className="sanctuary-portal-icon">
+              <IconMic size={20} strokeWidth={1.8} />
             </div>
-            <div className="pillar-content">
-              <div className="pillar-header">
-                <h3 className="pillar-title">Dictée Vocale Assistée</h3>
-                <span className="pillar-badge">Gemini 3.5 Transcribe</span>
-              </div>
-              <p className="pillar-desc">
-                Dictez votre premier jet à voix haute. L&apos;IA isole les auto-corrections et structure vos chapitres.
+            <div className="sanctuary-portal-text">
+              <h3 className="sanctuary-portal-title">Dictée & Repentirs Vivants</h3>
+              <p className="sanctuary-portal-desc">
+                Parlez sans filtre. L’intelligence de l’atelier isole vos ratures de votre texte pur.
               </p>
             </div>
-            <IconChevronRight size={16} className="pillar-chevron" />
+            <IconChevronRight size={16} className="sanctuary-portal-chevron" />
           </Link>
 
-          <Link href="/liseuse" className="pillar-card">
-            <div className="pillar-icon-box">
-              <IconSparkles size={20} strokeWidth={2} />
+          <Link href="/liseuse" className="sanctuary-portal-card" title="Ouvrir la liseuse et les exports">
+            <div className="sanctuary-portal-icon">
+              <IconSparkles size={20} strokeWidth={1.8} />
             </div>
-            <div className="pillar-content">
-              <div className="pillar-header">
-                <h3 className="pillar-title">Studio de Relecture & Export</h3>
-                <span className="pillar-badge">Édition & PDF</span>
-              </div>
-              <p className="pillar-desc">
-                Relisez sans distraction, personnalisez les 10 thèmes éditoriaux et exportez votre livre relié.
+            <div className="sanctuary-portal-text">
+              <h3 className="sanctuary-portal-title">Relecture & Reliure d&apos;Art</h3>
+              <p className="sanctuary-portal-desc">
+                Admirez votre mise en page aux proportions d&apos;or et préparez l&apos;exportation d&apos;imprimerie.
               </p>
             </div>
-            <IconChevronRight size={16} className="pillar-chevron" />
+            <IconChevronRight size={16} className="sanctuary-portal-chevron" />
           </Link>
         </div>
 
-        {/* ── 4. Signet Littéraire (Sagesse & Inspiration Washi) ── */}
-        <footer className="home-quote-bookmark" onClick={() => setQuoteIndex((prev) => (prev + 1) % LITERARY_QUOTES.length)}>
+        {/* ── 4. Signet Poétique Interactif (Méditation Wabi-Sabi Accessible) ── */}
+        <button
+          type="button"
+          className="sanctuary-quote-bookmark"
+          onClick={() => setQuoteIdx((prev) => (prev + 1) % LITERARY_SANCTUARY_QUOTES.length)}
+          title="Toucher pour renouveler la pensée littéraire"
+          aria-label="Changer de citation littéraire inspirante"
+        >
           <span className="quote-mark">“</span>
-          <p className="quote-text">
+          <p className="sanctuary-quote-text">
             {currentQuote.text}
-            <span className="quote-author">— {currentQuote.author}</span>
+            <span className="sanctuary-quote-author">— {currentQuote.author}</span>
           </p>
-        </footer>
+          <span className="sanctuary-quote-refresh">Toucher le signet ✦</span>
+        </button>
       </div>
-    </div>
+    </main>
   );
 }
