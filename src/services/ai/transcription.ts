@@ -66,7 +66,7 @@ async function generateWithFallback<T>(
   generationConfig: Record<string, unknown>,
   systemInstruction: string,
   feature: FeatureId,
-  execute: (model: unknown, modelName: string) => Promise<T>
+  execute: (model: unknown, modelName: string, inlineInstructions: boolean) => Promise<T>
 ): Promise<{ result: T; modelUsed: string }> {
   const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
   const app = getFirebaseApp();
@@ -74,10 +74,10 @@ async function generateWithFallback<T>(
 
   const selection = await selectModel(feature);
   const fallbackChain = FEATURE_CHAINS[feature]?.chain || [
+    'gemini-3.5-transcribe',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
     'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-2.5-pro',
   ];
   const chain = selection.modelId
     ? [selection.modelId, ...fallbackChain.filter((m) => m !== selection.modelId)]
@@ -86,6 +86,7 @@ async function generateWithFallback<T>(
   let lastError: unknown = null;
 
   for (const modelName of chain) {
+    // 1. Premier essai : avec systemInstruction officielle au niveau supérieur
     try {
       const model = getGenerativeModel(ai, {
         model: modelName,
@@ -93,12 +94,37 @@ async function generateWithFallback<T>(
         systemInstruction,
       });
 
-      const res = await execute(model, modelName);
+      const res = await execute(model, modelName, false);
       await recordUsage(modelName, 'generation', 'success');
       return { result: res, modelUsed: modelName };
     } catch (err: unknown) {
-      lastError = err;
       const errMsg = err instanceof Error ? err.message : String(err);
+
+      // 2. Contournement : si le modèle rejette developer instruction, réexécuter avec instructions inlinées dans le prompt !
+      if (
+        errMsg.includes('Developer instruction') ||
+        errMsg.includes('is not enabled') ||
+        errMsg.includes('systemInstruction') ||
+        errMsg.includes('system_instruction')
+      ) {
+        try {
+          console.warn(`[AI Adaptation] Le modèle ${modelName} requiert des instructions inlinées. Réessai avec préambule...`);
+          const modelInlined = getGenerativeModel(ai, {
+            model: modelName,
+            generationConfig: generationConfig as never,
+          });
+          const res = await execute(modelInlined, modelName, true);
+          await recordUsage(modelName, 'generation', 'success');
+          return { result: res, modelUsed: modelName };
+        } catch (inlinedErr: unknown) {
+          lastError = inlinedErr;
+          console.warn(`[AI Fallback] Échec avec instructions inlinées sur ${modelName}. Basculement vers le modèle suivant...`);
+          await recordUsage(modelName, 'generation', 'quota-error');
+          continue;
+        }
+      }
+
+      lastError = err;
       console.warn(
         `[AI Fallback] Le modèle ${modelName} a échoué (${errMsg}). Basculement vers le modèle suivant dans la chaîne...`
       );
@@ -164,20 +190,23 @@ export async function transcribeAudio(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     'dictation',
-    async (model, modelName) => {
+    async (model, modelName, inlineInstructions) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Dictation] Exécution avec le modèle spécialisé : ${modelName}`);
+        console.log(`[AI Dictation] Exécution avec le modèle spécialisé : ${modelName} (inlined: ${inlineInstructions})`);
       }
       const typedModel = model as RawModelClient;
-      const apiResult = await typedModel.generateContent([
-        contextPrompt,
+      const contentParts: unknown[] = [
+        inlineInstructions
+          ? `INSTRUCTIONS DU SYSTÈME ÉDITORIAL :\n${SYSTEM_PROMPT_TRANSCRIPTION}\n\nREQUÊTE DE L'AUTEUR :\n${contextPrompt}`
+          : contextPrompt,
         {
           inlineData: {
             data: audioBase64,
             mimeType: audioBlob.type || 'audio/webm',
           },
         },
-      ]);
+      ];
+      const apiResult = await typedModel.generateContent(contentParts);
 
       const responseText = apiResult.response.text();
       try {
@@ -227,12 +256,15 @@ export async function analyzeWrittenText(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     'text-analysis',
-    async (model, modelName) => {
+    async (model, modelName, inlineInstructions) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Text Analysis] Exécution avec le modèle : ${modelName}`);
+        console.log(`[AI Text Analysis] Exécution avec le modèle : ${modelName} (inlined: ${inlineInstructions})`);
       }
       const typedModel = model as RawModelClient;
-      const apiResult = await typedModel.generateContent([contextPrompt]);
+      const fullPrompt = inlineInstructions
+        ? `INSTRUCTIONS DU SYSTÈME ÉDITORIAL :\n${SYSTEM_PROMPT_TRANSCRIPTION}\n\nREQUÊTE DE L'AUTEUR :\n${contextPrompt}`
+        : contextPrompt;
+      const apiResult = await typedModel.generateContent([fullPrompt]);
       const responseText = apiResult.response.text();
       try {
         return JSON.parse(responseText) as TranscriptionResult;
@@ -275,20 +307,23 @@ export async function transcribeAudioStream(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     'dictation-live',
-    async (model, modelName) => {
+    async (model, modelName, inlineInstructions) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Stream] Exécution avec le modèle streaming : ${modelName}`);
+        console.log(`[AI Stream] Exécution avec le modèle streaming : ${modelName} (inlined: ${inlineInstructions})`);
       }
       const typedModel = model as RawModelClient;
-      const streamResult = await typedModel.generateContentStream([
-        contextPrompt,
+      const contentParts: unknown[] = [
+        inlineInstructions
+          ? `INSTRUCTIONS DU SYSTÈME ÉDITORIAL :\n${SYSTEM_PROMPT_TRANSCRIPTION}\n\nREQUÊTE DE L'AUTEUR :\n${contextPrompt}`
+          : contextPrompt,
         {
           inlineData: {
             data: audioBase64,
             mimeType: audioBlob.type || 'audio/webm',
           },
         },
-      ]);
+      ];
+      const streamResult = await typedModel.generateContentStream(contentParts);
 
       let fullText = '';
       for await (const chunk of streamResult.stream) {
