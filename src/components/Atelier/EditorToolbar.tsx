@@ -14,6 +14,7 @@
 
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import Tooltip from '@/components/Shared/Tooltip';
 import type { SaveStatus } from '@/types/editor';
 import {
@@ -31,6 +32,7 @@ import {
   IconScissors,
   IconPaperclip,
   IconFolder,
+  IconMoreVertical,
   IconCheck,
   IconCloudCheck,
   IconCloudUpload,
@@ -106,6 +108,19 @@ export default function EditorToolbar({
   onStopSpeech,
   onExportPdf,
 }: EditorToolbarProps) {
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const formatSaveTime = (ts: number | null) => {
     if (!ts) return '';
     const d = new Date(ts);
@@ -120,10 +135,10 @@ export default function EditorToolbar({
   const renderSaveIndicator = () => {
     if (isDirty || saveStatus === 'saving') {
       return (
-        <Tooltip content="Sauvegarde continue active : vos écrits sont enregistrés en direct.">
+        <Tooltip content="Sauvegarde continue : vos écrits sont enregistrés en direct.">
           <span className="save-status-indicator saving">
             <span className="save-pulse-dot" />
-            <span>Sauvegarde en cours…</span>
+            <span>Sauvegarde…</span>
           </span>
         </Tooltip>
       );
@@ -134,7 +149,7 @@ export default function EditorToolbar({
         <Tooltip content="Synchronisation de votre manuscrit avec le cloud Firestore…">
           <span className="save-status-indicator syncing">
             <IconCloudUpload size={13} strokeWidth={2} />
-            <span>Synchronisation cloud…</span>
+            <span>Sync…</span>
           </span>
         </Tooltip>
       );
@@ -143,10 +158,10 @@ export default function EditorToolbar({
     if (saveStatus === 'synced' && isCloudConnected) {
       const timeStr = formatSaveTime(lastCloudSync || lastSaved);
       return (
-        <Tooltip content={`Synchronisé avec le cloud (${timeStr}). Retrouvez votre manuscrit à jour sur tous vos appareils.`}>
+        <Tooltip content={`Synchronisé avec le cloud (${timeStr}). Disponible sur tous vos appareils.`}>
           <span className="save-status-indicator synced">
-            <IconCloudCheck size={14} strokeWidth={2} />
-            <span>Synchronisé ({timeStr})</span>
+            <IconCloudCheck size={13} strokeWidth={2} />
+            <span>Enregistré ({timeStr})</span>
           </span>
         </Tooltip>
       );
@@ -154,7 +169,7 @@ export default function EditorToolbar({
 
     if (saveStatus === 'offline') {
       return (
-        <Tooltip content="Mode hors-ligne : Sauvegardé en local. La synchronisation cloud reprendra dès que la connexion est rétablie.">
+        <Tooltip content="Mode hors-ligne : Sauvegardé en local. La synchronisation reprendra dès reconnexion.">
           <span className="save-status-indicator offline">
             <IconCloudOff size={13} strokeWidth={2} />
             <span>Hors-ligne ({formatSaveTime(lastSaved)})</span>
@@ -163,23 +178,12 @@ export default function EditorToolbar({
       );
     }
 
-    if (saveStatus === 'error') {
-      return (
-        <Tooltip content="Erreur de connexion au cloud. Vos modifications sont conservées en sécurité localement sur cet appareil.">
-          <span className="save-status-indicator error">
-            <IconAlertCircle size={13} strokeWidth={2} />
-            <span>Erreur cloud ({formatSaveTime(lastSaved)})</span>
-          </span>
-        </Tooltip>
-      );
-    }
-
     if (lastSaved) {
       const timeStr = formatSaveTime(lastSaved);
       return (
-        <Tooltip content={`Enregistré localement sur votre navigateur (${timeStr}). Pas un mot n'est perdu.`}>
-          <span className="save-status-indicator saved">
-            <IconCheck size={12} strokeWidth={2.5} />
+        <Tooltip content={`Enregistré localement sur votre navigateur (${timeStr}).`}>
+          <span className="save-status-indicator synced">
+            <IconCloudCheck size={13} strokeWidth={2} />
             <span>Enregistré ({timeStr})</span>
           </span>
         </Tooltip>
@@ -191,145 +195,67 @@ export default function EditorToolbar({
 
   return (
     <div className="editor-toolbar">
-      {/* Left: Chapter title & Mobile sidebar toggle */}
+      {/* ── Îlot 1 : Identité & Sauvegarde ── */}
       <div className="editor-toolbar-left">
         {onToggleSidebar && (
           <button
-            className="chapter-drawer-toggle-btn mobile-only-toggle"
+            className="editor-sidebar-toggle-btn"
             onClick={onToggleSidebar}
             title="Afficher les chapitres"
             aria-label="Afficher la liste des chapitres"
           >
-            <IconFolder size={16} strokeWidth={2} />
+            <IconFolder size={15} strokeWidth={2} />
             <span className="toggle-btn-label">Chapitres</span>
           </button>
         )}
         <span className="editor-toolbar-title">{chapterTitle}</span>
+        <span className="editor-save-indicator">{renderSaveIndicator()}</span>
       </div>
 
-      {/* Center: Actions */}
+      {/* ── Îlot 2 : Création & Polissage IA ── */}
       <div className="editor-toolbar-center">
         {onStartDictation && (
-          <>
-            <Tooltip content="Dicter un passage (Audio)" shortcut="⌘D">
-              <button
-                className={`btn-icon ${isRecording ? 'recording-active' : ''}`}
-                onClick={onStartDictation}
-                disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
-                aria-label="Démarrer la dictée vocale"
-              >
-                <IconMic size={17} strokeWidth={2} />
-              </button>
-            </Tooltip>
-            {onAnalyzeText && (
-              <Tooltip content={`Analyser tout le chapitre (${wordCount} mots) — Ratures & Style`}>
-                <button
-                  className={`btn-icon ${isAnalyzingText ? 'analyzing-active' : ''}`}
-                  onClick={onAnalyzeText}
-                  disabled={isAnalyzingText}
-                  aria-label="Analyser tout le chapitre par IA"
-                >
-                  <IconSparkles size={16} strokeWidth={2} />
-                </button>
-              </Tooltip>
-            )}
-            <div className="editor-toolbar-divider" />
-          </>
+          <Tooltip content="Démarrer la dictée vocale" shortcut="⌘D">
+            <button
+              className={`btn-icon ${isRecording ? 'recording-active' : ''}`}
+              onClick={onStartDictation}
+              disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
+              aria-label="Démarrer la dictée vocale"
+            >
+              <IconMic size={16} strokeWidth={2} />
+            </button>
+          </Tooltip>
         )}
 
-        <Tooltip content="Annuler la dernière action" shortcut="⌘Z">
-          <button
-            className="btn-icon"
-            onClick={onUndo}
-            disabled={!canUndo}
-            aria-label="Annuler"
-          >
-            <IconUndo size={16} strokeWidth={2} />
-          </button>
-        </Tooltip>
-        <Tooltip content="Rétablir l'action annulée" shortcut="⌘⇧Z">
-          <button
-            className="btn-icon"
-            onClick={onRedo}
-            disabled={!canRedo}
-            aria-label="Rétablir"
-          >
-            <IconRedo size={16} strokeWidth={2} />
-          </button>
-        </Tooltip>
+        {onAnalyzeText && (
+          <Tooltip content={`Analyser tout le chapitre (${wordCount} mots) — Ratures & Style`}>
+            <button
+              className={`btn-icon ${isAnalyzingText ? 'analyzing-active' : ''}`}
+              onClick={onAnalyzeText}
+              disabled={isAnalyzingText}
+              aria-label="Analyser tout le chapitre par IA"
+            >
+              <IconSparkles size={15} strokeWidth={2} />
+            </button>
+          </Tooltip>
+        )}
 
         <div className="editor-toolbar-divider" />
 
-        <Tooltip content="Exporter en Markdown (.md)">
-          <button className="btn-icon" onClick={onExport} aria-label="Exporter en Markdown">
-            <IconDownload size={16} strokeWidth={2} />
+        <Tooltip content="Annuler" shortcut="⌘Z">
+          <button className="btn-icon" onClick={onUndo} disabled={!canUndo} aria-label="Annuler">
+            <IconUndo size={15} strokeWidth={2} />
           </button>
         </Tooltip>
-
-        <Tooltip content="Exporter en PDF Éditorial (Couverture & Mise en page)">
-          <button
-            className="btn-icon pdf-export-btn"
-            onClick={onExportPdf || onExport}
-            aria-label="Exporter en PDF éditorial"
-          >
-            <IconBook size={16} strokeWidth={2} />
-          </button>
-        </Tooltip>
-
-        {onToggleSpeech && (
-          <Tooltip
-            content={
-              isSpeechPlaying
-                ? isSpeechPaused
-                  ? 'Reprendre la lecture audio'
-                  : 'Mettre en pause la lecture'
-                : 'Écouter le chapitre (Lecture audio)'
-            }
-          >
-            <button
-              className={`btn-icon ${isSpeechPlaying ? 'active' : ''}`}
-              onClick={onToggleSpeech}
-              aria-label="Lecture audio"
-            >
-              {isSpeechPlaying ? (
-                isSpeechPaused ? (
-                  <IconPlay size={15} strokeWidth={2} />
-                ) : (
-                  <IconPause size={15} strokeWidth={2} />
-                )
-              ) : (
-                <IconVolume size={16} strokeWidth={2} />
-              )}
-            </button>
-          </Tooltip>
-        )}
-        {isSpeechPlaying && onStopSpeech && (
-          <Tooltip content="Arrêter la lecture audio">
-            <button className="btn-icon btn-danger-icon" onClick={onStopSpeech} aria-label="Arrêter la lecture">
-              <IconStop size={15} strokeWidth={2} />
-            </button>
-          </Tooltip>
-        )}
-
-        <Tooltip content={isFocusMode ? 'Quitter le mode concentration' : 'Mode concentration (sans distraction)'}>
-          <button
-            className={`btn-icon ${isFocusMode ? 'active' : ''}`}
-            onClick={onToggleFocus}
-            aria-label="Mode concentration"
-          >
-            <IconTarget size={16} strokeWidth={2} />
+        <Tooltip content="Rétablir" shortcut="⌘⇧Z">
+          <button className="btn-icon" onClick={onRedo} disabled={!canRedo} aria-label="Rétablir">
+            <IconRedo size={15} strokeWidth={2} />
           </button>
         </Tooltip>
       </div>
 
-      {/* Right: Panels + Stats */}
+      {/* ── Îlot 3 : Tiroirs d'Atelier & Statistiques ── */}
       <div className="editor-toolbar-right">
-        {/* Real-time Save & Sync Indicator */}
-        <span className="editor-save-indicator">
-          {renderSaveIndicator()}
-        </span>
-
-        {/* Word count */}
         <Tooltip content={`Total manuscrit : ${totalWordCount.toLocaleString('fr-FR')} mots`}>
           <span className="editor-word-count">
             {wordCount.toLocaleString('fr-FR')} mots
@@ -338,20 +264,20 @@ export default function EditorToolbar({
 
         <div className="editor-toolbar-divider" />
 
-        {/* Review toggle */}
-        <Tooltip content={isReviewOpen ? 'Fermer les révisions IA' : 'Révisions & Ratures Gemini'}>
+        {/* Review drawer toggle */}
+        <Tooltip content={isReviewOpen ? 'Fermer les révisions' : 'Ratures & Polissage (max 15)'}>
           <button
             className={`btn-icon ${isReviewOpen ? 'active' : ''}`}
             onClick={onToggleReview}
-            aria-label="Révisions IA"
+            aria-label="Ratures & Révisions"
           >
             <IconScissors size={15} strokeWidth={2} />
             {pendingReviewCount > 0 && <span className="toolbar-badge">{pendingReviewCount}</span>}
           </button>
         </Tooltip>
 
-        {/* Notes toggle */}
-        <Tooltip content={isNotesOpen ? 'Fermer les notes' : 'Notes & Annotations'}>
+        {/* Notes drawer toggle */}
+        <Tooltip content={isNotesOpen ? 'Fermer les notes' : 'Notes & Pense-bête'}>
           <button
             className={`btn-icon ${isNotesOpen ? 'active' : ''}`}
             onClick={onToggleNotes}
@@ -361,6 +287,70 @@ export default function EditorToolbar({
             {noteCount > 0 && <span className="toolbar-badge">{noteCount}</span>}
           </button>
         </Tooltip>
+
+        <div className="editor-toolbar-divider" />
+
+        {/* ── Îlot 4 : Menu Plus « ... » (Exports, TTS, Mode Zen) ── */}
+        <div className="toolbar-more-menu-container" ref={moreMenuRef} style={{ position: 'relative' }}>
+          <button
+            className={`btn-icon ${showMoreMenu ? 'active' : ''}`}
+            onClick={() => setShowMoreMenu((prev) => !prev)}
+            title="Options & Exports"
+            aria-label="Options et exports"
+          >
+            <IconMoreVertical size={16} strokeWidth={2} />
+          </button>
+
+          {showMoreMenu && (
+            <div className="toolbar-dropdown-menu">
+              <button
+                className="dropdown-menu-item"
+                onClick={() => {
+                  onExportPdf ? onExportPdf() : onExport();
+                  setShowMoreMenu(false);
+                }}
+              >
+                <IconBook size={14} />
+                <span>Studio PDF Éditorial & Couverture</span>
+              </button>
+
+              <button
+                className="dropdown-menu-item"
+                onClick={() => {
+                  onExport();
+                  setShowMoreMenu(false);
+                }}
+              >
+                <IconDownload size={14} />
+                <span>Exporter en Markdown (.md)</span>
+              </button>
+
+              {onToggleSpeech && (
+                <button
+                  className="dropdown-menu-item"
+                  onClick={() => {
+                    onToggleSpeech();
+                    setShowMoreMenu(false);
+                  }}
+                >
+                  <IconVolume size={14} />
+                  <span>{isSpeechPlaying ? (isSpeechPaused ? 'Reprendre la lecture TTS' : 'Pause lecture TTS') : 'Écouter le chapitre (TTS)'}</span>
+                </button>
+              )}
+
+              <button
+                className={`dropdown-menu-item ${isFocusMode ? 'active' : ''}`}
+                onClick={() => {
+                  onToggleFocus();
+                  setShowMoreMenu(false);
+                }}
+              >
+                <IconTarget size={14} />
+                <span>{isFocusMode ? 'Quitter le Mode Zen' : 'Activer le Mode Zen'}</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

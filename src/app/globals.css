@@ -3656,3 +3656,241 @@ a:hover {
     transform: translateY(0);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   10. UNIFIED FLOATING AUDIO DOCK (Japandi Minimaliste)
+   ═══════════════════════════════════════════════════════════════ */
+.unified-audio-dock {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  animation: dock-rise 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+@keyframes dock-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.audio-dock-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.16), 0 6px 16px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.audio-dock-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.audio-dock-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--japandi-terracotta);
+  animation: pulse-glow 1.2s infinite ease-in-out;
+}
+
+.audio-dock-timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--japandi-terracotta);
+}
+
+.audio-dock-limit {
+  font-size: 11px;
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+.audio-dock-interim {
+  max-width: 320px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent);
+}
+
+.audio-dock-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-dock-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.btn-dock-action:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+.btn-dock-action.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btn-dock-action.primary:hover {
+  background: var(--accent-hover);
+}
+.btn-dock-action.ghost.danger:hover {
+  background: rgba(229, 62, 62, 0.12);
+  color: var(--japandi-terracotta);
+  border-color: var(--japandi-terracotta);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   11. TOOLBAR DROPDOWN & REVIEW PROGRESS STYLING
+   ═══════════════════════════════════════════════════════════════ */
+.toolbar-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  padding: 6px;
+  min-width: 220px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: fadeIn 0.12s ease;
+}
+
+.dropdown-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+.dropdown-menu-item:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.dropdown-menu-item.active {
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Review Chapter Status & Polish Bar */
+.review-chapter-status {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.status-progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.status-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.status-progress-fill.complete {
+  background: var(--japandi-bamboo);
+}
+
+.status-progress-label {
+  font-size: 11.5px;
+}
+.status-label-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--japandi-bamboo);
+  font-weight: 600;
+}
+.status-label-pending {
+  color: var(--text-soft);
+}
+
+.review-batch-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.btn-batch {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.btn-batch.apply {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+.btn-batch.apply:hover {
+  background: var(--accent-hover);
+}
+.btn-batch.reject {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.btn-batch.reject:hover {
+  color: var(--japandi-terracotta);
+  border-color: var(--japandi-terracotta);
+}

@@ -36,9 +36,11 @@ export default function NotesPanel({
   isOpen,
   onClose,
 }: NotesPanelProps) {
+  const [activeTab, setActiveTab] = useState<'footnotes' | 'margin'>('footnotes');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteCategory, setNewNoteCategory] = useState<'footnote' | 'margin'>('footnote');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Deep Research state
@@ -47,6 +49,10 @@ export default function NotesPanel({
   const [isResearching, setIsResearching] = useState(false);
   const [researchResult, setResearchResult] = useState<DeepResearchResult | null>(null);
   const [researchError, setResearchError] = useState<string | null>(null);
+
+  const footnotes = notes.filter((n) => n.category !== 'margin');
+  const marginNotes = notes.filter((n) => n.category === 'margin');
+  const displayedNotes = activeTab === 'footnotes' ? footnotes : marginNotes;
 
   useEffect(() => {
     if (showAddForm && inputRef.current) {
@@ -60,10 +66,11 @@ export default function NotesPanel({
       type: 'ADD_NOTE',
       chapterIndex,
       content: newNoteContent.trim(),
+      category: newNoteCategory,
     });
     setNewNoteContent('');
     setShowAddForm(false);
-  }, [chapterIndex, dispatch, newNoteContent]);
+  }, [chapterIndex, dispatch, newNoteContent, newNoteCategory]);
 
   const handleRunResearch = async () => {
     const q = researchQuery.trim();
@@ -92,7 +99,9 @@ export default function NotesPanel({
       type: 'ADD_NOTE',
       chapterIndex,
       content: noteContent,
+      category: 'margin',
     });
+    setActiveTab('margin');
   };
 
   const handleUpdate = useCallback(
@@ -146,6 +155,7 @@ export default function NotesPanel({
           <button
             className="btn-icon"
             onClick={() => {
+              setNewNoteCategory(activeTab === 'footnotes' ? 'footnote' : 'margin');
               setShowAddForm(true);
               setShowResearch(false);
             }}
@@ -158,6 +168,22 @@ export default function NotesPanel({
             <IconClose size={16} strokeWidth={2} />
           </button>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="notes-filters" style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)' }}>
+        <button
+          className={`pill ${activeTab === 'footnotes' ? 'active' : ''}`}
+          onClick={() => setActiveTab('footnotes')}
+        >
+          Bas de page ({footnotes.length})
+        </button>
+        <button
+          className={`pill ${activeTab === 'margin' ? 'active' : ''}`}
+          onClick={() => setActiveTab('margin')}
+        >
+          Pense-bête ({marginNotes.length})
+        </button>
       </div>
 
       {/* Deep Research Section */}
@@ -178,56 +204,30 @@ export default function NotesPanel({
               <IconSparkles size={14} />
               <span>Dossier Deep Research (Google 2026)</span>
             </div>
-            <span style={{ fontSize: 10.5, color: 'var(--text-soft)', fontStyle: 'italic' }}>
-              Multi-sources & synthèses
-            </span>
           </div>
 
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               type="text"
-              className="note-textarea"
-              placeholder="Question historique, hadith, lieu, époque…"
+              placeholder="Ex: Évolution du clergé sous la Restauration…"
               value={researchQuery}
               onChange={(e) => setResearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleRunResearch()}
-              disabled={isResearching}
-              style={{
-                flex: 1,
-                padding: '6px 8px',
-                fontSize: 12.5,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--text)',
-              }}
+              className="note-textarea"
+              style={{ flex: 1, padding: '6px 10px', fontSize: 12, height: 32, resize: 'none' }}
             />
             <button
               className="btn btn-primary btn-sm"
               onClick={handleRunResearch}
-              disabled={!researchQuery.trim() || isResearching}
-              style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              disabled={isResearching || !researchQuery.trim()}
+              style={{ fontSize: 11.5 }}
             >
-              {isResearching ? (
-                <span>Recherche…</span>
-              ) : (
-                <>
-                  <IconSparkles size={13} />
-                  <span>Explorer</span>
-                </>
-              )}
+              {isResearching ? 'Recherche…' : 'Lancer'}
             </button>
           </div>
 
-          {isResearching && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', fontSize: 11.5, color: 'var(--accent)' }}>
-              <span className="processing-spinner mini" />
-              <span>Deep Research explore les sources documentaires et compile le dossier…</span>
-            </div>
-          )}
-
           {researchError && (
-            <div style={{ fontSize: 11.5, color: 'var(--japandi-terracotta)', padding: 6, background: 'rgba(229,62,62,0.08)', borderRadius: 4 }}>
+            <div style={{ color: 'var(--japandi-terracotta)', fontSize: 11.5 }}>
               {researchError}
             </div>
           )}
@@ -235,17 +235,17 @@ export default function NotesPanel({
           {researchResult && (
             <div
               style={{
-                marginTop: 4,
-                padding: 10,
                 background: 'var(--surface)',
-                borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 12px',
                 fontSize: 12,
-                lineHeight: 1.45,
+                maxHeight: 220,
+                overflowY: 'auto',
               }}
             >
-              <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                📄 {researchResult.topic}
+              <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+                {researchResult.topic}
               </div>
               <div style={{ color: 'var(--text-soft)', marginBottom: 8 }}>
                 {researchResult.summary}
@@ -278,7 +278,7 @@ export default function NotesPanel({
                   style={{ fontSize: 11.5 }}
                 >
                   <IconPlus size={12} />
-                  <span>Insérer dans les notes</span>
+                  <span>Insérer dans le pense-bête</span>
                 </button>
               </div>
             </div>
@@ -289,12 +289,30 @@ export default function NotesPanel({
       {/* Add note form */}
       {showAddForm && (
         <div className="note-form">
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <button
+              type="button"
+              className={`pill ${newNoteCategory === 'footnote' ? 'active' : ''}`}
+              onClick={() => setNewNoteCategory('footnote')}
+              style={{ fontSize: 11, padding: '2px 8px' }}
+            >
+              Note de bas de page (numérotée)
+            </button>
+            <button
+              type="button"
+              className={`pill ${newNoteCategory === 'margin' ? 'active' : ''}`}
+              onClick={() => setNewNoteCategory('margin')}
+              style={{ fontSize: 11, padding: '2px 8px' }}
+            >
+              Pense-bête / Idée libre
+            </button>
+          </div>
           <textarea
             ref={inputRef}
             className="note-textarea"
             value={newNoteContent}
             onChange={(e) => setNewNoteContent(e.target.value)}
-            placeholder="Écrire une note ou une idée…"
+            placeholder={newNoteCategory === 'footnote' ? "Contenu de la note de bas de page…" : "Idée, rappel d'intrigue ou pense-bête…"}
             rows={3}
             autoFocus
           />
@@ -311,17 +329,19 @@ export default function NotesPanel({
 
       {/* Notes list */}
       <div className="notes-list">
-        {notes.length === 0 ? (
+        {displayedNotes.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <IconPaperclip size={28} strokeWidth={1.5} />
             </div>
             <div className="empty-state-text">
-              Aucune note pour ce chapitre. Cliquez sur « + » pour en consigner une.
+              {activeTab === 'footnotes'
+                ? 'Aucune note de bas de page pour ce chapitre.'
+                : 'Aucun pense-bête pour ce chapitre.'}
             </div>
           </div>
         ) : (
-          notes.map((note) => (
+          displayedNotes.map((note) => (
             <NoteItem
               key={note.id}
               note={note}

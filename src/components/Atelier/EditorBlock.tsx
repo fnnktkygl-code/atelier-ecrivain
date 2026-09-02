@@ -221,31 +221,13 @@ export default function EditorBlock({
         )}
       </div>
 
-      {/* Insert bar between blocks */}
-      <div
-        className={`editor-insert-line ${isInsertionPoint ? 'active' : ''}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          onDragOver(index + 1);
-        }}
-      >
-        <button
-          className="editor-insert-line-btn"
-          onClick={() => onInsertAfter(block.id)}
-          title="Insérer un paragraphe vide"
-        >
-          <IconPlus size={13} strokeWidth={2.2} />
-          <span>Paragraphe</span>
-        </button>
-        <button
-          className={`editor-insert-line-btn dictation ${isInsertionPoint ? 'active' : ''}`}
-          onClick={handleInsertionClick}
-          title={isInsertionPoint ? "Annuler le point d'insertion" : 'Dicter à la suite de ce paragraphe'}
-        >
-          <IconMic size={13} strokeWidth={2} />
-          <span>{isInsertionPoint ? "Point d'insertion actif" : 'Dicter ici'}</span>
-        </button>
-      </div>
+      {/* Subtle insertion indicator when dragging or active */}
+      {isInsertionPoint && (
+        <div className="editor-insert-indicator active">
+          <span className="editor-insert-dot" />
+          <span className="editor-insert-text">Point d&apos;insertion de dictée</span>
+        </div>
+      )}
     </>
   );
 }

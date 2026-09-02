@@ -20,6 +20,7 @@ import EditorToolbar from './EditorToolbar';
 import ReviewPanel from './ReviewPanel';
 import NotesPanel from './NotesPanel';
 import RecordButton from './RecordButton';
+import UnifiedAudioDock from './UnifiedAudioDock';
 import {
   IconFeather,
   IconClose,
@@ -551,92 +552,17 @@ export default function AtelierPage() {
             onExportPdf={() => setIsPdfWizardOpen(true)}
           />
 
-          {/* Dictation Status Bar (Always visible during recording/processing) */}
-          {ds.phase !== 'idle' && (
-            <div className="dictation-status-bar">
-              {ds.phase === 'recording' && (
-                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <div className="dictation-status-indicator recording">
-                      <span className="recording-pulse-dot" />
-                      <span>Enregistrement en cours… {dictation.formatTime(ds.duration)} / 02:30</span>
-                    </div>
-                    <div className="dictation-status-actions">
-                      <button className="btn-dictation-control" onClick={dictation.pauseRecording}>
-                        <IconPause size={14} />
-                        <span>Pause</span>
-                      </button>
-                      <button className="btn-dictation-control primary" onClick={dictation.stopRecording}>
-                        <IconStop size={14} />
-                        <span>Terminer</span>
-                      </button>
-                      <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
-                        <IconClose size={14} />
-                        <span>Annuler</span>
-                      </button>
-                    </div>
-                  </div>
-                  {ds.interimText && (
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        background: 'var(--surface-2)',
-                        borderLeft: '3px solid var(--accent)',
-                        borderRadius: 4,
-                        fontSize: 13,
-                        fontStyle: 'italic',
-                        color: 'var(--text-soft)',
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: 'var(--accent)', marginRight: 6 }}>En direct :</span>
-                      « {ds.interimText} »
-                    </div>
-                  )}
-                </div>
-              )}
-              {ds.phase === 'paused' && (
-                <>
-                  <div className="dictation-status-indicator paused">
-                    <IconPause size={15} />
-                    <span>En pause ({dictation.formatTime(ds.duration)})</span>
-                  </div>
-                  <div className="dictation-status-actions">
-                    <button className="btn-dictation-control" onClick={dictation.resumeRecording}>
-                      <IconPlay size={14} />
-                      <span>Reprendre</span>
-                    </button>
-                    <button className="btn-dictation-control primary" onClick={dictation.stopRecording}>
-                      <IconStop size={14} />
-                      <span>Terminer</span>
-                    </button>
-                    <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
-                      <IconClose size={14} />
-                      <span>Annuler</span>
-                    </button>
-                  </div>
-                </>
-              )}
-              {ds.phase === 'processing' && (
-                <>
-                  <div className="dictation-status-indicator processing">
-                    <span className="processing-spinner" />
-                    <span>{ds.statusMessage || 'Transcription instantanée…'}</span>
-                  </div>
-                  <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
-                    <IconClose size={14} />
-                    <span>Annuler</span>
-                  </button>
-                </>
-              )}
-              {ds.phase === 'error' && (
-                <div className="dictation-status-indicator error">
-                  <IconAlertCircle size={15} />
-                  <span>{ds.error}</span>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Unified Floating Audio Dock (Zero Layout Shift) */}
+          <UnifiedAudioDock
+            phase={ds.phase}
+            duration={ds.duration}
+            interimText={ds.interimText || ''}
+            formatTime={dictation.formatTime}
+            onPause={dictation.pauseRecording}
+            onResume={dictation.resumeRecording}
+            onStop={dictation.stopRecording}
+            onCancel={dictation.cancelRecording}
+          />
 
           {/* Search bar */}
           {showSearch && (

@@ -132,12 +132,14 @@ export function normalizeChapterNotesAndSuperscripts(chapters: EditableChapter[]
       return { ...block, content };
     });
 
-    // Re-key notes array strictly as Note 1, Note 2, Note 3...
-    const updatedNotes: EditableNote[] = legacyKeysOrder.map((oldKey, idx) => {
+    // Re-key footnotes array strictly as Note 1, Note 2, Note 3...
+    const existingMarginNotes = ch.notes.filter((n) => n.category === 'margin');
+    const updatedFootnotes: EditableNote[] = legacyKeysOrder.map((oldKey, idx) => {
       const existingNote = ch.notes.find((n) => {
+        if (n.category === 'margin') return false;
         const num = n.key ? String(n.key).replace(/\D/g, '') : '';
         return num === oldKey;
-      }) || ch.notes[idx];
+      }) || ch.notes.filter((n) => n.category !== 'margin')[idx];
 
       const noteContent = existingNote ? existingNote.content : (NOTES[oldKey] || `Note ${idx + 1}`);
 
@@ -145,9 +147,12 @@ export function normalizeChapterNotesAndSuperscripts(chapters: EditableChapter[]
         id: existingNote ? existingNote.id : uid(),
         key: `Note ${idx + 1}`,
         content: noteContent,
+        category: 'footnote' as const,
         source: (existingNote ? existingNote.source : 'original') as 'manual' | 'ai' | 'original',
       };
     });
+
+    const updatedNotes: EditableNote[] = [...updatedFootnotes, ...existingMarginNotes];
 
     return {
       ...ch,
@@ -570,11 +575,14 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     case 'ADD_NOTE': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      const nextKey = `Note ${ch.notes.length + 1}`;
+      const category = action.category || 'footnote';
+      const footnoteCount = ch.notes.filter((n) => n.category !== 'margin').length;
+      const nextKey = category === 'margin' ? 'Pense-bête' : `Note ${footnoteCount + 1}`;
       const note: EditableNote = {
         id: uid(),
         key: nextKey,
         content: action.content,
+        category,
         source: 'manual',
         attachedToBlockId: action.attachedToBlockId,
       };
@@ -593,7 +601,9 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
       ch.notes = ch.notes.map((n) =>
-        n.id === action.noteId ? { ...n, content: action.content } : n
+        n.id === action.noteId
+          ? { ...n, content: action.content, ...(action.category ? { category: action.category } : {}) }
+          : n
       );
       chapters[action.chapterIndex] = ch;
       return {
@@ -619,11 +629,19 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       };
     }
 
-    // ── Review operations ──
+    // ── Review operations (Ratures & Polissage du Chapitre) ──
     case 'ADD_REVIEWS': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      ch.pendingReviews = [...ch.pendingReviews, ...action.reviews];
+      const existingPending = ch.pendingReviews.filter((r) => r.status === 'pending');
+      const resolved = ch.pendingReviews.filter((r) => r.status !== 'pending');
+
+      // Enforce strict chapter limit: Max 15 active pending suggestions per chapter
+      const remainingQuota = Math.max(0, 15 - existingPending.length);
+      const incoming = action.reviews.slice(0, remainingQuota > 0 ? remainingQuota : 15);
+      
+      const newPending = [...existingPending, ...incoming].slice(0, 15);
+      ch.pendingReviews = [...newPending, ...resolved.slice(-50)];
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -643,24 +661,40 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
         const target = review.original ? review.original.trim() : '';
         const suggestion = review.suggestion ? review.suggestion.trim() : '';
 
-        // 1. If it's a style rature with a suggested replacement, apply the text edit directly in blocks!
+        // 1. If it's a style rature with a suggested replacement, apply resilient replacement
         if (review.type === 'rature' && target && suggestion && target !== suggestion) {
           let replaced = false;
-          ch.blocks = ch.blocks.map((block) => {
-            if (!replaced && block.content.includes(target)) {
-              replaced = true;
-              return {
-                ...block,
-                content: block.content.replace(target, suggestion),
-              };
-            }
-            return block;
-          });
+
+          // Target specific block if attachedToBlockId is available
+          if (review.attachedToBlockId) {
+            ch.blocks = ch.blocks.map((block) => {
+              if (block.id === review.attachedToBlockId && block.content.includes(target)) {
+                replaced = true;
+                return { ...block, content: block.content.replace(target, suggestion) };
+              }
+              return block;
+            });
+          }
+
+          // Fallback: search across blocks
+          if (!replaced) {
+            ch.blocks = ch.blocks.map((block) => {
+              if (!replaced && block.content.includes(target)) {
+                replaced = true;
+                return {
+                  ...block,
+                  content: block.content.replace(target, suggestion),
+                };
+              }
+              return block;
+            });
+          }
         }
 
-        // 2. If it's a factual correction or has a source/footnote, attach note superscript
+        // 2. If it's a factual correction or has a source, attach footnote
         if (review.type === 'correction' || review.source) {
-          const targetNoteNum = ch.notes.length + 1;
+          const footnoteCount = ch.notes.filter((n) => n.category !== 'margin').length;
+          const targetNoteNum = footnoteCount + 1;
           const supChar = toSuperscript(targetNoteNum);
           let marked = false;
 
@@ -698,6 +732,7 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
                 id: uid(),
                 key: noteKey,
                 content: noteContent,
+                category: 'footnote',
                 source: 'ai',
               },
             ];
@@ -732,6 +767,59 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const pending = updatedReviews.filter((r) => r.status === 'pending');
       const resolved = updatedReviews.filter((r) => r.status !== 'pending');
       ch.pendingReviews = [...pending, ...resolved.slice(-50)];
+      chapters[action.chapterIndex] = ch;
+      return {
+        ...state,
+        chapters,
+        isDirty: true,
+        lastSaved: now,
+        saveStatus: 'saving',
+      };
+    }
+
+    case 'APPLY_ALL_REVIEWS': {
+      const chapters = [...state.chapters];
+      if (!chapters[action.chapterIndex]) return state;
+      const ch = { ...chapters[action.chapterIndex] };
+      const pending = ch.pendingReviews.filter((r) => r.status === 'pending');
+
+      // Sequentially apply all pending reviews
+      pending.forEach((review) => {
+        const target = review.original ? review.original.trim() : '';
+        const suggestion = review.suggestion ? review.suggestion.trim() : '';
+
+        if (review.type === 'rature' && target && suggestion && target !== suggestion) {
+          let replaced = false;
+          ch.blocks = ch.blocks.map((block) => {
+            if (!replaced && block.content.includes(target)) {
+              replaced = true;
+              return { ...block, content: block.content.replace(target, suggestion) };
+            }
+            return block;
+          });
+        }
+      });
+
+      ch.pendingReviews = ch.pendingReviews.map((r) =>
+        r.status === 'pending' ? { ...r, status: 'accepted' as const } : r
+      );
+      chapters[action.chapterIndex] = ch;
+      return {
+        ...state,
+        chapters,
+        isDirty: true,
+        lastSaved: now,
+        saveStatus: 'saving',
+      };
+    }
+
+    case 'REJECT_ALL_REVIEWS': {
+      const chapters = [...state.chapters];
+      if (!chapters[action.chapterIndex]) return state;
+      const ch = { ...chapters[action.chapterIndex] };
+      ch.pendingReviews = ch.pendingReviews.map((r) =>
+        r.status === 'pending' ? { ...r, status: 'rejected' as const } : r
+      );
       chapters[action.chapterIndex] = ch;
       return {
         ...state,

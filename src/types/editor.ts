@@ -14,8 +14,9 @@ export interface TextBlock {
 /** Note éditable */
 export interface EditableNote {
   id: string;
-  key: string; // numéro affiché (1, 2, 3...)
+  key: string; // numéro affiché (1, 2, 3...) ou titre court
   content: string;
+  category?: 'footnote' | 'margin'; // Note de bas de page numérotée vs Pense-bête
   source: 'original' | 'ai' | 'manual';
   attachedToBlockId?: string;
 }
@@ -28,6 +29,8 @@ export interface PendingReview {
   original: string;
   /** Suggestion de remplacement */
   suggestion: string;
+  /** Identifiant du bloc cible (pour remplacement résilient) */
+  attachedToBlockId?: string;
   /** Explication de l'IA */
   explanation?: string;
   /** Source/référence pour les corrections */
@@ -75,13 +78,15 @@ export type ManuscriptAction =
   | { type: 'MOVE_CHAPTER'; fromIndex: number; toIndex: number }
   | { type: 'SET_ACTIVE_CHAPTER'; index: number }
   // Notes
-  | { type: 'ADD_NOTE'; chapterIndex: number; content: string; attachedToBlockId?: string }
-  | { type: 'UPDATE_NOTE'; chapterIndex: number; noteId: string; content: string }
+  | { type: 'ADD_NOTE'; chapterIndex: number; content: string; category?: 'footnote' | 'margin'; attachedToBlockId?: string }
+  | { type: 'UPDATE_NOTE'; chapterIndex: number; noteId: string; content: string; category?: 'footnote' | 'margin' }
   | { type: 'DELETE_NOTE'; chapterIndex: number; noteId: string }
   // Reviews
   | { type: 'ADD_REVIEWS'; chapterIndex: number; reviews: PendingReview[] }
   | { type: 'ACCEPT_REVIEW'; chapterIndex: number; reviewId: string }
   | { type: 'REJECT_REVIEW'; chapterIndex: number; reviewId: string }
+  | { type: 'APPLY_ALL_REVIEWS'; chapterIndex: number }
+  | { type: 'REJECT_ALL_REVIEWS'; chapterIndex: number }
   | { type: 'CLEAR_ARCHIVED_REVIEWS'; chapterIndex: number }
   // Insertion point
   | { type: 'SET_INSERTION_POINT'; blockIndex: number | null }
