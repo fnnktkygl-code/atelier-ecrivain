@@ -77,7 +77,7 @@ export function normalizeAudioMimeType(mimeType: string): string {
 /**
  * Convert an audio Blob to base64 for Gemini
  */
-async function blobToBase64(blob: Blob): Promise<string> {
+export async function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -92,7 +92,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
 /**
  * Parse a JSON response from Gemini cleanly
  */
-function parseTranscriptionJSON(responseText: string): TranscriptionResult {
+export function parseTranscriptionJSON(responseText: string): TranscriptionResult {
   try {
     return JSON.parse(responseText) as TranscriptionResult;
   } catch {
@@ -110,7 +110,7 @@ function parseTranscriptionJSON(responseText: string): TranscriptionResult {
  * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error using AI Router.
  * Configured with thinkingBudget: 0 to eliminate the 30s+ reasoning delay on Gemini 2.5/3.7 models.
  */
-async function generateWithFallback<T>(
+export async function generateWithFallback<T>(
   generationConfig: Record<string, unknown>,
   systemInstruction: string | undefined,
   feature: FeatureId,
@@ -236,7 +236,7 @@ function checkRateLimit() {
 /**
  * Stage 1: Speech-To-Text transcription using dedicated transcribe model (gemini-3.5-transcribe / gemini-2.5-flash)
  */
-async function transcribeAudioToRawText(
+export async function transcribeAudioToRawText(
   audioBase64: string,
   mimeType: string,
   contextPrompt?: string
@@ -278,7 +278,7 @@ async function transcribeAudioToRawText(
 /**
  * Stage 2: Literary text structuring and analysis (gemini-3.7-flash / gemini-2.5-flash)
  */
-async function structureTranscriptText(
+export async function structureTranscriptText(
   rawText: string,
   context?: { currentChapter?: number; previousContent?: string }
 ): Promise<{ result: TranscriptionResult; modelUsed: string }> {

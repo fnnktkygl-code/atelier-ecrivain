@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useManuscript } from '@/hooks/useManuscript';
 import { useDictation } from '@/hooks/useDictation';
 import { useSpeech } from '@/hooks/useSpeech';
@@ -162,30 +162,45 @@ export default function AtelierPage() {
     }
   }, [ds.phase, dictation]);
 
-  // When dictation completes, insert results into the manuscript
+  const insertedJetBrutKeyRef = useRef<string | null>(null);
+  const insertedReviewsKeyRef = useRef<string | null>(null);
+
+  // Reset tracking when starting a new recording or returning to idle
+  useEffect(() => {
+    if (ds.phase === 'idle' || ds.phase === 'recording') {
+      insertedJetBrutKeyRef.current = null;
+      insertedReviewsKeyRef.current = null;
+    }
+  }, [ds.phase]);
+
+  // When dictation completes or receives results, insert into the manuscript
   useEffect(() => {
     if (ds.phase !== 'complete' || !ds.result) return;
 
-    // Insert dictated text blocks
+    // 1. Insert dictated text blocks immediately (only once per dictation session)
     if (ds.result.jetBrut && ds.result.jetBrut.length > 0) {
-      const newBlocks: TextBlock[] = ds.result.jetBrut.map((text) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        content: text,
-        type: 'paragraph' as const,
-        source: 'dictation' as const,
-        createdAt: Date.now(),
-      }));
+      const jetBrutKey = ds.result.jetBrut.join(':::');
+      if (insertedJetBrutKeyRef.current !== jetBrutKey) {
+        insertedJetBrutKeyRef.current = jetBrutKey;
+        const newBlocks: TextBlock[] = ds.result.jetBrut.map((text) => ({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          content: text,
+          type: 'paragraph' as const,
+          source: 'dictation' as const,
+          createdAt: Date.now(),
+        }));
 
-      dispatch({
-        type: 'INSERT_DICTATION',
-        chapterIndex: ms.activeChapterIndex,
-        afterBlockIndex: ms.insertionPoint,
-        blocks: newBlocks,
-      });
-      showFeedback('Texte dicté intégré avec succès dans le manuscrit.');
+        dispatch({
+          type: 'INSERT_DICTATION',
+          chapterIndex: ms.activeChapterIndex,
+          afterBlockIndex: ms.insertionPoint,
+          blocks: newBlocks,
+        });
+        showFeedback('Texte dicté intégré immédiatement dans le manuscrit.');
+      }
     }
 
-    // Add ratures + corrections as pending reviews
+    // 2. Add ratures + corrections as pending reviews (when available from background analysis)
     const reviews: PendingReview[] = [];
 
     if (ds.result.ratures && ds.result.ratures.length > 0) {
@@ -217,11 +232,15 @@ export default function AtelierPage() {
     }
 
     if (reviews.length > 0) {
-      dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
-      setTimeout(() => setIsReviewOpen(true), 0);
+      const reviewsKey = reviews.map((r) => r.original + (r.suggestion || '')).join(':::');
+      if (insertedReviewsKeyRef.current !== reviewsKey) {
+        insertedReviewsKeyRef.current = reviewsKey;
+        dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
+        setTimeout(() => setIsReviewOpen(true), 0);
+      }
     }
 
-    // Add AI-generated notes
+    // 3. Add AI-generated notes
     if (ds.result.notes) {
       Object.entries(ds.result.notes).forEach(([, content]) => {
         dispatch({
@@ -231,8 +250,7 @@ export default function AtelierPage() {
         });
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ds.phase]);
+  }, [ds.phase, ds.result, ds.corrections, dispatch, ms.activeChapterIndex, ms.insertionPoint, showFeedback]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -315,7 +333,10 @@ export default function AtelierPage() {
             phase={ds.phase}
             level={ds.level}
             time={dictation.formatTime(ds.duration)}
+            duration={ds.duration}
+            maxDuration={150}
             statusMessage={ds.statusMessage}
+            isAnalyzingInBackground={ds.isAnalyzingInBackground}
             onStart={dictation.startRecording}
             onStop={dictation.stopRecording}
             onPause={dictation.pauseRecording}
@@ -366,26 +387,45 @@ export default function AtelierPage() {
           {ds.phase !== 'idle' && (
             <div className="dictation-status-bar">
               {ds.phase === 'recording' && (
-                <>
-                  <div className="dictation-status-indicator recording">
-                    <span className="recording-pulse-dot" />
-                    <span>Enregistrement en cours… {dictation.formatTime(ds.duration)}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div className="dictation-status-indicator recording">
+                      <span className="recording-pulse-dot" />
+                      <span>Enregistrement en cours… {dictation.formatTime(ds.duration)} / 02:30</span>
+                    </div>
+                    <div className="dictation-status-actions">
+                      <button className="btn-dictation-control" onClick={dictation.pauseRecording}>
+                        <IconPause size={14} />
+                        <span>Pause</span>
+                      </button>
+                      <button className="btn-dictation-control primary" onClick={dictation.stopRecording}>
+                        <IconStop size={14} />
+                        <span>Terminer</span>
+                      </button>
+                      <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
+                        <IconClose size={14} />
+                        <span>Annuler</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="dictation-status-actions">
-                    <button className="btn-dictation-control" onClick={dictation.pauseRecording}>
-                      <IconPause size={14} />
-                      <span>Pause</span>
-                    </button>
-                    <button className="btn-dictation-control primary" onClick={dictation.stopRecording}>
-                      <IconStop size={14} />
-                      <span>Terminer</span>
-                    </button>
-                    <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
-                      <IconClose size={14} />
-                      <span>Annuler</span>
-                    </button>
-                  </div>
-                </>
+                  {ds.interimText && (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        background: 'var(--surface-2)',
+                        borderLeft: '3px solid var(--accent)',
+                        borderRadius: 4,
+                        fontSize: 13,
+                        fontStyle: 'italic',
+                        color: 'var(--text-soft)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, color: 'var(--accent)', marginRight: 6 }}>En direct :</span>
+                      « {ds.interimText} »
+                    </div>
+                  )}
+                </div>
               )}
               {ds.phase === 'paused' && (
                 <>
@@ -413,7 +453,7 @@ export default function AtelierPage() {
                 <>
                   <div className="dictation-status-indicator processing">
                     <span className="processing-spinner" />
-                    <span>{ds.statusMessage || 'Gemini transcrit et structure la dictée…'}</span>
+                    <span>{ds.statusMessage || 'Transcription instantanée…'}</span>
                   </div>
                   <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
                     <IconClose size={14} />

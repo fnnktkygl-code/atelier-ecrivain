@@ -8,6 +8,7 @@ export interface RecorderState {
   isPaused: boolean;
   duration: number; // seconds
   level: number; // 0-1 audio level
+  maxDuration: number; // seconds (default 150s = 2min30)
 }
 
 export interface RecorderCallbacks {
@@ -26,15 +27,19 @@ export class AudioRecorder {
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private levelInterval: ReturnType<typeof setInterval> | null = null;
   private callbacks: RecorderCallbacks;
-  private state: RecorderState = {
-    isRecording: false,
-    isPaused: false,
-    duration: 0,
-    level: 0,
-  };
+  public readonly maxDuration: number;
+  private state: RecorderState;
 
-  constructor(callbacks: RecorderCallbacks) {
+  constructor(callbacks: RecorderCallbacks, maxDuration: number = 150) {
     this.callbacks = callbacks;
+    this.maxDuration = maxDuration;
+    this.state = {
+      isRecording: false,
+      isPaused: false,
+      duration: 0,
+      level: 0,
+      maxDuration: this.maxDuration,
+    };
   }
 
   async start(): Promise<void> {
@@ -91,8 +96,14 @@ export class AudioRecorder {
       // Timer
       this.timerInterval = setInterval(() => {
         if (!this.state.isPaused) {
-          this.state.duration = Math.floor((Date.now() - this.startTime) / 1000);
+          const currentDuration = Math.floor((Date.now() - this.startTime) / 1000);
+          this.state.duration = currentDuration;
           this.emitState();
+
+          if (currentDuration >= this.maxDuration) {
+            console.log('[AudioRecorder] Durée maximale atteinte (150s), finalisation automatique...');
+            this.stop();
+          }
         }
       }, 1000);
 
@@ -107,7 +118,7 @@ export class AudioRecorder {
         }
       }, 100);
 
-      this.state = { isRecording: true, isPaused: false, duration: 0, level: 0 };
+      this.state = { isRecording: true, isPaused: false, duration: 0, level: 0, maxDuration: this.maxDuration };
       this.emitState();
     } catch (err) {
       const msg =
@@ -166,7 +177,7 @@ export class AudioRecorder {
     this.stream = null;
     this.analyser = null;
     this.audioContext = null;
-    this.state = { isRecording: false, isPaused: false, duration: 0, level: 0 };
+    this.state = { isRecording: false, isPaused: false, duration: 0, level: 0, maxDuration: this.maxDuration };
   }
 
   private emitState(): void {

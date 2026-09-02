@@ -15,7 +15,10 @@ interface RecordButtonProps {
   phase: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
   level: number; // 0-1 audio level
   time: string;
+  duration?: number;
+  maxDuration?: number;
   statusMessage?: string;
+  isAnalyzingInBackground?: boolean;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -29,7 +32,10 @@ export default function RecordButton({
   phase,
   level,
   time,
+  duration = 0,
+  maxDuration = 150,
   statusMessage,
+  isAnalyzingInBackground = false,
   onStart,
   onPause,
   onResume,
@@ -40,6 +46,8 @@ export default function RecordButton({
 }: RecordButtonProps) {
   const isActive = phase === 'recording' || phase === 'paused';
   const ringScale = 1 + level * 0.35;
+  const progressRatio = maxDuration > 0 ? Math.min(1, duration / maxDuration) : 0;
+  const isNearLimit = duration >= 120;
 
   // Idle / Complete / Error — Sleek Compact Bar
   if (!isActive && phase !== 'processing') {
@@ -56,7 +64,12 @@ export default function RecordButton({
         </div>
         <div className="record-text-compact">
           <span className="record-title-compact">
-            {phase === 'complete' ? (
+            {isAnalyzingInBackground ? (
+              <span className="record-status-processing" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--accent)' }}>
+                <span className="processing-spinner mini" style={{ width: 11, height: 11 }} />
+                <span>Perfectionnement stylistique…</span>
+              </span>
+            ) : phase === 'complete' ? (
               <span className="record-status-success">
                 <IconCheck size={13} strokeWidth={2.5} />
                 <span>Texte inséré</span>
@@ -67,11 +80,15 @@ export default function RecordButton({
                 <span>Erreur</span>
               </span>
             ) : (
-              'Dictée vocale Gemini'
+              'Dictée vocale instantanée'
             )}
           </span>
           <span className="record-sub-compact">
-            {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : error || 'Appuyez pour dicter'}
+            {isAnalyzingInBackground
+              ? 'Gemini 3.7 analyse les ratures en arrière-plan'
+              : phase === 'complete'
+              ? 'Cliquez pour dicter la suite'
+              : error || 'Appuyez pour dicter (max 2min30)'}
           </span>
         </div>
         <div className="record-controls-compact">
@@ -125,8 +142,15 @@ export default function RecordButton({
         )}
       </button>
 
-      {/* Timer */}
-      {isActive && <div className="record-timer">{time}</div>}
+      {/* Timer with progress limit */}
+      {isActive && (
+        <div className="record-timer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>{time}</span>
+          <span style={{ fontSize: 11, color: isNearLimit ? 'var(--japandi-terracotta)' : 'var(--text-soft)', fontWeight: 500 }}>
+            / 02:30
+          </span>
+        </div>
+      )}
 
       {/* Status text */}
       <div className={`record-status ${isActive ? 'active' : ''}`}>
