@@ -222,12 +222,12 @@ export default function EditorToolbar({
               </button>
             </Tooltip>
             {onAnalyzeText && (
-              <Tooltip content="Analyser le texte au clavier (Ratures, Fact-check & Notes IA)">
+              <Tooltip content={`Analyser tout le chapitre (${wordCount} mots) — Ratures & Style`}>
                 <button
                   className={`btn-icon ${isAnalyzingText ? 'analyzing-active' : ''}`}
                   onClick={onAnalyzeText}
                   disabled={isAnalyzingText}
-                  aria-label="Analyser le texte par IA"
+                  aria-label="Analyser tout le chapitre par IA"
                 >
                   <IconSparkles size={16} strokeWidth={2} />
                 </button>

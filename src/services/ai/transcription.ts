@@ -192,12 +192,15 @@ export async function generateWithFallback<T>(
       lastError = err;
       const errMsg = err instanceof Error ? err.message : String(err);
 
-      // If model is not found in Google AI Studio, record in unavailable cache
+      // If model is not found or overloaded in Google AI Studio, record in unavailable cache
       if (
         errMsg.includes('404') ||
         errMsg.includes('is not found') ||
         errMsg.includes('NotFound') ||
-        errMsg.includes('not supported')
+        errMsg.includes('not supported') ||
+        errMsg.includes('503') ||
+        errMsg.includes('Service Unavailable') ||
+        errMsg.includes('high demand')
       ) {
         unavailableModels.add(modelName);
       }
@@ -537,4 +540,74 @@ export function toAIStructuredOutput(result: TranscriptionResult): AIStructuredO
     notes: result.notes,
     floatingNotes: result.floatingNotes,
   };
+}
+
+/**
+ * Targeted block analysis — analyzes a single paragraph/block specifically
+ */
+export async function analyzeBlockText(
+  blockContent: string,
+  context?: { currentChapter?: number; blockIndex?: number }
+): Promise<TranscriptionResult> {
+  if (!isGeminiConfigured()) {
+    throw new Error("Clé Gemini AI Studio non configurée.");
+  }
+  checkRateLimit();
+  recordApiRequest();
+
+  let contextPrompt = `Analyse et perfectionne ce paragraphe précis du manuscrit. Détecte les ratures stylistiques, élimine les répétitions et lourdeurs, vérifie les faits et propose des notes si nécessaire :\n\n« ${blockContent} »`;
+  if (context?.currentChapter !== undefined) {
+    contextPrompt += `\nChapitre en cours : Chapitre ${context.currentChapter + 1}.`;
+  }
+
+  const { result, modelUsed } = await generateWithFallback(
+    {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 4096,
+    },
+    SYSTEM_PROMPT_TRANSCRIPTION,
+    'text-analysis',
+    async (model, modelName) => {
+      const resp = await model.generateContent(contextPrompt);
+      const text = resp.response.text();
+      return parseTranscriptionJSON(text);
+    }
+  );
+
+  return { ...result, modelUsed };
+}
+
+/**
+ * Targeted selection analysis — analyzes a highlighted phrase or sentence (Notion style)
+ */
+export async function analyzeSelectionText(
+  selectedText: string,
+  context?: { currentChapter?: number; surroundingText?: string }
+): Promise<TranscriptionResult> {
+  if (!isGeminiConfigured()) {
+    throw new Error("Clé Gemini AI Studio non configurée.");
+  }
+  checkRateLimit();
+  recordApiRequest();
+
+  let contextPrompt = `Analyse et perfectionne cette sélection précise de texte (extrait de phrase ou proposition). Propose des ratures pour un style plus élégant et fluide, ou vérifie la citation :\n\nExtrait sélectionné : « ${selectedText} »`;
+  if (context?.surroundingText) {
+    contextPrompt += `\nContexte immédiat du paragraphe : « ${context.surroundingText.slice(0, 300)} »`;
+  }
+
+  const { result, modelUsed } = await generateWithFallback(
+    {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 2048,
+    },
+    SYSTEM_PROMPT_TRANSCRIPTION,
+    'text-analysis',
+    async (model, modelName) => {
+      const resp = await model.generateContent(contextPrompt);
+      const text = resp.response.text();
+      return parseTranscriptionJSON(text);
+    }
+  );
+
+  return { ...result, modelUsed };
 }

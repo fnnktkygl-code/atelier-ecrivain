@@ -12,7 +12,7 @@ import { useDictation } from '@/hooks/useDictation';
 import { useSpeech } from '@/hooks/useSpeech';
 import type { TextBlock, PendingReview } from '@/types/editor';
 import { ExportWizard } from '@/features/export/components/ExportWizard';
-import { analyzeWrittenText } from '@/services/ai/transcription';
+import { analyzeWrittenText, analyzeBlockText, analyzeSelectionText } from '@/services/ai/transcription';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import ChapterList from './ChapterList';
 import Editor from './Editor';
@@ -48,6 +48,7 @@ export default function AtelierPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [isPdfWizardOpen, setIsPdfWizardOpen] = useState(false);
   const [isAnalyzingText, setIsAnalyzingText] = useState(false);
+  const [analyzingBlockId, setAnalyzingBlockId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const showFeedback = (msg: string) => {
@@ -68,7 +69,164 @@ export default function AtelierPage() {
     }
   }, [speech, activeChapter]);
 
-  // Analyze text typed directly via keyboard
+  // Analyze specific single block
+  const handleAnalyzeBlock = useCallback(
+    async (blockId: string, content: string) => {
+      if (!content.trim()) return;
+      setAnalyzingBlockId(blockId);
+      showFeedback('Analyse de ce paragraphe en cours (Gemini 3.6 Flash)…');
+
+      try {
+        const res = await analyzeBlockText(content, { currentChapter: ms.activeChapterIndex });
+        const reviews: PendingReview[] = [];
+
+        if (res.ratures && res.ratures.length > 0) {
+          res.ratures.forEach((r) => {
+            const origText = typeof r === 'string' ? r : (r.original || r.corrected || '');
+            const suggText = typeof r === 'string' ? r : (r.corrected || r.original || '');
+            reviews.push({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              type: 'rature',
+              original: origText,
+              suggestion: suggText,
+              explanation: typeof r === 'string' ? undefined : r.explanation,
+              status: 'pending',
+            });
+          });
+        }
+
+        if (res.corrections && res.corrections.length > 0) {
+          res.corrections.forEach((c) => {
+            reviews.push({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              type: 'correction',
+              original: c.text,
+              suggestion: c.suggestion || '',
+              source: c.source,
+              explanation: c.status === 'confirmed' ? 'Vérifié' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
+              status: 'pending',
+            });
+          });
+        }
+
+        if (reviews.length > 0) {
+          dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
+          setIsReviewOpen(true);
+          showFeedback(`Paragraphe analysé : ${reviews.length} suggestion(s) de rature(s) prête(s).`);
+        } else {
+          showFeedback('Paragraphe analysé : Le style est fluide, aucune rature nécessaire.');
+        }
+
+        if (res.notes) {
+          Object.entries(res.notes).forEach(([, noteContent]) => {
+            dispatch({
+              type: 'ADD_NOTE',
+              chapterIndex: ms.activeChapterIndex,
+              content: noteContent,
+            });
+          });
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        showFeedback(`Erreur d'analyse : ${errMsg}`);
+      } finally {
+        setAnalyzingBlockId(null);
+      }
+    },
+    [ms.activeChapterIndex, dispatch]
+  );
+
+  // Analyze highlighted text selection (Notion Style)
+  const handleAnalyzeSelection = useCallback(
+    async (selectedText: string) => {
+      if (!selectedText.trim()) return;
+      setAnalyzingBlockId('selection');
+      showFeedback('Analyse de la sélection en cours (Gemini 3.6 Flash)…');
+
+      try {
+        const res = await analyzeSelectionText(selectedText, { currentChapter: ms.activeChapterIndex });
+        const reviews: PendingReview[] = [];
+
+        if (res.ratures && res.ratures.length > 0) {
+          res.ratures.forEach((r) => {
+            const origText = typeof r === 'string' ? r : (r.original || r.corrected || '');
+            const suggText = typeof r === 'string' ? r : (r.corrected || r.original || '');
+            reviews.push({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              type: 'rature',
+              original: origText,
+              suggestion: suggText,
+              explanation: typeof r === 'string' ? undefined : r.explanation,
+              status: 'pending',
+            });
+          });
+        }
+
+        if (reviews.length > 0) {
+          dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
+          setIsReviewOpen(true);
+          showFeedback(`Sélection analysée : ${reviews.length} suggestion(s) de rature(s).`);
+        } else {
+          showFeedback('Sélection analysée : Style fluide, aucune rature requise.');
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        showFeedback(`Erreur d'analyse : ${errMsg}`);
+      } finally {
+        setAnalyzingBlockId(null);
+      }
+    },
+    [ms.activeChapterIndex, dispatch]
+  );
+
+  const handleFactCheckSelection = useCallback(
+    async (selectedText: string) => {
+      if (!selectedText.trim()) return;
+      setAnalyzingBlockId('selection');
+      showFeedback('Vérification factuelle de la sélection…');
+      try {
+        const res = await analyzeSelectionText(selectedText, { currentChapter: ms.activeChapterIndex });
+        if (res.corrections && res.corrections.length > 0) {
+          const reviews: PendingReview[] = res.corrections.map((c) => ({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: 'correction',
+            original: c.text,
+            suggestion: c.suggestion || '',
+            source: c.source,
+            explanation: c.status === 'confirmed' ? 'Vérifié' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
+            status: 'pending',
+          }));
+          dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
+          setIsReviewOpen(true);
+          showFeedback(`Vérification : ${reviews.length} élément(s) vérifié(s).`);
+        } else {
+          showFeedback('Vérification : Aucune anomalie factuelle détectée.');
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        showFeedback(`Erreur : ${errMsg}`);
+      } finally {
+        setAnalyzingBlockId(null);
+      }
+    },
+    [ms.activeChapterIndex, dispatch]
+  );
+
+  const handleCreateNoteFromSelection = useCallback(
+    (selectedText: string) => {
+      if (!selectedText.trim()) return;
+      dispatch({
+        type: 'ADD_NOTE',
+        chapterIndex: ms.activeChapterIndex,
+        content: `Note sur : « ${selectedText.slice(0, 100)}${selectedText.length > 100 ? '…' : ''} »`,
+      });
+      setIsNotesOpen(true);
+      showFeedback('Note créée à partir de la sélection.');
+    },
+    [ms.activeChapterIndex, dispatch]
+  );
+
+  // Analyze entire chapter
   const handleAnalyzeWrittenText = useCallback(async () => {
     const chapterContent = activeChapter?.blocks.map((b) => b.content).join('\n\n') || '';
     if (!chapterContent.trim()) {
@@ -77,7 +235,7 @@ export default function AtelierPage() {
     }
 
     setIsAnalyzingText(true);
-    showFeedback('Analyse stylistique & ratures en cours (Gemini 3.6 Flash)…');
+    showFeedback('Analyse globale du chapitre en cours (Gemini 3.6 Flash)…');
 
     try {
       const res = await analyzeWrittenText(chapterContent, { currentChapter: ms.activeChapterIndex });
@@ -516,6 +674,11 @@ export default function AtelierPage() {
                 focusMode={isFocusMode}
                 onStartDictation={dictation.startRecording}
                 dictationPhase={ds.phase}
+                onAnalyzeBlock={handleAnalyzeBlock}
+                analyzingBlockId={analyzingBlockId}
+                onAnalyzeSelection={handleAnalyzeSelection}
+                onFactCheckSelection={handleFactCheckSelection}
+                onCreateNoteFromSelection={handleCreateNoteFromSelection}
               />
             ) : (
               <div className="atelier-empty-state">

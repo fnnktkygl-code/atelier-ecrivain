@@ -9,7 +9,7 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type { TextBlock } from '@/types/editor';
-import { IconMic, IconPlus, IconClose, IconDragHandle } from '@/components/Shared/Icons';
+import { IconMic, IconPlus, IconClose, IconDragHandle, IconSparkles } from '@/components/Shared/Icons';
 
 interface EditorBlockProps {
   block: TextBlock;
@@ -25,6 +25,8 @@ interface EditorBlockProps {
   onInsertAfter: (blockId: string) => void;
   onSetInsertionPoint: (blockIndex: number | null) => void;
   onStartDictation?: () => void;
+  onAnalyzeBlock?: (blockId: string, content: string) => void;
+  isAnalyzingBlock?: boolean;
   onFocus: (blockId: string) => void;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
@@ -47,6 +49,8 @@ export default function EditorBlock({
   onInsertAfter,
   onSetInsertionPoint,
   onStartDictation,
+  onAnalyzeBlock,
+  isAnalyzingBlock = false,
   onFocus,
   onDragStart,
   onDragOver,
@@ -152,13 +156,18 @@ export default function EditorBlock({
           <IconDragHandle size={14} />
         </div>
 
-        {/* Source badge */}
-        {block.source === 'dictation' && (
+        {/* Source / Analysis badge */}
+        {isAnalyzingBlock ? (
+          <span className="editor-block-source analyzing">
+            <IconSparkles size={12} strokeWidth={2} />
+            <span>Analyse en cours…</span>
+          </span>
+        ) : block.source === 'dictation' ? (
           <span className="editor-block-source">
             <IconMic size={12} strokeWidth={2} />
             <span>Dictée</span>
           </span>
-        )}
+        ) : null}
 
         {/* Editable content */}
         <div
@@ -175,8 +184,19 @@ export default function EditorBlock({
         />
 
         {/* Actions (visible on hover or focus) */}
-        {(isHovered || isFocused) && (
+        {(isHovered || isFocused || isAnalyzingBlock) && (
           <div className="editor-block-actions">
+            {onAnalyzeBlock && block.content.trim().length > 3 && (
+              <button
+                className={`editor-block-action-btn analyze-block-btn ${isAnalyzingBlock ? 'loading' : ''}`}
+                onClick={() => onAnalyzeBlock(block.id, block.content)}
+                disabled={isAnalyzingBlock}
+                title="Analyser ce paragraphe précis (Style, Ratures, Fact-check)"
+              >
+                <IconSparkles size={13} strokeWidth={2} />
+                <span>{isAnalyzingBlock ? 'Analyse…' : 'Analyser ce bloc'}</span>
+              </button>
+            )}
             {onStartDictation && (
               <button
                 className="editor-block-action-btn dictation-block-btn"

@@ -6,9 +6,10 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { EditableChapter, ManuscriptAction } from '@/types/editor';
 import EditorBlock from './EditorBlock';
+import FloatingSelectionMenu from './FloatingSelectionMenu';
 import { IconFeather, IconMic } from '@/components/Shared/Icons';
 
 interface EditorProps {
@@ -20,6 +21,11 @@ interface EditorProps {
   focusMode?: boolean;
   onStartDictation?: () => void;
   dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
+  onAnalyzeBlock?: (blockId: string, content: string) => void;
+  analyzingBlockId?: string | null;
+  onAnalyzeSelection?: (text: string) => void;
+  onFactCheckSelection?: (text: string) => void;
+  onCreateNoteFromSelection?: (text: string) => void;
 }
 
 export default function Editor({
@@ -31,10 +37,57 @@ export default function Editor({
   focusMode = false,
   onStartDictation,
   dictationPhase = 'idle',
+  onAnalyzeBlock,
+  analyzingBlockId = null,
+  onAnalyzeSelection,
+  onFactCheckSelection,
+  onCreateNoteFromSelection,
 }: EditorProps) {
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [selectionMenu, setSelectionMenu] = useState<{
+    position: { top: number; left: number } | null;
+    text: string;
+  }>({ position: null, text: '' });
+
+  // Detect text selection inside editor blocks for the Notion-style floating toolbar
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+        setSelectionMenu({ position: null, text: '' });
+        return;
+      }
+      const text = sel.toString().trim();
+      if (text.length < 3) {
+        setSelectionMenu({ position: null, text: '' });
+        return;
+      }
+      const anchorNode = sel.anchorNode;
+      if (!anchorNode) return;
+      const parentElem = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
+      if (!parentElem || !parentElem.closest('.editor-block-content')) {
+        setSelectionMenu({ position: null, text: '' });
+        return;
+      }
+
+      if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectionMenu({
+          position: {
+            top: rect.top,
+            left: rect.left + rect.width / 2,
+          },
+          text,
+        });
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
 
   const handleUpdate = useCallback(
     (blockId: string, content: string) => {
@@ -144,6 +197,19 @@ export default function Editor({
 
   return (
     <div className="editor-blocks">
+      {/* Floating Selection Menu (Notion Style) */}
+      {selectionMenu.position && (
+        <FloatingSelectionMenu
+          position={selectionMenu.position}
+          selectedText={selectionMenu.text}
+          onAnalyzeStyle={(text) => onAnalyzeSelection?.(text)}
+          onFactCheck={(text) => onFactCheckSelection?.(text)}
+          onCreateNote={(text) => onCreateNoteFromSelection?.(text)}
+          onClose={() => setSelectionMenu({ position: null, text: '' })}
+          isAnalyzing={analyzingBlockId === 'selection'}
+        />
+      )}
+
       {chapter.blocks.map((block, i) => (
         <EditorBlock
           key={block.id}
@@ -160,6 +226,8 @@ export default function Editor({
           onInsertAfter={handleInsertAfter}
           onSetInsertionPoint={handleSetInsertionPoint}
           onStartDictation={onStartDictation}
+          onAnalyzeBlock={onAnalyzeBlock}
+          isAnalyzingBlock={analyzingBlockId === block.id}
           onFocus={handleFocus}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
