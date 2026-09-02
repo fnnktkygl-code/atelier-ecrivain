@@ -242,13 +242,15 @@ function getStoredReaderChapters(currentManuscriptId: string): FormattedReaderCh
       const keysToScan: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('atelier-manuscrit')) {
+        if (k && (k.startsWith('atelier_manuscript_') || k.startsWith('atelier-manuscrit'))) {
           keysToScan.push(k);
         }
       }
       const explicitKeys = [
+        `atelier_manuscript_${currentManuscriptId}`,
         `atelier-manuscrit-v4-${currentManuscriptId}`,
         `atelier-manuscrit-${currentManuscriptId}`,
+        'atelier_manuscript_default',
         'atelier-manuscrit-default',
         'atelier-manuscrit-v1',
       ];

@@ -852,3 +852,84 @@ export function IconBookmark({ size = 18, strokeWidth = 1.75, className, ...prop
     </svg>
   );
 }
+
+export function IconCloud({ size = 18, strokeWidth = 1.75, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+    </svg>
+  );
+}
+
+export function IconCloudCheck({ size = 18, strokeWidth = 1.75, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M12 20H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 0 1 3.5 7" />
+      <polyline points="16 16 19 19 23 14" />
+    </svg>
+  );
+}
+
+export function IconCloudUpload({ size = 18, strokeWidth = 1.75, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+      <polyline points="12 12 12 16" />
+      <polyline points="9 14 12 11 15 14" />
+    </svg>
+  );
+}
+
+export function IconCloudOff({ size = 18, strokeWidth = 1.75, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="m2 2 20 20" />
+      <path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.52-.26" />
+      <path d="M21.5 15.5A4.5 4.5 0 0 0 17.5 11h-1.79A7.008 7.008 0 0 0 10 5.07" />
+    </svg>
+  );
+}

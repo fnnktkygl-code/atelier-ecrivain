@@ -32,9 +32,9 @@ import {
 } from '@/components/Shared/Icons';
 
 export default function AtelierPage() {
-  const { manuscript: activeManuscript } = useAuth();
+  const { user, manuscript: activeManuscript } = useAuth();
   const manuscript = useManuscript();
-  const { state: ms, activeChapter, dispatch, wordCount, totalWordCount, pendingReviewCount } = manuscript;
+  const { state: ms, activeChapter, dispatch, wordCount, totalWordCount, pendingReviewCount, saveStatus, forceSave } = manuscript;
 
   const dictation = useDictation(ms.activeChapterIndex);
   const { state: ds } = dictation;
@@ -360,6 +360,10 @@ export default function AtelierPage() {
             canRedo={manuscript.canRedo}
             isDirty={ms.isDirty}
             lastSaved={ms.lastSaved}
+            lastCloudSync={ms.lastCloudSync}
+            saveStatus={saveStatus}
+            isCloudConnected={!!user}
+            onForceSave={forceSave}
             pendingReviewCount={pendingReviewCount}
             noteCount={activeChapter?.notes.length || 0}
             isReviewOpen={isReviewOpen}

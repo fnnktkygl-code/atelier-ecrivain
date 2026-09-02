@@ -44,6 +44,8 @@ export interface EditableChapter {
   pendingReviews: PendingReview[];
 }
 
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'syncing' | 'synced' | 'offline' | 'error';
+
 /** État complet du manuscrit */
 export interface ManuscriptState {
   chapters: EditableChapter[];
@@ -51,7 +53,9 @@ export interface ManuscriptState {
   /** Index du bloc après lequel insérer la dictée (null = fin) */
   insertionPoint: number | null;
   isDirty: boolean;
-  lastSaved: number | null; // timestamp
+  lastSaved: number | null; // timestamp de sauvegarde locale
+  lastCloudSync?: number | null; // timestamp de dernière synchronisation Firestore
+  saveStatus?: SaveStatus;
 }
 
 /** Actions possibles sur le manuscrit */
@@ -81,5 +85,7 @@ export type ManuscriptAction =
   // Insertion point
   | { type: 'SET_INSERTION_POINT'; blockIndex: number | null }
   // Persistence
-  | { type: 'MARK_SAVED' }
+  | { type: 'MARK_SAVED'; timestamp?: number }
+  | { type: 'MARK_CLOUD_SYNCED'; timestamp?: number }
+  | { type: 'SET_SAVE_STATUS'; status: SaveStatus }
   | { type: 'LOAD_STATE'; state: ManuscriptState };

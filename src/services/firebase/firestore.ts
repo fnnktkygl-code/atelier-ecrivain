@@ -88,6 +88,34 @@ export async function getChapters(uid: string, manuscriptId: string): Promise<Ch
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
 }
 
+export function toTimestampMillis(val: unknown): number {
+  if (!val) return 0;
+  if (typeof val === 'number') return val;
+  if (val instanceof Date) return val.getTime();
+  if (
+    typeof val === 'object' &&
+    'toMillis' in val &&
+    typeof (val as { toMillis: () => number }).toMillis === 'function'
+  ) {
+    return (val as { toMillis: () => number }).toMillis();
+  }
+  if (typeof val === 'object' && 'seconds' in val) {
+    return (val as { seconds: number }).seconds * 1000;
+  }
+  if (typeof val === 'string') {
+    const d = new Date(val).getTime();
+    return isNaN(d) ? 0 : d;
+  }
+  return 0;
+}
+
+export async function getManuscriptMeta(uid: string, manuscriptId: string): Promise<ManuscriptMeta | null> {
+  const db = getDb();
+  const snap = await getDoc(doc(db, 'users', uid, 'manuscripts', manuscriptId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as ManuscriptMeta;
+}
+
 export async function saveChapter(uid: string, manuscriptId: string, chapterId: string, chapter: ChapterData): Promise<void> {
   const db = getDb();
   const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', chapterId);
@@ -100,7 +128,7 @@ export async function saveChapter(uid: string, manuscriptId: string, chapterId: 
 export async function saveAllChapters(
   uid: string,
   manuscriptId: string,
-  chapters: { id?: string; title: string; blocks: { content: string }[]; notes?: unknown[]; pendingReviews?: unknown[] }[]
+  chapters: { id?: string; title: string; blocks: { id?: string; content: string; type?: string; source?: string }[]; notes?: unknown[]; pendingReviews?: unknown[] }[]
 ): Promise<void> {
   const db = getDb();
   const chaptersCol = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
@@ -127,7 +155,9 @@ export async function saveAllChapters(
       existing.title !== ch.title ||
       existing.order !== idx ||
       JSON.stringify(existing.paragraphs) !== JSON.stringify(newParagraphs) ||
-      JSON.stringify(existing.notes) !== JSON.stringify(ch.notes || []);
+      JSON.stringify(existing.blocks) !== JSON.stringify(ch.blocks) ||
+      JSON.stringify(existing.notes) !== JSON.stringify(ch.notes || []) ||
+      JSON.stringify(existing.pendingReviews) !== JSON.stringify(ch.pendingReviews || []);
 
     if (isModified) {
       const chRef = doc(chaptersCol, docId);
@@ -138,6 +168,7 @@ export async function saveAllChapters(
         notes: ch.notes || [],
         pendingReviews: ch.pendingReviews || [],
         order: idx,
+        updatedAt: serverTimestamp(),
       });
       hasWriteOps = true;
     }
@@ -162,13 +193,29 @@ export async function saveAllChapters(
   );
 
   const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
-  batch.set(mRef, { updatedAt: serverTimestamp(), wordCount: totalWords }, { merge: true });
+  batch.set(
+    mRef,
+    {
+      updatedAt: serverTimestamp(),
+      wordCount: totalWords,
+      chapterCount: chapters.length,
+    },
+    { merge: true }
+  );
 
   if (hasWriteOps) {
     await batch.commit();
   } else {
     // Only update manuscript metadata timestamp if no chapter contents were altered
-    await setDoc(mRef, { updatedAt: serverTimestamp(), wordCount: totalWords }, { merge: true });
+    await setDoc(
+      mRef,
+      {
+        updatedAt: serverTimestamp(),
+        wordCount: totalWords,
+        chapterCount: chapters.length,
+      },
+      { merge: true }
+    );
   }
 }
 

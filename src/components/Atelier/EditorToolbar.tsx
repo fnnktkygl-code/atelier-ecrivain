@@ -8,12 +8,14 @@
  * - Export Markdown & Export PDF Éditorial
  * - Lecture audio (TTS)
  * - Mode concentration (Focus mode)
+ * - Indicateur de statut de sauvegarde en temps réel (Local + Cloud Firestore)
  * - Compteur de mots et badges de révisions / notes
  */
 
 'use client';
 
 import Tooltip from '@/components/Shared/Tooltip';
+import type { SaveStatus } from '@/types/editor';
 import {
   IconMic,
   IconSparkles,
@@ -30,6 +32,10 @@ import {
   IconPaperclip,
   IconFolder,
   IconCheck,
+  IconCloudCheck,
+  IconCloudUpload,
+  IconCloudOff,
+  IconAlertCircle,
 } from '@/components/Shared/Icons';
 
 interface EditorToolbarProps {
@@ -40,6 +46,10 @@ interface EditorToolbarProps {
   canRedo: boolean;
   isDirty: boolean;
   lastSaved: number | null;
+  lastCloudSync?: number | null;
+  saveStatus?: SaveStatus;
+  isCloudConnected?: boolean;
+  onForceSave?: () => void;
   pendingReviewCount: number;
   noteCount: number;
   isReviewOpen: boolean;
@@ -71,6 +81,9 @@ export default function EditorToolbar({
   canRedo,
   isDirty,
   lastSaved,
+  lastCloudSync = null,
+  saveStatus = 'saved',
+  isCloudConnected = false,
   pendingReviewCount,
   noteCount,
   isReviewOpen,
@@ -96,10 +109,85 @@ export default function EditorToolbar({
   const formatSaveTime = (ts: number | null) => {
     if (!ts) return '';
     const d = new Date(ts);
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    const h = d.getHours().toString().padStart(2, '0');
+    const m = d.getMinutes().toString().padStart(2, '0');
+    const s = d.getSeconds().toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
   };
 
   const isRecording = dictationPhase === 'recording' || dictationPhase === 'processing';
+
+  const renderSaveIndicator = () => {
+    if (isDirty || saveStatus === 'saving') {
+      return (
+        <Tooltip content="Sauvegarde continue active : vos écrits sont enregistrés en direct.">
+          <span className="save-status-indicator saving">
+            <span className="save-pulse-dot" />
+            <span>Sauvegarde en cours…</span>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    if (saveStatus === 'syncing') {
+      return (
+        <Tooltip content="Synchronisation de votre manuscrit avec le cloud Firestore…">
+          <span className="save-status-indicator syncing">
+            <IconCloudUpload size={13} strokeWidth={2} />
+            <span>Synchronisation cloud…</span>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    if (saveStatus === 'synced' && isCloudConnected) {
+      const timeStr = formatSaveTime(lastCloudSync || lastSaved);
+      return (
+        <Tooltip content={`Synchronisé avec le cloud (${timeStr}). Retrouvez votre manuscrit à jour sur tous vos appareils.`}>
+          <span className="save-status-indicator synced">
+            <IconCloudCheck size={14} strokeWidth={2} />
+            <span>Synchronisé ({timeStr})</span>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    if (saveStatus === 'offline') {
+      return (
+        <Tooltip content="Mode hors-ligne : Sauvegardé en local. La synchronisation cloud reprendra dès que la connexion est rétablie.">
+          <span className="save-status-indicator offline">
+            <IconCloudOff size={13} strokeWidth={2} />
+            <span>Hors-ligne ({formatSaveTime(lastSaved)})</span>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    if (saveStatus === 'error') {
+      return (
+        <Tooltip content="Erreur de connexion au cloud. Vos modifications sont conservées en sécurité localement sur cet appareil.">
+          <span className="save-status-indicator error">
+            <IconAlertCircle size={13} strokeWidth={2} />
+            <span>Erreur cloud ({formatSaveTime(lastSaved)})</span>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    if (lastSaved) {
+      const timeStr = formatSaveTime(lastSaved);
+      return (
+        <Tooltip content={`Enregistré localement sur votre navigateur (${timeStr}). Pas un mot n'est perdu.`}>
+          <span className="save-status-indicator saved">
+            <IconCheck size={12} strokeWidth={2.5} />
+            <span>Enregistré ({timeStr})</span>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="editor-toolbar">
@@ -236,16 +324,9 @@ export default function EditorToolbar({
 
       {/* Right: Panels + Stats */}
       <div className="editor-toolbar-right">
-        {/* Save indicator */}
+        {/* Real-time Save & Sync Indicator */}
         <span className="editor-save-indicator">
-          {isDirty ? (
-            <span className="save-status-dirty">Enregistrement…</span>
-          ) : lastSaved ? (
-            <span className="save-status-saved">
-              <IconCheck size={12} strokeWidth={2.5} />
-              <span>{formatSaveTime(lastSaved)}</span>
-            </span>
-          ) : null}
+          {renderSaveIndicator()}
         </span>
 
         {/* Word count */}
