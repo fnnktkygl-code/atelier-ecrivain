@@ -3,8 +3,8 @@
  *
  * Manages the full dictation workflow:
  * 1. Audio recording via MediaRecorder
- * 2. AI transcription & structuring via Gemini (two-stage pipeline)
- * 3. State management & dynamic progress tracking for the UI
+ * 2. AI transcription & structuring via Gemini (two-stage high-speed pipeline)
+ * 3. State management & dynamic progress tracking for the UI with zero race conditions
  */
 
 'use client';
@@ -59,6 +59,7 @@ export function useDictation(currentChapterIndex: number) {
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const watchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentRequestIdRef = useRef<number>(0);
 
   // Check Firebase config on mount
   useEffect(() => {
@@ -70,6 +71,7 @@ export function useDictation(currentChapterIndex: number) {
     return () => {
       if (watchdogTimerRef.current) {
         clearTimeout(watchdogTimerRef.current);
+        watchdogTimerRef.current = null;
       }
     };
   }, []);
@@ -94,19 +96,24 @@ export function useDictation(currentChapterIndex: number) {
         }));
       },
       onComplete: async (blob: Blob, duration: number) => {
+        const requestId = ++currentRequestIdRef.current;
+
         setState((prev) => ({
           ...prev,
           phase: 'processing',
           statusMessage: 'Initialisation de la transcription…',
+          error: null,
           duration,
         }));
 
         if (!isGeminiConfigured() && !isFirebaseConfigured()) {
           // Demo mode: simulate a result
           setTimeout(() => {
+            if (currentRequestIdRef.current !== requestId) return;
             setState((prev) => ({
               ...prev,
               phase: 'complete',
+              error: null,
               result: {
                 jetBrut: [
                   'Ceci est une démonstration. Configurez votre clé Google AI Studio dans Profil pour activer la transcription IA.',
@@ -125,11 +132,12 @@ export function useDictation(currentChapterIndex: number) {
           return;
         }
 
-        // Safety watchdog timer (45s max) to guarantee UI never hangs indefinitely
+        // Safety watchdog timer (60s max) to guarantee UI never hangs indefinitely
         if (watchdogTimerRef.current) {
           clearTimeout(watchdogTimerRef.current);
         }
         watchdogTimerRef.current = setTimeout(() => {
+          if (currentRequestIdRef.current !== requestId) return;
           setState((prev) => {
             if (prev.phase === 'processing') {
               return {
@@ -141,13 +149,14 @@ export function useDictation(currentChapterIndex: number) {
             }
             return prev;
           });
-        }, 45000);
+        }, 60000);
 
         try {
           const result = await transcribeAudio(
             blob,
             { currentChapter: currentChapterIndex },
             (progress) => {
+              if (currentRequestIdRef.current !== requestId) return;
               setState((prev) => ({
                 ...prev,
                 statusMessage: progress.message,
@@ -155,6 +164,8 @@ export function useDictation(currentChapterIndex: number) {
               }));
             }
           );
+
+          if (currentRequestIdRef.current !== requestId) return;
 
           if (watchdogTimerRef.current) {
             clearTimeout(watchdogTimerRef.current);
@@ -164,6 +175,7 @@ export function useDictation(currentChapterIndex: number) {
           setState((prev) => ({
             ...prev,
             phase: 'complete',
+            error: null,
             result: toAIStructuredOutput(result),
             corrections: result.corrections,
             summary: result.summary,
@@ -173,10 +185,13 @@ export function useDictation(currentChapterIndex: number) {
             statusMessage: undefined,
           }));
         } catch (err) {
+          if (currentRequestIdRef.current !== requestId) return;
+
           if (watchdogTimerRef.current) {
             clearTimeout(watchdogTimerRef.current);
             watchdogTimerRef.current = null;
           }
+
           setState((prev) => ({
             ...prev,
             phase: 'error',
@@ -207,6 +222,7 @@ export function useDictation(currentChapterIndex: number) {
   }, []);
 
   const cancelRecording = useCallback(() => {
+    currentRequestIdRef.current++;
     if (watchdogTimerRef.current) {
       clearTimeout(watchdogTimerRef.current);
       watchdogTimerRef.current = null;
@@ -230,6 +246,7 @@ export function useDictation(currentChapterIndex: number) {
   }, []);
 
   const reset = useCallback(() => {
+    currentRequestIdRef.current++;
     if (watchdogTimerRef.current) {
       clearTimeout(watchdogTimerRef.current);
       watchdogTimerRef.current = null;

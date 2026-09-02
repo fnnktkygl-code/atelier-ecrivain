@@ -182,6 +182,7 @@ export default function AtelierPage() {
         afterBlockIndex: ms.insertionPoint,
         blocks: newBlocks,
       });
+      showFeedback('Texte dicté intégré avec succès dans le manuscrit.');
     }
 
     // Add ratures + corrections as pending reviews

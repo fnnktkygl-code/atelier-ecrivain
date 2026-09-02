@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test, describe } from 'node:test';
-import { toAIStructuredOutput, type TranscriptionResult } from '../services/ai/transcription';
+import {
+  toAIStructuredOutput,
+  normalizeAudioMimeType,
+  markModelUnavailable,
+  isModelUnavailable,
+  resetUnavailableModels,
+  type TranscriptionResult,
+} from '../services/ai/transcription';
 import { clearModelCooldown, loadModelQuota, recordModelUsage } from '../services/ai-router/quota/quotaStore';
 import { FEATURE_CHAINS } from '../services/ai-router/types/featureChains';
 
@@ -8,6 +15,27 @@ describe('Dictation Pipeline & Fallback System', () => {
   test('FEATURE_CHAINS dictation prioritizes gemini-3.5-transcribe for audio and text-analysis for gemini-3.7-flash', () => {
     assert.equal(FEATURE_CHAINS.dictation.chain[0], 'gemini-3.5-transcribe');
     assert.equal(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.7-flash');
+    assert.ok(FEATURE_CHAINS.dictation.chain.includes('gemini-2.5-flash'));
+  });
+
+  test('normalizeAudioMimeType cleans complex browser MIME types', () => {
+    assert.equal(normalizeAudioMimeType('audio/webm;codecs=opus'), 'audio/webm');
+    assert.equal(normalizeAudioMimeType('audio/webm;codecs="opus,vorbis"'), 'audio/webm');
+    assert.equal(normalizeAudioMimeType('audio/mp4;codecs=mp4a.40.2'), 'audio/mp4');
+    assert.equal(normalizeAudioMimeType('audio/ogg;codecs=opus'), 'audio/ogg');
+    assert.equal(normalizeAudioMimeType('audio/wav'), 'audio/wav');
+    assert.equal(normalizeAudioMimeType(''), 'audio/webm');
+  });
+
+  test('unavailable models cache marks and resets models properly', () => {
+    resetUnavailableModels();
+    assert.equal(isModelUnavailable('gemini-3.5-transcribe'), false);
+
+    markModelUnavailable('gemini-3.5-transcribe');
+    assert.equal(isModelUnavailable('gemini-3.5-transcribe'), true);
+
+    resetUnavailableModels();
+    assert.equal(isModelUnavailable('gemini-3.5-transcribe'), false);
   });
 
   test('toAIStructuredOutput transforms TranscriptionResult correctly', () => {

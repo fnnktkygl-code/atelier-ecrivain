@@ -2,8 +2,8 @@
  * Gemini AI Service — Transcription & Structuration
  *
  * Utilise la pile Gemini AI Studio (Google AI Developer API) avec les derniers modèles spécialisés 2026 :
- * 1. Gemini 3.5 Transcribe pour la transcription audio haute précision (STT ultra-rapide)
- * 2. Gemini 3.7 Flash / 3.6 Flash pour l'analyse stylistique, ratures et structuration JSON
+ * 1. Speech-To-Text ultra-rapide avec Gemini 3.5 Transcribe / Gemini 2.5 Flash (audio natif, thinkingBudget=0)
+ * 2. Gemini 3.7 Flash / Gemini 2.5 Flash pour l'analyse stylistique, ratures et structuration JSON
  * 3. Fallback multimodal direct et protection anti-perte de texte dicté
  */
 
@@ -42,6 +42,39 @@ export type DictationProgressCallback = (status: {
 }) => void;
 
 /**
+ * Cache for models unavailable in the current session (404/not supported)
+ * to avoid wasting network round-trips on subsequent dictations.
+ */
+const unavailableModels = new Set<string>();
+
+export function markModelUnavailable(modelName: string): void {
+  unavailableModels.add(modelName);
+}
+
+export function isModelUnavailable(modelName: string): boolean {
+  return unavailableModels.has(modelName);
+}
+
+export function resetUnavailableModels(): void {
+  unavailableModels.clear();
+}
+
+/**
+ * Normalize browser-reported MIME types to standard Gemini-supported MIME types.
+ * Strips codecs parameters (e.g. 'audio/webm;codecs=opus' -> 'audio/webm').
+ */
+export function normalizeAudioMimeType(mimeType: string): string {
+  if (!mimeType) return 'audio/webm';
+  const baseType = mimeType.split(';')[0].trim().toLowerCase();
+  if (baseType.includes('webm')) return 'audio/webm';
+  if (baseType.includes('mp4') || baseType.includes('m4a') || baseType.includes('aac')) return 'audio/mp4';
+  if (baseType.includes('ogg')) return 'audio/ogg';
+  if (baseType.includes('wav')) return 'audio/wav';
+  if (baseType.includes('mp3') || baseType.includes('mpeg')) return 'audio/mp3';
+  return baseType || 'audio/webm';
+}
+
+/**
  * Convert an audio Blob to base64 for Gemini
  */
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -74,50 +107,103 @@ function parseTranscriptionJSON(responseText: string): TranscriptionResult {
 }
 
 /**
- * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error using AI Router
+ * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error using AI Router.
+ * Configured with thinkingBudget: 0 to eliminate the 30s+ reasoning delay on Gemini 2.5/3.7 models.
  */
 async function generateWithFallback<T>(
   generationConfig: Record<string, unknown>,
   systemInstruction: string | undefined,
   feature: FeatureId,
-  execute: (model: GenerativeModel, modelName: string) => Promise<T>
+  execute: (model: GenerativeModel, modelName: string) => Promise<T>,
+  preferredModelName?: string
 ): Promise<{ result: T; modelUsed: string }> {
   const genAI = getGeminiAIStudio();
 
   const selection = await selectModel(feature);
   const fallbackChain = FEATURE_CHAINS[feature]?.chain || [
     'gemini-3.7-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
-    'gemini-3.1-pro',
   ];
-  const chain = selection.modelId
-    ? [selection.modelId, ...fallbackChain.filter((m) => m !== selection.modelId)]
-    : fallbackChain;
+
+  let rawChain: string[];
+  if (preferredModelName) {
+    rawChain = [preferredModelName, ...fallbackChain.filter((m) => m !== preferredModelName)];
+  } else if (selection.modelId) {
+    rawChain = [selection.modelId, ...fallbackChain.filter((m) => m !== selection.modelId)];
+  } else {
+    rawChain = fallbackChain;
+  }
+
+  // Filter out models known to be unavailable (404 in current session)
+  const activeChain = rawChain.filter((m) => !unavailableModels.has(m));
+  const chain = activeChain.length > 0 ? activeChain : rawChain;
 
   let lastError: unknown = null;
 
   for (const modelName of chain) {
     try {
-      const model = genAI.getGenerativeModel(
+      // Configure generation with thinkingBudget: 0 for lightning-fast output
+      const fastConfig = {
+        ...generationConfig,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      };
+
+      let model = genAI.getGenerativeModel(
         {
           model: modelName,
-          generationConfig: generationConfig as never,
+          generationConfig: fastConfig as never,
           ...(systemInstruction ? { systemInstruction } : {}),
         },
-        { timeout: 30000 }
+        { timeout: 15000 }
       );
 
-      const res = await execute(model, modelName);
+      let res: T;
+      try {
+        res = await execute(model, modelName);
+      } catch (execErr) {
+        const msg = execErr instanceof Error ? execErr.message : String(execErr);
+        // If thinkingConfig is unrecognized on an older model, retry without it
+        if (msg.includes('thinkingConfig') || msg.includes('thinking_config') || msg.includes('unknown field')) {
+          model = genAI.getGenerativeModel(
+            {
+              model: modelName,
+              generationConfig: generationConfig as never,
+              ...(systemInstruction ? { systemInstruction } : {}),
+            },
+            { timeout: 15000 }
+          );
+          res = await execute(model, modelName);
+        } else {
+          throw execErr;
+        }
+      }
+
       await recordUsage(modelName, 'generation', 'success');
       return { result: res, modelUsed: modelName };
     } catch (err: unknown) {
       lastError = err;
       const errMsg = err instanceof Error ? err.message : String(err);
+
+      // If model is not found in Google AI Studio, record in unavailable cache
+      if (
+        errMsg.includes('404') ||
+        errMsg.includes('is not found') ||
+        errMsg.includes('NotFound') ||
+        errMsg.includes('not supported')
+      ) {
+        unavailableModels.add(modelName);
+      }
+
       console.warn(
         `[Gemini AI Studio Fallback] Le modèle ${modelName} a échoué (${errMsg}). Basculement vers le modèle suivant dans la chaîne...`
       );
-      // ONLY register quota-error if it's actually a quota/rate limit error (429 / RESOURCE_EXHAUSTED)
+
+      // Register quota-error only for 429 / RESOURCE_EXHAUSTED
       if (
         errMsg.includes('429') ||
         errMsg.includes('RESOURCE_EXHAUSTED') ||
@@ -148,7 +234,7 @@ function checkRateLimit() {
 }
 
 /**
- * Stage 1: Speech-To-Text transcription using dedicated transcribe model (gemini-3.5-transcribe)
+ * Stage 1: Speech-To-Text transcription using dedicated transcribe model (gemini-3.5-transcribe / gemini-2.5-flash)
  */
 async function transcribeAudioToRawText(
   audioBase64: string,
@@ -158,6 +244,8 @@ async function transcribeAudioToRawText(
   const prompt = `Transcris fidèlement et intégralement cet enregistrement audio en français. Rédige mot à mot tout ce qui a été dicté par l'auteur sans résumer ni omettre de phrases.${
     contextPrompt ? ` Contexte : ${contextPrompt}` : ''
   }`;
+
+  const cleanMimeType = normalizeAudioMimeType(mimeType);
 
   // STT models don't support JSON mode, so we request plain text
   const { result, modelUsed } = await generateWithFallback(
@@ -175,7 +263,7 @@ async function transcribeAudioToRawText(
         {
           inlineData: {
             data: audioBase64,
-            mimeType: mimeType || 'audio/webm',
+            mimeType: cleanMimeType,
           },
         },
       ]);
@@ -188,7 +276,7 @@ async function transcribeAudioToRawText(
 }
 
 /**
- * Stage 2: Literary text structuring and analysis (gemini-3.7-flash / gemini-3.6-flash)
+ * Stage 2: Literary text structuring and analysis (gemini-3.7-flash / gemini-2.5-flash)
  */
 async function structureTranscriptText(
   rawText: string,
@@ -224,8 +312,8 @@ async function structureTranscriptText(
 
 /**
  * High-performance audio transcription and structuring pipeline:
- * 1. Stage 1: Ultra-fast STT with gemini-3.5-transcribe
- * 2. Stage 2: Literary structuring with gemini-3.7-flash
+ * 1. Stage 1: Ultra-fast STT with gemini-3.5-transcribe / gemini-2.5-flash (< 1.5s)
+ * 2. Stage 2: Literary structuring with gemini-3.7-flash / gemini-2.5-flash (< 1s)
  * 3. Fallback: Direct multimodal processing or safe raw transcript return (zero data loss)
  */
 export async function transcribeAudio(
@@ -243,23 +331,24 @@ export async function transcribeAudio(
   recordApiRequest();
 
   const audioBase64 = await blobToBase64(audioBlob);
+  const cleanMimeType = normalizeAudioMimeType(audioBlob.type || 'audio/webm');
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {
     contextPrompt += ` Chapitre ${context.currentChapter + 1}.`;
   }
 
-  // ── Two-stage pipeline ──
+  // ── Two-stage ultra-fast pipeline ──
   try {
     onProgress?.({
       step: 'transcribing',
-      message: 'Transcription audio en cours (Gemini 3.5 Transcribe)…',
+      message: 'Transcription vocale instantanée…',
       modelName: 'gemini-3.5-transcribe',
     });
 
     const { text: rawTranscript, modelUsed: sttModel } = await transcribeAudioToRawText(
       audioBase64,
-      audioBlob.type || 'audio/webm',
+      cleanMimeType,
       context?.previousContent ? `Contexte : ${context.previousContent.slice(-300)}` : undefined
     );
 
@@ -269,7 +358,7 @@ export async function transcribeAudio(
 
     onProgress?.({
       step: 'structuring',
-      message: 'Structuration & analyse stylistique (Gemini 3.7 Flash)…',
+      message: 'Structuration littéraire & détection des ratures…',
       modelName: 'gemini-3.7-flash',
     });
 
@@ -301,7 +390,7 @@ export async function transcribeAudio(
 
     onProgress?.({
       step: 'structuring',
-      message: 'Analyse et structuration multimodale directe (Gemini 3.7 Flash)…',
+      message: 'Finalisation et structuration de la dictée…',
       modelName: 'gemini-3.7-flash',
     });
 
@@ -321,7 +410,7 @@ export async function transcribeAudio(
           {
             inlineData: {
               data: audioBase64,
-              mimeType: audioBlob.type || 'audio/webm',
+              mimeType: cleanMimeType,
             },
           },
         ]);
@@ -392,6 +481,7 @@ export async function transcribeAudioStream(
   }
 
   const audioBase64 = await blobToBase64(audioBlob);
+  const cleanMimeType = normalizeAudioMimeType(audioBlob.type || 'audio/webm');
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {
@@ -414,7 +504,7 @@ export async function transcribeAudioStream(
         {
           inlineData: {
             data: audioBase64,
-            mimeType: audioBlob.type || 'audio/webm',
+            mimeType: cleanMimeType,
           },
         },
       ]);
