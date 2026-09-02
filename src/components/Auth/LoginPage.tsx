@@ -17,23 +17,23 @@ export default function LoginPage() {
   const MOVEMENTS = [
     {
       step: 'I',
-      title: 'Le Premier Jet',
+      title: 'Le Souffle du Premier Jet',
       subtitle: 'La Parole Déliée',
-      desc: 'Dictez librement : l’atelier recueille vos silences, vos hésitations et l’élan pur de votre pensée.',
+      desc: 'Dictez comme vous pensez. L’atelier écoute vos hésitations, vos silences et vos repentirs sans jamais vous interrompre.',
       Icon: IconMic,
     },
     {
       step: 'II',
-      title: 'Les Variantes',
-      subtitle: 'L’Art du Repentir',
-      desc: 'Vos reformulations s’isolent en marge : adoptez d’un geste la tournure la plus juste.',
+      title: 'L’Alchimie des Variantes',
+      subtitle: 'Les Ratures Révélées',
+      desc: 'Vos reformulations orales sont isolées avec délicatesse en marge du texte, prêtes à être adoptées d’un geste.',
       Icon: IconFeather,
     },
     {
       step: 'III',
-      title: 'Le Livre d’Art',
+      title: 'Le Livre et son Éternité',
       subtitle: 'La Haute Typographie',
-      desc: 'Mise en page aux proportions d’or, reliure ornée et tirage PDF d’artisan.',
+      desc: 'Relisez votre œuvre dans des gabarits éditoriaux d’exception, ornez votre reliure et exportez en PDF d’artisan.',
       Icon: IconBook,
     },
   ];
@@ -55,7 +55,8 @@ export default function LoginPage() {
           </h1>
 
           <p className="landing-subtitle">
-            Le sanctuaire où la voix devient haute littérature. Dictez, raturez, façonnez votre œuvre sans contrainte.
+            Un atelier d’art contemporain où l’oralité se transmute en haute littérature.
+            Dictez, raturez, façonnez votre œuvre sans friction.
           </p>
 
           {/* CTA Sceau d'Entrée */}
