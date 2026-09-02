@@ -7,7 +7,7 @@
  * 3. Gemini 2.5 Flash avec Grounding Google Search pour le fact-checking
  */
 
-import { getGeminiAIStudio, isGeminiConfigured } from './geminiClient';
+import { getGeminiAIStudio, isGeminiConfigured, formatGeminiError } from './geminiClient';
 import { SYSTEM_PROMPT_TRANSCRIPTION } from './prompts';
 import type { AIStructuredOutput, VerificationItem } from '@/types/manuscript';
 import { selectModel } from '../ai-router/router/selectModel';
@@ -96,7 +96,7 @@ async function generateWithFallback<T>(
     }
   }
 
-  throw lastError || new Error(`Tous les modèles de la chaîne ${feature} ont échoué.`);
+  throw new Error(formatGeminiError(lastError || `Tous les modèles de la chaîne ${feature} ont échoué.`));
 }
 
 // ── Rate Limiter ──

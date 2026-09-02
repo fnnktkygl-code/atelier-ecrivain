@@ -12,6 +12,7 @@ import {
   IconCompass,
   IconShield,
   IconDownload,
+  IconSparkles,
 } from '@/components/Shared/Icons';
 
 export default function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -40,6 +41,13 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [userGeminiKey, setUserGeminiKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('atelier_user_gemini_key') || '';
+    }
+    return '';
+  });
+  const [keySavedMessage, setKeySavedMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -380,6 +388,106 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
               </div>
             </div>
           )}
+        </div>
+
+        {/* Intelligence Artificielle & Clé Gemini */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconSparkles size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+              <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
+                Intelligence Artificielle
+              </span>
+            </div>
+            {Boolean(process.env.NEXT_PUBLIC_GEMINI_API_KEY || userGeminiKey) && (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color: '#27ae60',
+                  background: 'rgba(39, 174, 96, 0.12)',
+                  padding: '2px 7px',
+                  borderRadius: 6,
+                }}
+              >
+                {userGeminiKey ? 'Clé personnalisée' : 'Clé environnement'}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-soft)', marginBottom: 8, lineHeight: 1.4 }}>
+            Clé Google AI Studio (Gemini 3.5 / 3.7).
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="password"
+              placeholder={process.env.NEXT_PUBLIC_GEMINI_API_KEY ? 'Clé configurée via .env' : 'Collez votre clé AIzaSy…'}
+              value={userGeminiKey}
+              onChange={(e) => {
+                setUserGeminiKey(e.target.value);
+                setKeySavedMessage(false);
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 4,
+                border: '1px solid var(--border)',
+                fontSize: 12,
+                fontFamily: 'monospace',
+                background: 'var(--surface-2)',
+                color: 'var(--text)',
+              }}
+            />
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const cleaned = userGeminiKey.trim();
+                  if (cleaned) {
+                    localStorage.setItem('atelier_user_gemini_key', cleaned);
+                  } else {
+                    localStorage.removeItem('atelier_user_gemini_key');
+                  }
+                  window.dispatchEvent(new Event('atelier_quota_updated'));
+                  setKeySavedMessage(true);
+                  setTimeout(() => setKeySavedMessage(false), 3000);
+                }
+              }}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+            >
+              {keySavedMessage ? '✓ Enregistré' : 'Sauver'}
+            </button>
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'underline' }}
+            >
+              Obtenir une clé Google AI Studio ↗
+            </a>
+            {userGeminiKey && (
+              <button
+                onClick={() => {
+                  setUserGeminiKey('');
+                  localStorage.removeItem('atelier_user_gemini_key');
+                  window.dispatchEvent(new Event('atelier_quota_updated'));
+                  setKeySavedMessage(true);
+                  setTimeout(() => setKeySavedMessage(false), 2000);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 11,
+                  color: 'var(--japandi-terracotta)',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Theme */}

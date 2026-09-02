@@ -26,8 +26,8 @@ describe('Stress & Performance Benchmarks', () => {
         title: `Chapitre ${c + 1} — Titre du Chapitre`,
         blocks,
         notes: [
-          { id: `n-${c}-1`, key: 'Note 1', content: `Explication historique pour le chapitre ${c + 1}` },
-          { id: `n-${c}-2`, key: 'Note 2', content: `Source littéraire pour le chapitre ${c + 1}` },
+          { id: `n-${c}-1`, key: 'Note 1', content: `Explication historique pour le chapitre ${c + 1}`, source: 'original' as const },
+          { id: `n-${c}-2`, key: 'Note 2', content: `Source littéraire pour le chapitre ${c + 1}`, source: 'original' as const },
         ],
         pendingReviews: [],
       });
@@ -58,8 +58,8 @@ describe('Stress & Performance Benchmarks', () => {
         title: 'Chapitre 1',
         blocks: [{ id: 'b0', content: 'Première référence¹ et seconde référence²', type: 'paragraph', source: 'original', createdAt: 0 }],
         notes: [
-          { id: 'n1', key: 'Note 1', content: 'Note A' },
-          { id: 'n2', key: 'Note 2', content: 'Note B' },
+          { id: 'n1', key: 'Note 1', content: 'Note A', source: 'original' as const },
+          { id: 'n2', key: 'Note 2', content: 'Note B', source: 'original' as const },
         ],
         pendingReviews: [],
       },
@@ -68,7 +68,7 @@ describe('Stress & Performance Benchmarks', () => {
         title: 'Chapitre 2',
         blocks: [{ id: 'b1', content: 'Référence distincte¹ dans le chapitre 2', type: 'paragraph', source: 'original', createdAt: 0 }],
         notes: [
-          { id: 'n3', key: 'Note 1', content: 'Note C (Chapitre 2)' },
+          { id: 'n3', key: 'Note 1', content: 'Note C (Chapitre 2)', source: 'original' as const },
         ],
         pendingReviews: [],
       },

@@ -10,8 +10,8 @@ describe('PDF Export Module (Chantier 2)', () => {
         id: 'ch1',
         title: 'Chapitre Premier',
         blocks: [
-          { id: 'b1', content: 'Il était une fois...', type: 'paragraph' as const, createdAt: 100 },
-          { id: 'b2', content: 'Dans un royaume lointain.', type: 'paragraph' as const, createdAt: 101 },
+          { id: 'b1', content: 'Il était une fois...', type: 'paragraph' as const, source: 'original' as const, createdAt: 100 },
+          { id: 'b2', content: 'Dans un royaume lointain.', type: 'paragraph' as const, source: 'original' as const, createdAt: 101 },
         ],
         notes: [],
         pendingReviews: [],
