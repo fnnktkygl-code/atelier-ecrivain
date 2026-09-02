@@ -52,39 +52,48 @@ export default function Dashboard() {
             <div className="home-action-icon-wrap">
               <IconMic size={22} strokeWidth={1.9} />
             </div>
-            <h2 className="home-action-title">Dicter</h2>
-            <p className="home-action-desc desktop-only">
-              Enregistrez à voix haute. L&apos;IA Gemini structure votre oral en premier jet fidèle.
-            </p>
-            <p className="home-action-desc mobile-only">
-              Dictée vocale & structuration IA
-            </p>
+            <div className="home-action-text">
+              <h2 className="home-action-title">Dicter</h2>
+              <p className="home-action-desc desktop-only">
+                Enregistrez à voix haute. L&apos;IA Gemini structure votre oral en premier jet fidèle.
+              </p>
+              <p className="home-action-desc mobile-only">
+                Dictée vocale & structuration IA
+              </p>
+            </div>
+            <IconChevronRight size={16} strokeWidth={2} className="home-action-chevron mobile-only" />
           </Link>
 
           <Link href="/atelier" className="home-action">
             <div className="home-action-icon-wrap">
               <IconFeather size={22} strokeWidth={1.9} />
             </div>
-            <h2 className="home-action-title">Éditer</h2>
-            <p className="home-action-desc desktop-only">
-              Façonnez votre manuscrit. Suggestions de style, ratures et annotations de marge.
-            </p>
-            <p className="home-action-desc mobile-only">
-              Chapitres, style & notes
-            </p>
+            <div className="home-action-text">
+              <h2 className="home-action-title">Éditer</h2>
+              <p className="home-action-desc desktop-only">
+                Façonnez votre manuscrit. Suggestions de style, ratures et annotations de marge.
+              </p>
+              <p className="home-action-desc mobile-only">
+                Chapitres, style & notes
+              </p>
+            </div>
+            <IconChevronRight size={16} strokeWidth={2} className="home-action-chevron mobile-only" />
           </Link>
 
           <Link href="/liseuse" className="home-action">
             <div className="home-action-icon-wrap">
               <IconBook size={22} strokeWidth={1.9} />
             </div>
-            <h2 className="home-action-title">Lire</h2>
-            <p className="home-action-desc desktop-only">
-              Relisez votre texte dans une mise en page d&apos;édition soignée, sans distraction.
-            </p>
-            <p className="home-action-desc mobile-only">
-              Liseuse sans distraction
-            </p>
+            <div className="home-action-text">
+              <h2 className="home-action-title">Lire</h2>
+              <p className="home-action-desc desktop-only">
+                Relisez votre texte dans une mise en page d&apos;édition soignée, sans distraction.
+              </p>
+              <p className="home-action-desc mobile-only">
+                Liseuse sans distraction
+              </p>
+            </div>
+            <IconChevronRight size={16} strokeWidth={2} className="home-action-chevron mobile-only" />
           </Link>
         </section>
 
