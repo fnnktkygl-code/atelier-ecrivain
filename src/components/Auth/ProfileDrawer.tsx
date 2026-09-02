@@ -70,7 +70,7 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
     updateProfileSettings({ avatarUrl: '' });
   };
 
-  if (!user) return null;
+  if (!user || !open) return null;
 
   const handleCreate = async () => {
     const title = newTitle.trim();
@@ -115,19 +115,43 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
   ];
 
   return (
-    <>
+    <div className="drawer-portal-wrapper" style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
       <div
-        className={`toc-overlay ${open ? 'open' : ''}`}
+        className="drawer-overlay open"
         onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(18, 18, 17, 0.55)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease',
+        }}
       />
       <div
-        className={`toc-drawer ${open ? 'open' : ''}`}
-        style={{ right: 0, left: 'auto', transform: open ? 'translateX(0)' : 'translateX(100%)', width: 360 }}
+        className="profile-drawer open"
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(380px, 100vw)',
+          height: '100vh',
+          background: 'var(--surface)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: '-8px 0 36px rgba(0,0,0,0.25)',
+          zIndex: 10000,
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          padding: 20,
+          animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
       >
-        <div className="chapter-list-header" style={{ marginBottom: 16 }}>
-          <h3 className="sidebar-section-title">Profil & Paramètres</h3>
-          <button className="sidebar-close-btn" onClick={onClose} aria-label="Fermer">
-            <IconClose size={16} strokeWidth={2} />
+        <div className="chapter-list-header" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 className="sidebar-section-title" style={{ margin: 0, fontSize: 16 }}>Profil & Paramètres</h3>
+          <button className="sidebar-close-btn" onClick={onClose} aria-label="Fermer" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-soft)', padding: 4 }}>
+            <IconClose size={18} strokeWidth={2} />
           </button>
         </div>
 
@@ -458,6 +482,6 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
