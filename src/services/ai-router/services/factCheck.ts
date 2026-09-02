@@ -1,17 +1,8 @@
-import { getFirebaseApp } from '@/services/firebase/config';
+import { getGeminiAIStudio } from '@/services/ai/geminiClient';
 import { SYSTEM_PROMPT_FACTCHECK } from '@/services/ai/prompts';
 import type { VerificationItem } from '@/types/manuscript';
 import { selectModel } from '../router/selectModel';
 import { recordUsage } from '../router/recordUsage';
-
-let aiModule: typeof import('firebase/ai') | null = null;
-
-async function getAIModule() {
-  if (!aiModule) {
-    aiModule = await import('firebase/ai');
-  }
-  return aiModule;
-}
 
 export interface FactCheckResponse {
   verifications: VerificationItem[];
@@ -52,11 +43,8 @@ export async function verifyTextFactCheck(text: string): Promise<FactCheckRespon
   }
 
   try {
-    const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
-    const app = getFirebaseApp();
-    const ai = getAI(app, { backend: new GoogleAIBackend() });
-
-    const model = getGenerativeModel(ai, {
+    const genAI = getGeminiAIStudio();
+    const model = genAI.getGenerativeModel({
       model: selection.modelId,
       tools: [{ googleSearch: {} } as never],
       generationConfig: {

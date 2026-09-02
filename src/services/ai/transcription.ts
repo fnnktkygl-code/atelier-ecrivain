@@ -1,13 +1,13 @@
 /**
  * Gemini AI Service — Transcription & Structuration
  *
- * Utilise Firebase AI Logic / Gemini Developer API avec les derniers modèles spécialisés 2026 :
+ * Utilise la pile Gemini AI Studio (Google AI Developer API) avec les derniers modèles spécialisés 2026 :
  * 1. Gemini 3.5 Transcribe / Transcribe Live pour l'audio et la dictée vocale
  * 2. Gemini 3.7 Flash pour l'analyse stylistique et les ratures
  * 3. Gemini 2.5 Flash avec Grounding Google Search pour le fact-checking
  */
 
-import { getFirebaseApp, isFirebaseConfigured } from '@/services/firebase/config';
+import { getGeminiAIStudio, isGeminiConfigured } from './geminiClient';
 import { SYSTEM_PROMPT_TRANSCRIPTION } from './prompts';
 import type { AIStructuredOutput, VerificationItem } from '@/types/manuscript';
 import { selectModel } from '../ai-router/router/selectModel';
@@ -15,16 +15,7 @@ import { recordUsage } from '../ai-router/router/recordUsage';
 import { recordApiRequest } from './quotaTracker';
 import { verifyTextFactCheck } from '../ai-router/services/factCheck';
 import { FEATURE_CHAINS, FeatureId } from '../ai-router/types/featureChains';
-
-// Lazy-loaded Firebase AI imports
-let aiModule: typeof import('firebase/ai') | null = null;
-
-async function getAIModule() {
-  if (!aiModule) {
-    aiModule = await import('firebase/ai');
-  }
-  return aiModule;
-}
+import type { GenerativeModel } from '@google/generative-ai';
 
 export interface TranscriptionResult {
   chapterIndex: number | null;
@@ -66,11 +57,9 @@ async function generateWithFallback<T>(
   generationConfig: Record<string, unknown>,
   systemInstruction: string,
   feature: FeatureId,
-  execute: (model: unknown, modelName: string, inlineInstructions: boolean) => Promise<T>
+  execute: (model: GenerativeModel, modelName: string) => Promise<T>
 ): Promise<{ result: T; modelUsed: string }> {
-  const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
-  const app = getFirebaseApp();
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const genAI = getGeminiAIStudio();
 
   const selection = await selectModel(feature);
   const fallbackChain = FEATURE_CHAINS[feature]?.chain || [
@@ -86,47 +75,21 @@ async function generateWithFallback<T>(
   let lastError: unknown = null;
 
   for (const modelName of chain) {
-    // 1. Premier essai : avec systemInstruction officielle au niveau supérieur
     try {
-      const model = getGenerativeModel(ai, {
+      const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig: generationConfig as never,
         systemInstruction,
       });
 
-      const res = await execute(model, modelName, false);
+      const res = await execute(model, modelName);
       await recordUsage(modelName, 'generation', 'success');
       return { result: res, modelUsed: modelName };
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-
-      // 2. Contournement : si le modèle rejette developer instruction, réexécuter avec instructions inlinées dans le prompt !
-      if (
-        errMsg.includes('Developer instruction') ||
-        errMsg.includes('is not enabled') ||
-        errMsg.includes('systemInstruction') ||
-        errMsg.includes('system_instruction')
-      ) {
-        try {
-          console.warn(`[AI Adaptation] Le modèle ${modelName} requiert des instructions inlinées. Réessai avec préambule...`);
-          const modelInlined = getGenerativeModel(ai, {
-            model: modelName,
-            generationConfig: generationConfig as never,
-          });
-          const res = await execute(modelInlined, modelName, true);
-          await recordUsage(modelName, 'generation', 'success');
-          return { result: res, modelUsed: modelName };
-        } catch (inlinedErr: unknown) {
-          lastError = inlinedErr;
-          console.warn(`[AI Fallback] Échec avec instructions inlinées sur ${modelName}. Basculement vers le modèle suivant...`);
-          await recordUsage(modelName, 'generation', 'quota-error');
-          continue;
-        }
-      }
-
       lastError = err;
+      const errMsg = err instanceof Error ? err.message : String(err);
       console.warn(
-        `[AI Fallback] Le modèle ${modelName} a échoué (${errMsg}). Basculement vers le modèle suivant dans la chaîne...`
+        `[Gemini AI Studio Fallback] Le modèle ${modelName} a échoué (${errMsg}). Basculement vers le modèle suivant dans la chaîne...`
       );
       await recordUsage(modelName, 'generation', 'quota-error');
       continue;
@@ -151,22 +114,13 @@ function checkRateLimit() {
   requestTimestamps.push(now);
 }
 
-interface RawModelClient {
-  generateContent: (content: unknown[]) => Promise<{
-    response: { text: () => string };
-  }>;
-  generateContentStream: (content: unknown[]) => Promise<{
-    stream: AsyncIterable<{ text: () => string }>;
-  }>;
-}
-
 export async function transcribeAudio(
   audioBlob: Blob,
   context?: { currentChapter?: number; previousContent?: string }
 ): Promise<TranscriptionResult> {
-  if (!isFirebaseConfigured()) {
+  if (!isGeminiConfigured()) {
     throw new Error(
-      "Firebase n'est pas configuré. Ajoutez votre config dans .env.local"
+      "Clé Gemini AI Studio non configurée. Ajoutez NEXT_PUBLIC_GEMINI_API_KEY dans votre environnement ou vos paramètres."
     );
   }
 
@@ -190,23 +144,19 @@ export async function transcribeAudio(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     'dictation',
-    async (model, modelName, inlineInstructions) => {
+    async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Dictation] Exécution avec le modèle spécialisé : ${modelName} (inlined: ${inlineInstructions})`);
+        console.log(`[Gemini AI Studio Dictation] Modèle : ${modelName}`);
       }
-      const typedModel = model as RawModelClient;
-      const contentParts: unknown[] = [
-        inlineInstructions
-          ? `INSTRUCTIONS DU SYSTÈME ÉDITORIAL :\n${SYSTEM_PROMPT_TRANSCRIPTION}\n\nREQUÊTE DE L'AUTEUR :\n${contextPrompt}`
-          : contextPrompt,
+      const apiResult = await model.generateContent([
+        contextPrompt,
         {
           inlineData: {
             data: audioBase64,
             mimeType: audioBlob.type || 'audio/webm',
           },
         },
-      ];
-      const apiResult = await typedModel.generateContent(contentParts);
+      ]);
 
       const responseText = apiResult.response.text();
       try {
@@ -236,8 +186,8 @@ export async function analyzeWrittenText(
   text: string,
   context?: { currentChapter?: number }
 ): Promise<TranscriptionResult> {
-  if (!isFirebaseConfigured()) {
-    throw new Error("Firebase n'est pas configuré. Ajoutez votre configuration dans .env.local");
+  if (!isGeminiConfigured()) {
+    throw new Error("Clé Gemini AI Studio non configurée. Ajoutez NEXT_PUBLIC_GEMINI_API_KEY.");
   }
 
   checkRateLimit();
@@ -256,15 +206,11 @@ export async function analyzeWrittenText(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     'text-analysis',
-    async (model, modelName, inlineInstructions) => {
+    async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Text Analysis] Exécution avec le modèle : ${modelName} (inlined: ${inlineInstructions})`);
+        console.log(`[Gemini AI Studio Text Analysis] Modèle : ${modelName}`);
       }
-      const typedModel = model as RawModelClient;
-      const fullPrompt = inlineInstructions
-        ? `INSTRUCTIONS DU SYSTÈME ÉDITORIAL :\n${SYSTEM_PROMPT_TRANSCRIPTION}\n\nREQUÊTE DE L'AUTEUR :\n${contextPrompt}`
-        : contextPrompt;
-      const apiResult = await typedModel.generateContent([fullPrompt]);
+      const apiResult = await model.generateContent([contextPrompt]);
       const responseText = apiResult.response.text();
       try {
         return JSON.parse(responseText) as TranscriptionResult;
@@ -289,8 +235,8 @@ export async function transcribeAudioStream(
   onChunk: (partialText: string) => void,
   context?: { currentChapter?: number }
 ): Promise<TranscriptionResult> {
-  if (!isFirebaseConfigured()) {
-    throw new Error("Firebase n'est pas configuré.");
+  if (!isGeminiConfigured()) {
+    throw new Error("Clé Gemini AI Studio non configurée.");
   }
 
   const audioBase64 = await blobToBase64(audioBlob);
@@ -307,23 +253,19 @@ export async function transcribeAudioStream(
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
     'dictation-live',
-    async (model, modelName, inlineInstructions) => {
+    async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Stream] Exécution avec le modèle streaming : ${modelName} (inlined: ${inlineInstructions})`);
+        console.log(`[Gemini AI Studio Stream] Modèle : ${modelName}`);
       }
-      const typedModel = model as RawModelClient;
-      const contentParts: unknown[] = [
-        inlineInstructions
-          ? `INSTRUCTIONS DU SYSTÈME ÉDITORIAL :\n${SYSTEM_PROMPT_TRANSCRIPTION}\n\nREQUÊTE DE L'AUTEUR :\n${contextPrompt}`
-          : contextPrompt,
+      const streamResult = await model.generateContentStream([
+        contextPrompt,
         {
           inlineData: {
             data: audioBase64,
             mimeType: audioBlob.type || 'audio/webm',
           },
         },
-      ];
-      const streamResult = await typedModel.generateContentStream(contentParts);
+      ]);
 
       let fullText = '';
       for await (const chunk of streamResult.stream) {

@@ -1,15 +1,6 @@
-import { getFirebaseApp } from '@/services/firebase/config';
+import { getGeminiAIStudio } from '@/services/ai/geminiClient';
 import { selectModel } from '../router/selectModel';
 import { recordUsage } from '../router/recordUsage';
-
-let aiModule: typeof import('firebase/ai') | null = null;
-
-async function getAIModule() {
-  if (!aiModule) {
-    aiModule = await import('firebase/ai');
-  }
-  return aiModule;
-}
 
 export interface TTSResponse {
   audioBlobUrl?: string;
@@ -35,11 +26,8 @@ export async function generateChapterSpeech(text: string): Promise<TTSResponse> 
   }
 
   try {
-    const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
-    const app = getFirebaseApp();
-    const ai = getAI(app, { backend: new GoogleAIBackend() });
-
-    const model = getGenerativeModel(ai, {
+    const genAI = getGeminiAIStudio();
+    const model = genAI.getGenerativeModel({
       model: selection.modelId,
       generationConfig: {
         responseMimeType: 'audio/mp3',
