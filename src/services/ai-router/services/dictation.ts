@@ -8,7 +8,7 @@ export interface DictationModelSelection {
 export async function getDictationModel(): Promise<DictationModelSelection> {
   const selection = await selectModel('dictation');
   return {
-    modelId: selection.modelId || 'gemini-3.5-transcribe',
+    modelId: selection.modelId || 'gemini-2.5-flash',
     degraded: selection.degraded,
   };
 }

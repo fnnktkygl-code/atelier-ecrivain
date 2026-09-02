@@ -43,9 +43,9 @@ describe('AI Router & Quota System (Chantier 1)', () => {
   });
 
   test('FEATURE_CHAINS maps optimal specialized models for each task', () => {
-    assert.strictEqual(FEATURE_CHAINS.dictation.chain[0], 'gemini-3.5-transcribe');
-    assert.strictEqual(FEATURE_CHAINS['dictation-live'].chain[0], 'gemini-3.5-transcribe-live');
-    assert.strictEqual(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.7-flash');
+    assert.strictEqual(FEATURE_CHAINS.dictation.chain[0], 'gemini-2.5-flash');
+    assert.strictEqual(FEATURE_CHAINS['dictation-live'].chain[0], 'gemini-2.5-flash');
+    assert.strictEqual(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-2.5-flash');
     assert.strictEqual(FEATURE_CHAINS['cover-generation'].chain[0], 'nano-banana-pro');
     assert.strictEqual(FEATURE_CHAINS.tts.chain[0], 'gemini-3.1-flash-tts');
     assert.strictEqual(FEATURE_CHAINS['global-analysis'].chain[0], 'gemini-3.1-pro');
@@ -53,10 +53,10 @@ describe('AI Router & Quota System (Chantier 1)', () => {
 
   test('selectModel returns specialized models for each feature', async () => {
     const dictation = await selectModel('dictation');
-    assert.strictEqual(dictation.modelId, 'gemini-3.5-transcribe');
+    assert.strictEqual(dictation.modelId, 'gemini-2.5-flash');
 
     const textAnalysis = await selectModel('text-analysis');
-    assert.strictEqual(textAnalysis.modelId, 'gemini-3.7-flash');
+    assert.strictEqual(textAnalysis.modelId, 'gemini-2.5-flash');
 
     const cover = await selectModel('cover-generation');
     assert.strictEqual(cover.modelId, 'nano-banana-pro');

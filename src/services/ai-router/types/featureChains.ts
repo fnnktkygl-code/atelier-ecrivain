@@ -18,18 +18,16 @@ export interface FeatureRequirement {
 }
 
 export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
-  // 1. Transcription audio enregistrée (modèles dédiés STT)
+  // 1. Transcription audio enregistrée & Dictée
   dictation: {
     requiredCapability: 'text',
     requiredQuotaKind: 'generation',
     degradeInsteadOfFallback: false,
     chain: [
-      'gemini-3.5-transcribe', // Modèle dédié ultra-précis pour fichiers audio
-      'gemini-3.7-flash', // Dernier modèle Flash pour analyse et structuration
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
-      'gemini-2.5-flash',
-      'chirp-2',
+      'gemini-2.5-flash', // Modèle multimodal audio ultra-rapide et précis
+      'gemini-2.0-flash',
+      'gemini-2.5-pro',
+      'gemini-1.5-flash',
     ],
   },
 
@@ -39,10 +37,9 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     requiredQuotaKind: 'generation',
     degradeInsteadOfFallback: false,
     chain: [
-      'gemini-3.5-transcribe-live', // Modèle dédié streaming temps réel
-      'gemini-2.5-flash-native-audio-dialog',
-      'gemini-3.7-flash',
-      'chirp-2',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
     ],
   },
 
@@ -52,11 +49,10 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     requiredQuotaKind: 'generation',
     degradeInsteadOfFallback: false,
     chain: [
-      'gemini-3.7-flash', // Dernier modèle Flash de texte (le plus avancé)
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
-      'gemini-3.1-pro',
       'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.5-pro',
+      'gemini-1.5-flash',
     ],
   },
 

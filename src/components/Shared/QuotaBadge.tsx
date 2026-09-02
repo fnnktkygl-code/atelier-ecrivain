@@ -14,11 +14,10 @@ export default function QuotaBadge() {
       if (typeof window !== 'undefined') {
         setHasCustomKey(!!localStorage.getItem('atelier_user_gemini_key'));
       }
-      const qTranscribe = loadModelQuota('gemini-3.5-transcribe', 'generation');
-      const q37 = loadModelQuota('gemini-3.7-flash', 'generation');
-      const q36 = loadModelQuota('gemini-3.6-flash', 'generation');
-      const q25 = loadModelQuota('gemini-2.5-flash', 'generation');
-      setDictationDayCount(qTranscribe.dayCount + q37.dayCount + q36.dayCount + q25.dayCount);
+      const q25f = loadModelQuota('gemini-2.5-flash', 'generation');
+      const q20f = loadModelQuota('gemini-2.0-flash', 'generation');
+      const q25p = loadModelQuota('gemini-2.5-pro', 'generation');
+      setDictationDayCount(q25f.dayCount + q20f.dayCount + q25p.dayCount);
     };
     update();
     window.addEventListener('atelier_quota_updated', update);
@@ -76,7 +75,7 @@ export default function QuotaBadge() {
           }}
         />
         <span style={{ whiteSpace: 'nowrap' }}>
-          {hasCustomKey ? 'Clé Dédiée' : 'IA Active (Gemini 3.5/3.7)'}
+          {hasCustomKey ? 'Clé Dédiée' : 'IA Active (Gemini 2.5 Flash)'}
         </span>
       </div>
 
@@ -101,17 +100,17 @@ export default function QuotaBadge() {
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--accent, #8a5a34)' }}>
-            {hasCustomKey ? '🔑 Quota Gemini (Clé Dédiée)' : '🟢 Modèles Spécialisés Google 2026'}
+            {hasCustomKey ? '🔑 Quota Gemini (Clé Dédiée)' : '🟢 Modèles Multimodaux Google'}
           </div>
           {hasCustomKey ? (
             <div>• Clé personnelle active (Quota Illimité)<br />• Requêtes aujourd&apos;hui : {dictationDayCount}</div>
           ) : (
             <div>
-              • <strong>Audio & Dictée :</strong> Gemini 3.5 Transcribe & Live<br />
-              • <strong>Style & Ratures :</strong> Gemini 3.7 Flash & 3.6 Flash<br />
+              • <strong>Audio & Dictée :</strong> Gemini 2.5 Flash & 2.0 Flash<br />
+              • <strong>Style & Ratures :</strong> Gemini 2.5 Flash<br />
               • <strong>Fact-Checking :</strong> Gemini 2.5 Flash (Grounding Search)<br />
-              • <strong>Couvertures :</strong> Nano Banana Pro (Gemini 3 Pro Image)<br />
-              • <strong>Synthèse Vocale :</strong> Gemini 3.1 Flash TTS<br />
+              • <strong>Raisonnement :</strong> Gemini 2.5 Pro<br />
+              • <strong>Couvertures :</strong> Imagen 3.0<br />
               <span style={{ fontSize: 10, color: 'var(--text-soft)', fontStyle: 'italic', marginTop: 4, display: 'block' }}>
                 Réinitialisation à minuit heure Pacifique ({getPacificDateString()})
               </span>

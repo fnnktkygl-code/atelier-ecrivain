@@ -74,10 +74,10 @@ async function generateWithFallback<T>(
 
   const selection = await selectModel(feature);
   const fallbackChain = FEATURE_CHAINS[feature]?.chain || [
-    'gemini-3.5-transcribe',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
     'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-2.5-pro',
   ];
   const chain = selection.modelId
     ? [selection.modelId, ...fallbackChain.filter((m) => m !== selection.modelId)]
@@ -99,20 +99,11 @@ async function generateWithFallback<T>(
     } catch (err: unknown) {
       lastError = err;
       const errMsg = err instanceof Error ? err.message : String(err);
-      const isQuotaOrNotFound =
-        errMsg.includes('429') ||
-        errMsg.includes('RESOURCE_EXHAUSTED') ||
-        errMsg.includes('Quota exceeded') ||
-        errMsg.includes('404') ||
-        errMsg.includes('not found') ||
-        errMsg.includes('is not supported');
-
-      if (isQuotaOrNotFound) {
-        await recordUsage(modelName, 'generation', 'quota-error');
-        console.warn(`[AI Fallback] Modèle ${modelName} indisponible ou quota atteint pour ${feature}. Basculement...`);
-        continue;
-      }
-      throw err;
+      console.warn(
+        `[AI Fallback] Le modèle ${modelName} a échoué (${errMsg}). Basculement vers le modèle suivant dans la chaîne...`
+      );
+      await recordUsage(modelName, 'generation', 'quota-error');
+      continue;
     }
   }
 
