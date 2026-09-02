@@ -15,6 +15,7 @@ interface RecordButtonProps {
   phase: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
   level: number; // 0-1 audio level
   time: string;
+  statusMessage?: string;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -28,6 +29,7 @@ export default function RecordButton({
   phase,
   level,
   time,
+  statusMessage,
   onStart,
   onPause,
   onResume,
@@ -133,7 +135,7 @@ export default function RecordButton({
         {phase === 'processing' && (
           <span className="processing-label">
             <span className="processing-spinner" />
-            <span>Gemini 3.7 analyse la dictée…</span>
+            <span>{statusMessage || 'Transcription et structuration en cours…'}</span>
           </span>
         )}
       </div>

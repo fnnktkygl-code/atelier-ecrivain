@@ -314,6 +314,7 @@ export default function AtelierPage() {
             phase={ds.phase}
             level={ds.level}
             time={dictation.formatTime(ds.duration)}
+            statusMessage={ds.statusMessage}
             onStart={dictation.startRecording}
             onStop={dictation.stopRecording}
             onPause={dictation.pauseRecording}
@@ -411,7 +412,7 @@ export default function AtelierPage() {
                 <>
                   <div className="dictation-status-indicator processing">
                     <span className="processing-spinner" />
-                    <span>Gemini 3.7 analyse et structure la dictée…</span>
+                    <span>{ds.statusMessage || 'Gemini transcrit et structure la dictée…'}</span>
                   </div>
                   <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
                     <IconClose size={14} />

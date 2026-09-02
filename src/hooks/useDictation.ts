@@ -3,8 +3,8 @@
  *
  * Manages the full dictation workflow:
  * 1. Audio recording via MediaRecorder
- * 2. AI transcription via Gemini
- * 3. State management for the UI
+ * 2. AI transcription & structuring via Gemini (two-stage pipeline)
+ * 3. State management & dynamic progress tracking for the UI
  */
 
 'use client';
@@ -13,6 +13,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { AudioRecorder, type RecorderState } from '@/services/audio/recorder';
 import { transcribeAudio, toAIStructuredOutput } from '@/services/ai/transcription';
 import { isFirebaseConfigured } from '@/services/firebase/config';
+import { isGeminiConfigured } from '@/services/ai/geminiClient';
 import type { AIStructuredOutput, VerificationItem } from '@/types/manuscript';
 
 export type DictationPhase =
@@ -34,6 +35,8 @@ export interface DictationState {
   isNewChapter: boolean;
   chapterTitle: string | null;
   firebaseConfigured: boolean;
+  statusMessage?: string;
+  activeModelName?: string;
   usedModel?: string | null;
 }
 
@@ -49,14 +52,26 @@ export function useDictation(currentChapterIndex: number) {
     isNewChapter: false,
     chapterTitle: null,
     firebaseConfigured: false,
+    statusMessage: undefined,
+    activeModelName: undefined,
     usedModel: null,
   });
 
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const watchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check Firebase config on mount
   useEffect(() => {
     setState((prev) => ({ ...prev, firebaseConfigured: isFirebaseConfigured() }));
+  }, []);
+
+  // Clean up watchdog timer on unmount
+  useEffect(() => {
+    return () => {
+      if (watchdogTimerRef.current) {
+        clearTimeout(watchdogTimerRef.current);
+      }
+    };
   }, []);
 
   const startRecording = useCallback(async () => {
@@ -82,10 +97,11 @@ export function useDictation(currentChapterIndex: number) {
         setState((prev) => ({
           ...prev,
           phase: 'processing',
+          statusMessage: 'Initialisation de la transcription…',
           duration,
         }));
 
-        if (!isFirebaseConfigured()) {
+        if (!isGeminiConfigured() && !isFirebaseConfigured()) {
           // Demo mode: simulate a result
           setTimeout(() => {
             setState((prev) => ({
@@ -93,7 +109,7 @@ export function useDictation(currentChapterIndex: number) {
               phase: 'complete',
               result: {
                 jetBrut: [
-                  'Ceci est une démonstration. Configurez Firebase dans .env.local pour activer la transcription IA.',
+                  'Ceci est une démonstration. Configurez votre clé Google AI Studio dans Profil pour activer la transcription IA.',
                   `Durée de l'enregistrement : ${Math.floor(duration / 60)}min ${duration % 60}s.`,
                 ],
                 ratures: [],
@@ -101,17 +117,49 @@ export function useDictation(currentChapterIndex: number) {
                 notes: {},
                 floatingNotes: [],
               },
-              summary: 'Mode démonstration — Firebase non configuré',
+              summary: 'Mode démonstration — Clé Gemini non configurée',
               usedModel: 'demo',
+              statusMessage: undefined,
             }));
           }, 1500);
           return;
         }
 
-        try {
-          const result = await transcribeAudio(blob, {
-            currentChapter: currentChapterIndex,
+        // Safety watchdog timer (45s max) to guarantee UI never hangs indefinitely
+        if (watchdogTimerRef.current) {
+          clearTimeout(watchdogTimerRef.current);
+        }
+        watchdogTimerRef.current = setTimeout(() => {
+          setState((prev) => {
+            if (prev.phase === 'processing') {
+              return {
+                ...prev,
+                phase: 'error',
+                error: 'Le délai d’attente pour la transcription a été dépassé. Veuillez réessayer avec une dictée plus courte ou vérifier votre connexion.',
+                statusMessage: undefined,
+              };
+            }
+            return prev;
           });
+        }, 45000);
+
+        try {
+          const result = await transcribeAudio(
+            blob,
+            { currentChapter: currentChapterIndex },
+            (progress) => {
+              setState((prev) => ({
+                ...prev,
+                statusMessage: progress.message,
+                activeModelName: progress.modelName,
+              }));
+            }
+          );
+
+          if (watchdogTimerRef.current) {
+            clearTimeout(watchdogTimerRef.current);
+            watchdogTimerRef.current = null;
+          }
 
           setState((prev) => ({
             ...prev,
@@ -122,17 +170,23 @@ export function useDictation(currentChapterIndex: number) {
             isNewChapter: result.isNewChapter,
             chapterTitle: result.chapterTitle,
             usedModel: result.modelUsed,
+            statusMessage: undefined,
           }));
         } catch (err) {
+          if (watchdogTimerRef.current) {
+            clearTimeout(watchdogTimerRef.current);
+            watchdogTimerRef.current = null;
+          }
           setState((prev) => ({
             ...prev,
             phase: 'error',
             error: err instanceof Error ? err.message : 'Erreur inconnue pendant la transcription.',
+            statusMessage: undefined,
           }));
         }
       },
       onError: (error: string) => {
-        setState((prev) => ({ ...prev, phase: 'error', error }));
+        setState((prev) => ({ ...prev, phase: 'error', error, statusMessage: undefined }));
       },
     });
 
@@ -153,6 +207,10 @@ export function useDictation(currentChapterIndex: number) {
   }, []);
 
   const cancelRecording = useCallback(() => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
     recorderRef.current?.cancel();
     setState({
       phase: 'idle',
@@ -165,11 +223,17 @@ export function useDictation(currentChapterIndex: number) {
       isNewChapter: false,
       chapterTitle: null,
       firebaseConfigured: isFirebaseConfigured(),
+      statusMessage: undefined,
+      activeModelName: undefined,
       usedModel: null,
     });
   }, []);
 
   const reset = useCallback(() => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
     setState({
       phase: 'idle',
       duration: 0,
@@ -181,6 +245,8 @@ export function useDictation(currentChapterIndex: number) {
       isNewChapter: false,
       chapterTitle: null,
       firebaseConfigured: isFirebaseConfigured(),
+      statusMessage: undefined,
+      activeModelName: undefined,
       usedModel: null,
     });
   }, []);

@@ -2,9 +2,9 @@
  * Gemini AI Service — Transcription & Structuration
  *
  * Utilise la pile Gemini AI Studio (Google AI Developer API) avec les derniers modèles spécialisés 2026 :
- * 1. Gemini 3.5 Transcribe / Transcribe Live pour l'audio et la dictée vocale
- * 2. Gemini 3.7 Flash pour l'analyse stylistique et les ratures
- * 3. Gemini 2.5 Flash avec Grounding Google Search pour le fact-checking
+ * 1. Gemini 3.5 Transcribe pour la transcription audio haute précision (STT ultra-rapide)
+ * 2. Gemini 3.7 Flash / 3.6 Flash pour l'analyse stylistique, ratures et structuration JSON
+ * 3. Fallback multimodal direct et protection anti-perte de texte dicté
  */
 
 import { getGeminiAIStudio, isGeminiConfigured, formatGeminiError } from './geminiClient';
@@ -35,6 +35,12 @@ export interface TranscriptionResult {
   modelUsed?: string;
 }
 
+export type DictationProgressCallback = (status: {
+  step: 'transcribing' | 'structuring';
+  message: string;
+  modelName: string;
+}) => void;
+
 /**
  * Convert an audio Blob to base64 for Gemini
  */
@@ -51,11 +57,28 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
+ * Parse a JSON response from Gemini cleanly
+ */
+function parseTranscriptionJSON(responseText: string): TranscriptionResult {
+  try {
+    return JSON.parse(responseText) as TranscriptionResult;
+  } catch {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]) as TranscriptionResult;
+      } catch {}
+    }
+    throw new Error('Impossible de parser la réponse de Gemini. Réponse reçue : ' + responseText.slice(0, 200));
+  }
+}
+
+/**
  * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error using AI Router
  */
 async function generateWithFallback<T>(
   generationConfig: Record<string, unknown>,
-  systemInstruction: string,
+  systemInstruction: string | undefined,
   feature: FeatureId,
   execute: (model: GenerativeModel, modelName: string) => Promise<T>
 ): Promise<{ result: T; modelUsed: string }> {
@@ -63,10 +86,10 @@ async function generateWithFallback<T>(
 
   const selection = await selectModel(feature);
   const fallbackChain = FEATURE_CHAINS[feature]?.chain || [
-    'gemini-3.5-transcribe',
     'gemini-3.7-flash',
     'gemini-3.6-flash',
-    'gemini-2.5-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-pro',
   ];
   const chain = selection.modelId
     ? [selection.modelId, ...fallbackChain.filter((m) => m !== selection.modelId)]
@@ -76,11 +99,14 @@ async function generateWithFallback<T>(
 
   for (const modelName of chain) {
     try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: generationConfig as never,
-        systemInstruction,
-      });
+      const model = genAI.getGenerativeModel(
+        {
+          model: modelName,
+          generationConfig: generationConfig as never,
+          ...(systemInstruction ? { systemInstruction } : {}),
+        },
+        { timeout: 30000 }
+      );
 
       const res = await execute(model, modelName);
       await recordUsage(modelName, 'generation', 'success');
@@ -91,7 +117,14 @@ async function generateWithFallback<T>(
       console.warn(
         `[Gemini AI Studio Fallback] Le modèle ${modelName} a échoué (${errMsg}). Basculement vers le modèle suivant dans la chaîne...`
       );
-      await recordUsage(modelName, 'generation', 'quota-error');
+      // ONLY register quota-error if it's actually a quota/rate limit error (429 / RESOURCE_EXHAUSTED)
+      if (
+        errMsg.includes('429') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('Quota exceeded')
+      ) {
+        await recordUsage(modelName, 'generation', 'quota-error');
+      }
       continue;
     }
   }
@@ -114,9 +147,91 @@ function checkRateLimit() {
   requestTimestamps.push(now);
 }
 
+/**
+ * Stage 1: Speech-To-Text transcription using dedicated transcribe model (gemini-3.5-transcribe)
+ */
+async function transcribeAudioToRawText(
+  audioBase64: string,
+  mimeType: string,
+  contextPrompt?: string
+): Promise<{ text: string; modelUsed: string }> {
+  const prompt = `Transcris fidèlement et intégralement cet enregistrement audio en français. Rédige mot à mot tout ce qui a été dicté par l'auteur sans résumer ni omettre de phrases.${
+    contextPrompt ? ` Contexte : ${contextPrompt}` : ''
+  }`;
+
+  // STT models don't support JSON mode, so we request plain text
+  const { result, modelUsed } = await generateWithFallback(
+    {
+      maxOutputTokens: 8192,
+    },
+    undefined,
+    'dictation',
+    async (model, modelName) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Gemini STT Stage 1] Modèle audio : ${modelName}`);
+      }
+      const apiResult = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: audioBase64,
+            mimeType: mimeType || 'audio/webm',
+          },
+        },
+      ]);
+      const text = apiResult.response.text();
+      return text.trim();
+    }
+  );
+
+  return { text: result, modelUsed };
+}
+
+/**
+ * Stage 2: Literary text structuring and analysis (gemini-3.7-flash / gemini-3.6-flash)
+ */
+async function structureTranscriptText(
+  rawText: string,
+  context?: { currentChapter?: number; previousContent?: string }
+): Promise<{ result: TranscriptionResult; modelUsed: string }> {
+  let contextPrompt = `Structure et analyse ce texte dicté par l'écrivain :\n\n« ${rawText} »`;
+  if (context?.currentChapter !== undefined) {
+    contextPrompt += `\nL'auteur poursuit la rédaction de son chapitre en cours (Chapitre ${context.currentChapter + 1}). Tout le texte dicté doit venir À LA SUITE de ce chapitre. Ne crée PAS de nouveau chapitre sauf si explicitement demandé.`;
+  }
+  if (context?.previousContent) {
+    contextPrompt += `\nContexte du texte précédent : « ${context.previousContent.slice(-400)} »`;
+  }
+
+  const { result, modelUsed } = await generateWithFallback(
+    {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 8192,
+    },
+    SYSTEM_PROMPT_TRANSCRIPTION,
+    'text-analysis',
+    async (model, modelName) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Gemini Structuring Stage 2] Modèle texte : ${modelName}`);
+      }
+      const apiResult = await model.generateContent([contextPrompt]);
+      const responseText = apiResult.response.text();
+      return parseTranscriptionJSON(responseText);
+    }
+  );
+
+  return { result, modelUsed };
+}
+
+/**
+ * High-performance audio transcription and structuring pipeline:
+ * 1. Stage 1: Ultra-fast STT with gemini-3.5-transcribe
+ * 2. Stage 2: Literary structuring with gemini-3.7-flash
+ * 3. Fallback: Direct multimodal processing or safe raw transcript return (zero data loss)
+ */
 export async function transcribeAudio(
   audioBlob: Blob,
-  context?: { currentChapter?: number; previousContent?: string }
+  context?: { currentChapter?: number; previousContent?: string },
+  onProgress?: DictationProgressCallback
 ): Promise<TranscriptionResult> {
   if (!isGeminiConfigured()) {
     throw new Error(
@@ -131,47 +246,92 @@ export async function transcribeAudio(
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {
-    contextPrompt += ` L'auteur poursuit la rédaction de son chapitre en cours (Chapitre ${context.currentChapter + 1}). Tout le texte dicté doit venir À LA SUITE de ce chapitre. Ne crée PAS de nouveau chapitre.`;
-  }
-  if (context?.previousContent) {
-    contextPrompt += ` Voici le contexte du texte précédent pour maintenir la continuité : « ${context.previousContent.slice(-500)} »`;
+    contextPrompt += ` Chapitre ${context.currentChapter + 1}.`;
   }
 
-  const { result, modelUsed } = await generateWithFallback(
-    {
-      responseMimeType: 'application/json',
-      maxOutputTokens: 8192,
-    },
-    SYSTEM_PROMPT_TRANSCRIPTION,
-    'dictation',
-    async (model, modelName) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[Gemini AI Studio Dictation] Modèle : ${modelName}`);
-      }
-      const apiResult = await model.generateContent([
-        contextPrompt,
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: audioBlob.type || 'audio/webm',
-          },
-        },
-      ]);
+  // ── Two-stage pipeline ──
+  try {
+    onProgress?.({
+      step: 'transcribing',
+      message: 'Transcription audio en cours (Gemini 3.5 Transcribe)…',
+      modelName: 'gemini-3.5-transcribe',
+    });
 
-      const responseText = apiResult.response.text();
-      try {
-        return JSON.parse(responseText) as TranscriptionResult;
-      } catch {
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as TranscriptionResult;
-        }
-        throw new Error('Impossible de parser la réponse de Gemini. Réponse reçue : ' + responseText.slice(0, 200));
-      }
+    const { text: rawTranscript, modelUsed: sttModel } = await transcribeAudioToRawText(
+      audioBase64,
+      audioBlob.type || 'audio/webm',
+      context?.previousContent ? `Contexte : ${context.previousContent.slice(-300)}` : undefined
+    );
+
+    if (!rawTranscript || rawTranscript.trim().length === 0) {
+      throw new Error('Aucun contenu audio détecté lors de la transcription.');
     }
-  );
 
-  return { ...result, modelUsed };
+    onProgress?.({
+      step: 'structuring',
+      message: 'Structuration & analyse stylistique (Gemini 3.7 Flash)…',
+      modelName: 'gemini-3.7-flash',
+    });
+
+    try {
+      const { result, modelUsed: structModel } = await structureTranscriptText(rawTranscript, context);
+      return {
+        ...result,
+        modelUsed: `${sttModel} + ${structModel}`,
+      };
+    } catch (structErr) {
+      console.warn('[Transcription Structuring Fallback] Erreur de structuration, retour du texte brut sécurisé:', structErr);
+      // Safe fallback: never lose the user's dictated speech!
+      return {
+        chapterIndex: context?.currentChapter ?? null,
+        chapterTitle: null,
+        isNewChapter: false,
+        jetBrut: rawTranscript.split('\n\n').filter(Boolean),
+        ratures: [],
+        corrections: [],
+        notes: {},
+        floatingNotes: [],
+        summary: rawTranscript.slice(0, 120),
+        modelUsed: `${sttModel} (texte brut)`,
+      };
+    }
+  } catch (sttErr) {
+    // If Stage 1 STT failed, try direct multimodal structuring fallback with Flash models
+    console.warn('[Transcription STT Fallback] Basculement vers la structuration multimodale directe:', sttErr);
+
+    onProgress?.({
+      step: 'structuring',
+      message: 'Analyse et structuration multimodale directe (Gemini 3.7 Flash)…',
+      modelName: 'gemini-3.7-flash',
+    });
+
+    const { result, modelUsed } = await generateWithFallback(
+      {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
+      },
+      SYSTEM_PROMPT_TRANSCRIPTION,
+      'text-analysis',
+      async (model, modelName) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[Gemini Direct Multimodal Fallback] Modèle : ${modelName}`);
+        }
+        const apiResult = await model.generateContent([
+          contextPrompt,
+          {
+            inlineData: {
+              data: audioBase64,
+              mimeType: audioBlob.type || 'audio/webm',
+            },
+          },
+        ]);
+        const responseText = apiResult.response.text();
+        return parseTranscriptionJSON(responseText);
+      }
+    );
+
+    return { ...result, modelUsed: `${modelUsed} (direct)` };
+  }
 }
 
 export async function factCheck(text: string): Promise<VerificationItem[]> {
@@ -212,15 +372,7 @@ export async function analyzeWrittenText(
       }
       const apiResult = await model.generateContent([contextPrompt]);
       const responseText = apiResult.response.text();
-      try {
-        return JSON.parse(responseText) as TranscriptionResult;
-      } catch {
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as TranscriptionResult;
-        }
-        throw new Error('Impossible de parser la réponse de Gemini. Réponse : ' + responseText.slice(0, 200));
-      }
+      return parseTranscriptionJSON(responseText);
     }
   );
 
@@ -252,7 +404,7 @@ export async function transcribeAudioStream(
       maxOutputTokens: 8192,
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
-    'dictation-live',
+    'text-analysis',
     async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[Gemini AI Studio Stream] Modèle : ${modelName}`);
@@ -274,15 +426,7 @@ export async function transcribeAudioStream(
         onChunk(fullText);
       }
 
-      try {
-        return JSON.parse(fullText) as TranscriptionResult;
-      } catch {
-        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as TranscriptionResult;
-        }
-        throw new Error('Erreur de parsing de la réponse streaming.');
-      }
+      return parseTranscriptionJSON(fullText);
     }
   );
 

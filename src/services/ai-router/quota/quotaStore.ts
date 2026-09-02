@@ -11,6 +11,7 @@ interface QuotaState {
 }
 
 const STORAGE_PREFIX = 'atelier_quota_router_v2_';
+const memoryStore: Record<string, string> = {};
 
 function getStorageKey(modelId: string, quotaKind: QuotaKind): string {
   return `${STORAGE_PREFIX}${modelId}_${quotaKind}`;
@@ -18,11 +19,9 @@ function getStorageKey(modelId: string, quotaKind: QuotaKind): string {
 
 export function loadModelQuota(modelId: string, quotaKind: QuotaKind): QuotaState {
   const today = getPacificDateString();
-  if (typeof window === 'undefined') {
-    return { minuteCount: 0, dayCount: 0, dayDate: today };
-  }
+  const key = getStorageKey(modelId, quotaKind);
   try {
-    const raw = localStorage.getItem(getStorageKey(modelId, quotaKind));
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : memoryStore[key];
     if (raw) {
       const parsed = JSON.parse(raw) as QuotaState;
       if (parsed.dayDate !== today) {
@@ -35,10 +34,15 @@ export function loadModelQuota(modelId: string, quotaKind: QuotaKind): QuotaStat
 }
 
 export function saveModelQuota(modelId: string, quotaKind: QuotaKind, state: QuotaState) {
-  if (typeof window === 'undefined') return;
+  const key = getStorageKey(modelId, quotaKind);
   try {
-    localStorage.setItem(getStorageKey(modelId, quotaKind), JSON.stringify(state));
-    window.dispatchEvent(new CustomEvent('atelier_quota_updated'));
+    const serialized = JSON.stringify(state);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(key, serialized);
+      window.dispatchEvent(new CustomEvent('atelier_quota_updated'));
+    } else {
+      memoryStore[key] = serialized;
+    }
   } catch {}
 }
 
@@ -69,6 +73,13 @@ export function hasModelQuota(modelId: string, quotaKind: QuotaKind): boolean {
   }
 
   return true;
+}
+
+/** Clear cooldown for a specific model */
+export function clearModelCooldown(modelId: string, quotaKind: QuotaKind) {
+  const state = loadModelQuota(modelId, quotaKind);
+  delete state.cooldownUntilPacificDate;
+  saveModelQuota(modelId, quotaKind, state);
 }
 
 /** Increment local & Firestore usage counters or register cooldown */
