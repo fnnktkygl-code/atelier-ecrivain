@@ -57,11 +57,56 @@ export function useAuth() {
 }
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(() => isFirebaseConfigured());
-  const [manuscript, setManuscript] = useState<ManuscriptMeta | null>(null);
-  const [manuscripts, setManuscripts] = useState<ManuscriptMeta[]>([]);
-  const [penNameState, setPenNameState] = useState('');
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return { uid: 'mock-writer', displayName: 'Richard', email: 'richard@ecrivain.fr' } as unknown as User;
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return false;
+    }
+    return isFirebaseConfigured();
+  });
+  const [manuscript, setManuscript] = useState<ManuscriptMeta | null>(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return {
+        id: 'ms-1',
+        title: 'Dieu à l’image des hommes',
+        author: 'Richard',
+        wordCount: 1363,
+        chaptersCount: 3,
+        lastModified: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        coverUrl: '',
+      };
+    }
+    return null;
+  });
+  const [manuscripts, setManuscripts] = useState<ManuscriptMeta[]>(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return [{
+        id: 'ms-1',
+        title: 'Dieu à l’image des hommes',
+        author: 'Richard',
+        wordCount: 1363,
+        chaptersCount: 3,
+        lastModified: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        coverUrl: '',
+      }];
+    }
+    return [];
+  });
+  const [penNameState, setPenNameState] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return 'Richard';
+    }
+    return '';
+  });
   const [avatarColor, setAvatarColor] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [showEmailState, setShowEmailState] = useState(true);
@@ -78,6 +123,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return;
+    }
+
     if (!isFirebaseConfigured()) {
       return;
     }

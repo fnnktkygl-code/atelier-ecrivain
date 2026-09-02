@@ -22,9 +22,19 @@ const LITERARY_SANCTUARY_QUOTES = [
   { text: 'Dans le silence de l’encre, chaque mot posé est une pierre d’éternité.', author: 'Jun’ichirō Tanizaki' },
 ];
 
+function getTimeRitual(): string {
+  if (typeof window === 'undefined') return "L'Encre de l'Aube";
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "L'Encre de l'Aube";
+  if (hour >= 12 && hour < 18) return 'La Clarté du Jour';
+  if (hour >= 18 && hour < 23) return 'Le Calme du Crépuscule';
+  return 'La Veilleuse Nocturne';
+}
+
 export default function Dashboard() {
   const { user, loading, manuscript, penName, manuscripts } = useAuth();
   const [quoteIdx, setQuoteIdx] = useState(() => Math.floor(Math.random() * LITERARY_SANCTUARY_QUOTES.length));
+  const [timeRitual] = useState(getTimeRitual);
 
   if (loading) {
     return (
@@ -41,20 +51,10 @@ export default function Dashboard() {
     return <LoginPage />;
   }
 
-  const displayName = penName || user.displayName?.split(' ')[0] || 'Écrivain';
-
-  // Moment de la journée selon les rituels de l'encre et du thé
-  const hour = new Date().getHours();
-  const timeRitual =
-    hour >= 5 && hour < 12
-      ? "L'Encre de l'Aube"
-      : hour >= 12 && hour < 18
-      ? 'La Clarté du Jour'
-      : hour >= 18 && hour < 23
-      ? 'Le Calme du Crépuscule'
-      : 'La Veilleuse Nocturne';
-
+  const displayName = penName || user.displayName?.split(' ')[0] || 'Richard';
   const currentQuote = LITERARY_SANCTUARY_QUOTES[quoteIdx];
+  const activeManuscript = manuscript;
+  const activeManuscripts = manuscripts;
 
   return (
     <main className="sanctuary-wrapper">
@@ -65,7 +65,7 @@ export default function Dashboard() {
             <span className="sanctuary-ritual-tag">{timeRitual}</span>
             <span className="sanctuary-ritual-dot" />
             <span className="sanctuary-ritual-count">
-              {manuscripts.length} {manuscripts.length > 1 ? 'œuvres en gestation' : 'œuvre en cours'}
+              {activeManuscripts.length} {activeManuscripts.length > 1 ? 'œuvres en gestation' : 'œuvre en cours'}
             </span>
           </div>
 
@@ -79,7 +79,7 @@ export default function Dashboard() {
         </header>
 
         {/* ── 2. Le Manuscrit Actif (Volume 3D & Noblesse Tactile) ── */}
-        {manuscript ? (
+        {activeManuscript ? (
           <section className="sanctuary-hero-card" aria-label="Manuscrit en cours">
             {/* Rendu 3D du Livre Japandi */}
             <div className="book-3d-stage">
@@ -88,7 +88,7 @@ export default function Dashboard() {
                   <div className="book-3d-groove" />
                   <div className="book-3d-ribbon" />
                   <IconFeather size={18} className="book-3d-feather" />
-                  <span className="book-3d-title">{manuscript.title}</span>
+                  <span className="book-3d-title">{activeManuscript.title}</span>
                   <span className="book-3d-author">{displayName}</span>
                 </div>
                 <div className="book-3d-pages-edge" />
@@ -102,7 +102,7 @@ export default function Dashboard() {
                 <span>Manuscrit Actif</span>
               </div>
 
-              <h2 className="sanctuary-hero-title">{manuscript.title}</h2>
+              <h2 className="sanctuary-hero-title">{activeManuscript.title}</h2>
 
               <p className="sanctuary-hero-details">
                 Poursuivez la rédaction au point exact où vous l’avez laissée, dictez vos repentirs ou relisez vos chapitres.
