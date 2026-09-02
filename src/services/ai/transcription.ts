@@ -1,14 +1,20 @@
 /**
  * Gemini AI Service — Transcription & Structuration
  *
- * Uses Firebase AI Logic (Gemini Developer API) to:
- * 1. Transcribe audio dictation into structured manuscript
- * 2. Fact-check citations and historical references
+ * Utilise Firebase AI Logic / Gemini Developer API avec les derniers modèles spécialisés 2026 :
+ * 1. Gemini 3.5 Transcribe / Transcribe Live pour l'audio et la dictée vocale
+ * 2. Gemini 3.7 Flash pour l'analyse stylistique et les ratures
+ * 3. Gemini 2.5 Flash avec Grounding Google Search pour le fact-checking
  */
 
 import { getFirebaseApp, isFirebaseConfigured } from '@/services/firebase/config';
-import { SYSTEM_PROMPT_TRANSCRIPTION, SYSTEM_PROMPT_FACTCHECK } from './prompts';
+import { SYSTEM_PROMPT_TRANSCRIPTION } from './prompts';
 import type { AIStructuredOutput, VerificationItem } from '@/types/manuscript';
+import { selectModel } from '../ai-router/router/selectModel';
+import { recordUsage } from '../ai-router/router/recordUsage';
+import { recordApiRequest } from './quotaTracker';
+import { verifyTextFactCheck } from '../ai-router/services/factCheck';
+import { FEATURE_CHAINS, FeatureId } from '../ai-router/types/featureChains';
 
 // Lazy-loaded Firebase AI imports
 let aiModule: typeof import('firebase/ai') | null = null;
@@ -20,7 +26,7 @@ async function getAIModule() {
   return aiModule;
 }
 
-interface TranscriptionResult {
+export interface TranscriptionResult {
   chapterIndex: number | null;
   chapterTitle: string | null;
   isNewChapter: boolean;
@@ -54,54 +60,45 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Prioritized list of Gemini models for automatic fallback.
- * 1. Primary high-performance models (3.6 Flash -> 3.5 Flash)
- * 2. High-quota fallback model (3.5 Flash Lite — 500 RPD)
- * 3. General alias fallback (gemini-flash-latest)
- */
-const MODEL_FALLBACK_CHAIN = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-latest',
-];
-
-import { selectModel } from '../ai-router/router/selectModel';
-import { recordUsage } from '../ai-router/router/recordUsage';
-
-/**
  * Execute a Gemini AI operation with automatic fallback on quota/rate-limit error using AI Router
  */
 async function generateWithFallback<T>(
-  generationConfig: any,
+  generationConfig: Record<string, unknown>,
   systemInstruction: string,
-  execute: (model: any, modelName: string) => Promise<T>
+  feature: FeatureId,
+  execute: (model: unknown, modelName: string) => Promise<T>
 ): Promise<{ result: T; modelUsed: string }> {
   const { getAI, getGenerativeModel, GoogleAIBackend } = await getAIModule();
   const app = getFirebaseApp();
   const ai = getAI(app, { backend: new GoogleAIBackend() });
 
-  const selection = await selectModel('dictation');
+  const selection = await selectModel(feature);
+  const fallbackChain = FEATURE_CHAINS[feature]?.chain || [
+    'gemini-3.5-transcribe',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-2.5-flash',
+  ];
   const chain = selection.modelId
-    ? [selection.modelId, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest']
-    : ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+    ? [selection.modelId, ...fallbackChain.filter((m) => m !== selection.modelId)]
+    : fallbackChain;
 
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   for (const modelName of chain) {
     try {
       const model = getGenerativeModel(ai, {
         model: modelName,
-        generationConfig,
+        generationConfig: generationConfig as never,
         systemInstruction,
       });
 
       const res = await execute(model, modelName);
       await recordUsage(modelName, 'generation', 'success');
       return { result: res, modelUsed: modelName };
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      const errMsg = err?.message || String(err);
+      const errMsg = err instanceof Error ? err.message : String(err);
       const isQuotaOrNotFound =
         errMsg.includes('429') ||
         errMsg.includes('RESOURCE_EXHAUSTED') ||
@@ -112,19 +109,16 @@ async function generateWithFallback<T>(
 
       if (isQuotaOrNotFound) {
         await recordUsage(modelName, 'generation', 'quota-error');
-        console.warn(`[AI Fallback] Modèle ${modelName} indisponible ou quota atteint. Basculement...`);
+        console.warn(`[AI Fallback] Modèle ${modelName} indisponible ou quota atteint pour ${feature}. Basculement...`);
         continue;
       }
       throw err;
     }
   }
 
-  throw lastError || new Error('Tous les modèles Gemini de la chaîne de secours ont échoué.');
+  throw lastError || new Error(`Tous les modèles de la chaîne ${feature} ont échoué.`);
 }
 
-/**
- * Transcribe and structure an audio recording using Gemini
- */
 // ── Rate Limiter ──
 const requestTimestamps: number[] = [];
 
@@ -134,13 +128,20 @@ function checkRateLimit() {
   while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
     requestTimestamps.shift();
   }
-  if (requestTimestamps.length >= 10) {
-    throw new Error('Limite de requêtes atteinte (max 10 dictées / minute). Veuillez patienter quelques secondes.');
+  if (requestTimestamps.length >= 30) {
+    throw new Error('Limite de requêtes atteinte (max 30 requêtes / minute). Veuillez patienter quelques secondes.');
   }
   requestTimestamps.push(now);
 }
 
-import { recordApiRequest } from './quotaTracker';
+interface RawModelClient {
+  generateContent: (content: unknown[]) => Promise<{
+    response: { text: () => string };
+  }>;
+  generateContentStream: (content: unknown[]) => Promise<{
+    stream: AsyncIterable<{ text: () => string }>;
+  }>;
+}
 
 export async function transcribeAudio(
   audioBlob: Blob,
@@ -148,7 +149,7 @@ export async function transcribeAudio(
 ): Promise<TranscriptionResult> {
   if (!isFirebaseConfigured()) {
     throw new Error(
-      'Firebase n\'est pas configuré. Ajoutez votre config dans .env.local'
+      "Firebase n'est pas configuré. Ajoutez votre config dans .env.local"
     );
   }
 
@@ -171,11 +172,13 @@ export async function transcribeAudio(
       maxOutputTokens: 8192,
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
+    'dictation',
     async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Dictation] Exécution avec le modèle : ${modelName}`);
+        console.log(`[AI Dictation] Exécution avec le modèle spécialisé : ${modelName}`);
       }
-      const apiResult = await model.generateContent([
+      const typedModel = model as RawModelClient;
+      const apiResult = await typedModel.generateContent([
         contextPrompt,
         {
           inlineData: {
@@ -201,8 +204,6 @@ export async function transcribeAudio(
   return { ...result, modelUsed };
 }
 
-import { verifyTextFactCheck } from '../ai-router/services/factCheck';
-
 export async function factCheck(text: string): Promise<VerificationItem[]> {
   const res = await verifyTextFactCheck(text);
   return res.verifications;
@@ -216,7 +217,7 @@ export async function analyzeWrittenText(
   context?: { currentChapter?: number }
 ): Promise<TranscriptionResult> {
   if (!isFirebaseConfigured()) {
-    throw new Error('Firebase n\'est pas configuré. Ajoutez votre configuration dans .env.local');
+    throw new Error("Firebase n'est pas configuré. Ajoutez votre configuration dans .env.local");
   }
 
   checkRateLimit();
@@ -234,11 +235,13 @@ export async function analyzeWrittenText(
       maxOutputTokens: 8192,
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
+    'text-analysis',
     async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[AI Text Analysis] Exécution avec le modèle : ${modelName}`);
       }
-      const apiResult = await model.generateContent([contextPrompt]);
+      const typedModel = model as RawModelClient;
+      const apiResult = await typedModel.generateContent([contextPrompt]);
       const responseText = apiResult.response.text();
       try {
         return JSON.parse(responseText) as TranscriptionResult;
@@ -264,7 +267,7 @@ export async function transcribeAudioStream(
   context?: { currentChapter?: number }
 ): Promise<TranscriptionResult> {
   if (!isFirebaseConfigured()) {
-    throw new Error('Firebase n\'est pas configuré.');
+    throw new Error("Firebase n'est pas configuré.");
   }
 
   const audioBase64 = await blobToBase64(audioBlob);
@@ -280,11 +283,13 @@ export async function transcribeAudioStream(
       maxOutputTokens: 8192,
     },
     SYSTEM_PROMPT_TRANSCRIPTION,
+    'dictation-live',
     async (model, modelName) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[AI Stream] Exécution avec le modèle : ${modelName}`);
+        console.log(`[AI Stream] Exécution avec le modèle streaming : ${modelName}`);
       }
-      const streamResult = await model.generateContentStream([
+      const typedModel = model as RawModelClient;
+      const streamResult = await typedModel.generateContentStream([
         contextPrompt,
         {
           inlineData: {

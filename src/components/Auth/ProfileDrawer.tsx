@@ -1,17 +1,42 @@
-'use client';
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from './AuthProvider';
 import { useTheme } from '@/components/Shared/ThemeProvider';
+import {
+  IconClose,
+  IconEdit,
+  IconBook,
+  IconPlus,
+  IconPalette,
+  IconSun,
+  IconMoon,
+  IconCompass,
+  IconShield,
+  IconDownload,
+} from '@/components/Shared/Icons';
 
 export default function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, manuscript, manuscripts, penName, avatarColor, avatarUrl, showEmail, updatePenName, renameManuscript, logOut, selectManuscript, addManuscript, deleteManuscript, updateProfileSettings } = useAuth();
+  const {
+    user,
+    manuscript,
+    manuscripts,
+    penName,
+    avatarColor,
+    avatarUrl,
+    showEmail,
+    updatePenName,
+    renameManuscript,
+    logOut,
+    selectManuscript,
+    addManuscript,
+    deleteManuscript,
+    updateProfileSettings,
+  } = useAuth();
   const { theme, setTheme } = useTheme();
   const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editNameValue, setEditNameValue] = useState('');
+  const [editNameValue, setEditNameValue] = useState(() => penName || user?.displayName || 'Écrivain');
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -29,7 +54,6 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d')!;
-        // Crop to square from center
         const min = Math.min(img.width, img.height);
         const sx = (img.width - min) / 2;
         const sy = (img.height - min) / 2;
@@ -45,10 +69,6 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
   const removePhoto = () => {
     updateProfileSettings({ avatarUrl: '' });
   };
-
-  useEffect(() => {
-    setEditNameValue(penName || user?.displayName || 'Écrivain');
-  }, [penName, user]);
 
   if (!user) return null;
 
@@ -74,7 +94,7 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
     setIsEditingName(false);
   };
 
-  const handleSelect = (m: typeof manuscripts[0]) => {
+  const handleSelect = (m: (typeof manuscripts)[0]) => {
     selectManuscript(m);
     onClose();
   };
@@ -83,302 +103,111 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
     ? new Date(user.metadata.creationTime).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     : '';
 
+  const AVATAR_COLORS = [
+    '#C07D49',
+    '#466353',
+    '#BA5A45',
+    '#4A6B82',
+    '#7D6B90',
+    '#5C5549',
+    '#8A5A34',
+    '#3D5A50',
+  ];
+
   return (
     <>
-      <style>{`
-        .drawer-overlay {
-          position: fixed; inset: 0; z-index: 999;
-          background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
-          opacity: 0; pointer-events: none;
-          transition: opacity .3s ease;
-        }
-        .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+      <div
+        className={`toc-overlay ${open ? 'open' : ''}`}
+        onClick={onClose}
+      />
+      <div
+        className={`toc-drawer ${open ? 'open' : ''}`}
+        style={{ right: 0, left: 'auto', transform: open ? 'translateX(0)' : 'translateX(100%)', width: 360 }}
+      >
+        <div className="chapter-list-header" style={{ marginBottom: 16 }}>
+          <h3 className="sidebar-section-title">Profil & Paramètres</h3>
+          <button className="sidebar-close-btn" onClick={onClose} aria-label="Fermer">
+            <IconClose size={16} strokeWidth={2} />
+          </button>
+        </div>
 
-        .profile-drawer {
-          position: fixed; top: 0; right: 0; bottom: 0;
-          width: 360px; max-width: 90vw; z-index: 1000;
-          background: var(--surface);
-          box-shadow: -8px 0 32px rgba(0,0,0,.12);
-          transform: translateX(100%);
-          transition: transform .32s cubic-bezier(.22,.68,0,1);
-          display: flex; flex-direction: column;
-          overflow-y: auto;
-        }
-        .profile-drawer.open { transform: translateX(0); }
-
-        .drawer-header {
-          padding: 28px 24px 20px;
-          border-bottom: 1px solid var(--border);
-          display: flex; align-items: center; gap: 16px;
-        }
-        .drawer-avatar {
-          width: 56px; height: 56px; border-radius: 50%;
-          border: 3px solid var(--accent);
-          object-fit: cover; flex-shrink: 0;
-        }
-        .drawer-avatar-placeholder {
-          width: 56px; height: 56px; border-radius: 50%;
-          background: var(--accent);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 22px; color: #fff; font-weight: 700;
-          font-family: var(--font-sans);
-          flex-shrink: 0; cursor: pointer; position: relative;
-          transition: opacity .2s;
-        }
-        .drawer-avatar-placeholder:hover { opacity: .85; }
-        .avatar-edit-hint {
-          position: absolute; bottom: -2px; right: -2px;
-          width: 20px; height: 20px; border-radius: 50%;
-          background: var(--surface); border: 1px solid var(--border);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px;
-        }
-        .color-picker-row {
-          display: flex; gap: 6px; flex-wrap: wrap;
-          padding: 10px 0;
-        }
-        .color-dot {
-          width: 28px; height: 28px; border-radius: 50%;
-          border: 2px solid transparent; cursor: pointer;
-          transition: all .15s;
-        }
-        .color-dot:hover { transform: scale(1.15); }
-        .color-dot.active { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
-        .email-toggle {
-          display: flex; align-items: center; gap: 10px;
-          padding: 6px 0; cursor: pointer;
-        }
-        .email-toggle-switch {
-          width: 36px; height: 20px; border-radius: 10px;
-          background: var(--border); position: relative;
-          transition: background .2s; flex-shrink: 0;
-        }
-        .email-toggle-switch.on { background: var(--accent); }
-        .email-toggle-switch::after {
-          content: ''; position: absolute; top: 2px; left: 2px;
-          width: 16px; height: 16px; border-radius: 50%;
-          background: white; transition: transform .2s;
-          box-shadow: 0 1px 3px rgba(0,0,0,.15);
-        }
-        .email-toggle-switch.on::after { transform: translateX(16px); }
-        .drawer-user-info { flex: 1; min-width: 0; }
-        .drawer-name {
-          font-family: var(--font-sans);
-          font-size: 18px; font-weight: 700; color: var(--text);
-          margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-          cursor: pointer; display: inline-block;
-          border-bottom: 1px dashed transparent;
-          transition: border-color .2s;
-        }
-        .drawer-name:hover {
-          border-bottom-color: var(--text-soft);
-        }
-        .drawer-name-input {
-          font-family: var(--font-sans);
-          font-size: 18px; font-weight: 700; color: var(--text);
-          margin: 0; width: 100%; border: none; background: transparent;
-          border-bottom: 1px solid var(--accent); outline: none;
-          padding: 0;
-        }
-        .drawer-email {
-          font-size: 13px; color: var(--text-soft); font-family: var(--font-sans); font-weight: 500;
-          margin: 2px 0 0; overflow: hidden;
-          text-overflow: ellipsis; white-space: nowrap;
-        }
-        .drawer-member {
-          font-size: 12px; color: var(--accent);
-          font-family: var(--font-sans); font-weight: 600;
-          margin-top: 4px;
-        }
-        .drawer-close {
-          position: absolute; top: 16px; right: 16px;
-          background: none; border: none; color: var(--text-soft);
-          font-size: 22px; cursor: pointer; width: 36px; height: 36px;
-          border-radius: 50%; display: flex; align-items: center;
-          justify-content: center; transition: all .2s;
-        }
-        .drawer-close:hover { background: var(--hover); color: var(--text); }
-
-        .drawer-section {
-          padding: 20px 24px;
-        }
-        .drawer-section-title {
-          font-family: var(--font-sans);
-          font-size: 12px; font-weight: 700;
-          letter-spacing: .08em; text-transform: uppercase;
-          color: var(--text-soft); margin: 0 0 14px;
-        }
-
-        .manuscript-list { list-style: none; margin: 0; padding: 0; }
-        .manuscript-item {
-          display: flex; align-items: center; gap: 12px;
-          padding: 12px 14px; border-radius: 10px;
-          cursor: pointer; transition: all .18s;
-          margin-bottom: 4px; border: 1px solid transparent;
-        }
-        .manuscript-item:hover { background: var(--hover); }
-        .manuscript-item.active {
-          background: rgba(138,90,52,0.08);
-          border-color: var(--accent);
-        }
-        .manuscript-icon {
-          font-size: 20px; flex-shrink: 0;
-          width: 36px; height: 36px; border-radius: 8px;
-          background: var(--hover);
-          display: flex; align-items: center; justify-content: center;
-        }
-        .manuscript-item.active .manuscript-icon {
-          background: rgba(138,90,52,0.15);
-        }
-        .manuscript-info { flex: 1; min-width: 0; }
-        .manuscript-title {
-          font-family: var(--font-sans);
-          font-size: 14.5px; font-weight: 600; color: var(--text);
-          margin: 0; white-space: normal; line-height: 1.35;
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-          overflow: hidden; text-overflow: ellipsis;
-          cursor: pointer;
-          border-bottom: 1px dashed transparent;
-          transition: border-color .2s;
-        }
-        .manuscript-title:hover {
-          border-bottom-color: var(--text-soft);
-        }
-        .manuscript-title-input {
-          font-family: var(--font-sans);
-          font-size: 14.5px; font-weight: 600; color: var(--text);
-          margin: 0; width: 100%; border: none; background: transparent;
-          border-bottom: 1px solid var(--accent); outline: none;
-          padding: 0; line-height: 1.35;
-        }
-        .manuscript-date {
-          font-size: 12px; color: var(--text-soft); margin-top: 2px; font-family: var(--font-sans); font-weight: 500;
-        }
-        .manuscript-active-badge {
-          font-size: 11px; background: var(--accent); color: #fff;
-          padding: 3px 10px; border-radius: 12px;
-          font-family: var(--font-sans);
-          font-weight: 700;
-        }
-
-        .new-manuscript-btn {
-          display: flex; align-items: center; gap: 10px;
-          padding: 12px 14px; border-radius: 10px;
-          background: none; border: 1px dashed var(--border);
-          cursor: pointer; width: 100%;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 14px; color: var(--text-soft);
-          transition: all .18s; margin-top: 8px;
-        }
-        .new-manuscript-btn:hover {
-          border-color: var(--accent); color: var(--accent);
-          background: rgba(138,90,52,0.04);
-        }
-
-        .new-form { margin-top: 12px; }
-        .new-form input {
-          width: 100%; padding: 10px 14px;
-          border: 1px solid var(--border); border-radius: 8px;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 14px; color: var(--text);
-          background: var(--bg); outline: none;
-          transition: border-color .2s;
-        }
-        .new-form input:focus { border-color: var(--accent); }
-        .new-form-actions {
-          display: flex; gap: 8px; margin-top: 10px;
-        }
-        .new-form-actions button {
-          flex: 1; padding: 8px 0; border-radius: 8px;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 13px; cursor: pointer; transition: all .2s;
-          border: 1px solid var(--border);
-        }
-        .btn-create {
-          background: var(--text); color: var(--bg); border-color: var(--text) !important;
-        }
-        .btn-create:hover { opacity: .85; }
-        .btn-create:disabled { opacity: .5; cursor: wait; }
-        .btn-cancel { background: none; color: var(--text-soft); }
-        .btn-cancel:hover { background: var(--hover); }
-
-        .drawer-divider {
-          height: 1px; background: var(--border); margin: 0 28px;
-        }
-
-        .drawer-footer {
-          margin-top: auto; padding: 20px 28px 28px;
-          border-top: 1px solid var(--border);
-        }
-        .drawer-logout-btn {
-          display: flex; align-items: center; justify-content: center;
-          gap: 8px; width: 100%; padding: 11px 0;
-          border: 1px solid var(--border); border-radius: 10px;
-          background: none; color: var(--text-soft);
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 13.5px; letter-spacing: .04em;
-          cursor: pointer; transition: all .2s;
-        }
-        .drawer-logout-btn:hover {
-          border-color: #c44; color: #c44;
-          background: rgba(204,68,68,.04);
-        }
-      `}</style>
-
-      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
-
-      <div className={`profile-drawer ${open ? 'open' : ''}`}>
-        <button className="drawer-close" onClick={onClose} aria-label="Fermer">×</button>
-
-        {/* ── Header: Avatar + Info ── */}
-        <div className="drawer-header">
-          {/* Avatar: custom photo > color placeholder */}
+        {/* User Card */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarUrl}
               alt=""
-              className="drawer-avatar"
-              style={{ cursor: 'pointer' }}
+              className="user-avatar"
+              style={{ width: 52, height: 52, cursor: 'pointer' }}
               onClick={() => setShowColorPicker(!showColorPicker)}
             />
           ) : (
             <div
-              className="drawer-avatar-placeholder"
-              style={avatarColor ? { background: avatarColor } : {}}
+              className="avatar-placeholder"
+              style={{
+                width: 52,
+                height: 52,
+                fontSize: 20,
+                background: avatarColor || 'var(--accent)',
+                cursor: 'pointer',
+              }}
               onClick={() => setShowColorPicker(!showColorPicker)}
               title="Personnaliser l'avatar"
             >
               {(penName || user.displayName || user.email || '?')[0].toUpperCase()}
-              <span className="avatar-edit-hint">✏️</span>
             </div>
           )}
-          <div className="drawer-user-info">
+          <div style={{ flex: 1, minWidth: 0 }}>
             {isEditingName ? (
               <input
-                className="drawer-name-input"
                 value={editNameValue}
                 onChange={(e) => setEditNameValue(e.target.value)}
                 onBlur={handleSaveName}
                 onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
                 autoFocus
+                style={{
+                  width: '100%',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  border: '1px solid var(--accent)',
+                  background: 'var(--surface-2)',
+                  color: 'var(--text)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
               />
             ) : (
-              <h2 className="drawer-name" onClick={() => setIsEditingName(true)} title="Modifier le nom d'auteur">
-                {penName || user.displayName || 'Écrivain'}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-serif-classic)',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                  }}
+                >
+                  {penName || user.displayName || 'Écrivain'}
+                </span>
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}
+                  title="Modifier le nom d'auteur"
+                >
+                  <IconEdit size={13} />
+                </button>
+              </div>
             )}
-            {showEmail && <p className="drawer-email">{user.email}</p>}
-            {memberSince && <p className="drawer-member">Membre depuis {memberSince}</p>}
+            {showEmail && <p style={{ fontSize: 11.5, color: 'var(--text-soft)', marginTop: 2 }}>{user.email}</p>}
+            {memberSince && <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Membre depuis {memberSince}</p>}
           </div>
         </div>
 
-        {/* ── Avatar settings ── */}
+        {/* Color / Photo Picker */}
         {showColorPicker && (
-          <div className="drawer-section" style={{ paddingTop: 0, paddingBottom: 12 }}>
-            {/* Photo upload */}
-            <div style={{ fontSize: 11, color: 'var(--text-soft)', fontFamily: "'Cormorant Garamond', serif", letterSpacing: '.08em', marginBottom: 8 }}>
-              Photo de profil
+          <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)', marginBottom: 8 }}>
+              Photo & Couleur d&apos;avatar
             </div>
             <input
               ref={fileInputRef}
@@ -387,260 +216,226 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
               style={{ display: 'none' }}
               onChange={handlePhotoUpload}
             />
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <button
+                className="btn btn-secondary btn-sm"
                 onClick={() => fileInputRef.current?.click()}
-                style={{
-                  flex: 1, padding: '8px 0', borderRadius: 8,
-                  border: '1px solid var(--border)', background: 'transparent',
-                  fontFamily: "'Cormorant Garamond', serif", fontSize: 12,
-                  color: 'var(--text-soft)', cursor: 'pointer',
-                  transition: 'all .15s',
-                }}
+                style={{ flex: 1 }}
               >
-                📷 Choisir une photo
+                Choisir une photo
               </button>
               {avatarUrl && (
                 <button
+                  className="btn btn-ghost btn-sm danger"
                   onClick={removePhoto}
-                  style={{
-                    padding: '8px 14px', borderRadius: 8,
-                    border: '1px solid var(--border)', background: 'transparent',
-                    fontFamily: "'Cormorant Garamond', serif", fontSize: 12,
-                    color: '#c44', cursor: 'pointer',
-                  }}
                 >
                   Supprimer
                 </button>
               )}
             </div>
-
-            {/* Color picker (only when no custom photo) */}
             {!avatarUrl && (
-              <>
-                <div style={{ fontSize: 11, color: 'var(--text-soft)', fontFamily: "'Cormorant Garamond', serif", letterSpacing: '.08em', marginBottom: 6 }}>
-                  Couleur de l’avatar
-                </div>
-                <div className="color-picker-row">
-                  {['#8a5a34', '#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#e74c3c', '#3498db', '#1abc9c', '#f39c12'].map((c) => (
-                    <button
-                      key={c}
-                      className={`color-dot ${avatarColor === c ? 'active' : ''}`}
-                      style={{ background: c }}
-                      onClick={() => updateProfileSettings({ avatarColor: c })}
-                    />
-                  ))}
-                </div>
-              </>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {AVATAR_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateProfileSettings({ avatarColor: c })}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: c,
+                      border: avatarColor === c ? '2px solid var(--text)' : '1px solid transparent',
+                      cursor: 'pointer',
+                    }}
+                  />
+                ))}
+              </div>
             )}
-
-            <div className="email-toggle" onClick={() => updateProfileSettings({ showEmail: !showEmail })}>
-              <div className={`email-toggle-switch ${showEmail ? 'on' : ''}`} />
-              <span style={{ fontSize: 12.5, color: 'var(--text-soft)', fontFamily: "'Cormorant Garamond', serif" }}>
-                Afficher l’email
-              </span>
-            </div>
           </div>
         )}
 
-        {/* ── Manuscripts ── */}
-        <div className="drawer-section">
-          <h3 className="drawer-section-title">📚 Mes Manuscrits</h3>
-          <ul className="manuscript-list">
-            {manuscripts.map((m) => (
-              <li
-                key={m.id}
-                className={`manuscript-item ${manuscript?.id === m.id ? 'active' : ''}`}
-                onClick={() => handleSelect(m)}
-              >
-                <div className="manuscript-icon">📖</div>
-                <div className="manuscript-info">
+        {/* Manuscripts list */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <IconBook size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
+              Mes Manuscrits ({manuscripts.length})
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {manuscripts.map((m) => {
+              const isActive = m.id === manuscript?.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => handleSelect(m)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: isActive ? 'var(--accent-glow)' : 'var(--surface-2)',
+                    border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    cursor: 'pointer',
+                  }}
+                >
                   {editingTitleId === m.id ? (
                     <input
-                      className="manuscript-title-input"
                       value={editTitleValue}
                       onChange={(e) => setEditTitleValue(e.target.value)}
                       onBlur={async () => {
-                        const t = editTitleValue.trim();
-                        if (t && t !== m.title) await renameManuscript(m.id, t);
+                        if (editTitleValue.trim()) await renameManuscript(m.id, editTitleValue.trim());
                         setEditingTitleId(null);
                       }}
                       onKeyDown={async (e) => {
-                        if (e.key === 'Enter') {
-                          const t = editTitleValue.trim();
-                          if (t && t !== m.title) await renameManuscript(m.id, t);
+                        if (e.key === 'Enter' && editTitleValue.trim()) {
+                          await renameManuscript(m.id, editTitleValue.trim());
                           setEditingTitleId(null);
                         }
-                        if (e.key === 'Escape') setEditingTitleId(null);
                       }}
-                      onClick={(e) => e.stopPropagation()}
                       autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        flex: 1,
+                        padding: '2px 6px',
+                        border: '1px solid var(--accent)',
+                        borderRadius: 4,
+                        fontSize: 13,
+                        background: 'var(--surface)',
+                        color: 'var(--text)',
+                      }}
                     />
                   ) : (
-                    <p
-                      className="manuscript-title"
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        setEditingTitleId(m.id);
-                        setEditTitleValue(m.title);
-                      }}
-                      title="Double-cliquez pour renommer"
-                    >
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {m.title}
-                    </p>
+                    </span>
                   )}
-                  <p className="manuscript-date">
-                    {m.createdAt && typeof (m.createdAt as { toDate?: () => Date }).toDate === 'function'
-                      ? (m.createdAt as { toDate: () => Date }).toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
-                      : ''}
-                  </p>
+                  {isActive && <span className="badge-active">Actif</span>}
                 </div>
-                {manuscript?.id === m.id && (
-                  <span className="manuscript-active-badge">ACTIF</span>
-                )}
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
 
           {!showNewForm ? (
-            <button className="new-manuscript-btn" onClick={() => setShowNewForm(true)}>
-              <span style={{ fontSize: 18 }}>＋</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowNewForm(true)}
+              style={{ width: '100%', marginTop: 8 }}
+            >
+              <IconPlus size={14} strokeWidth={2.2} />
               <span>Nouveau manuscrit</span>
             </button>
           ) : (
-            <div className="new-form">
+            <div style={{ marginTop: 8, padding: 8, background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)' }}>
               <input
                 type="text"
-                placeholder="Titre du manuscrit..."
+                placeholder="Titre du manuscrit…"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                 autoFocus
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  borderRadius: 4,
+                  border: '1px solid var(--border)',
+                  fontSize: 13,
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  marginBottom: 6,
+                }}
               />
-              <div className="new-form-actions">
-                <button className="btn-cancel" onClick={() => { setShowNewForm(false); setNewTitle(''); }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowNewForm(false)}>
                   Annuler
                 </button>
-                <button className="btn-create" onClick={handleCreate} disabled={!newTitle.trim() || creating}>
-                  {creating ? '...' : 'Créer'}
+                <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={!newTitle.trim() || creating}>
+                  {creating ? 'Création…' : 'Créer'}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── Theme Switcher ── */}
-        <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <p className="drawer-section-title">🎨 Thème de l'application</p>
+        {/* Theme */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <IconPalette size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
+              Thème
+            </span>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { id: 'day', label: '☀️ Jour', bg: '#efe7d5' },
-              { id: 'sepia', label: '📜 Sépia', bg: '#e8d9b8' },
-              { id: 'night', label: '🌙 Nuit', bg: '#1b1a17' },
-            ].map((t) => (
+              { id: 'day', label: 'Jour', Icon: IconSun },
+              { id: 'sepia', label: 'Sépia', Icon: IconCompass },
+              { id: 'night', label: 'Nuit', Icon: IconMoon },
+            ].map(({ id, label, Icon }) => (
               <button
-                key={t.id}
-                onClick={() => setTheme(t.id as any)}
-                style={{
-                  flex: 1,
-                  padding: '8px 4px',
-                  borderRadius: 8,
-                  border: theme === t.id ? '2px solid var(--accent)' : '1px solid var(--border)',
-                  background: 'var(--surface-2)',
-                  color: 'var(--text)',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                  transition: 'all 0.15s ease',
-                }}
+                key={id}
+                onClick={() => setTheme(id as 'day' | 'sepia' | 'night')}
+                className={`pill ${theme === id ? 'active' : ''}`}
+                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
               >
-                {t.label}
+                <Icon size={13} strokeWidth={2} />
+                <span>{label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* ── Custom API Key (BYOK) ── */}
-        <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <p className="drawer-section-title">🔑 Clé IA Personnelle (Optionnelle)</p>
-          <p style={{ fontSize: 11, color: 'var(--text-soft)', margin: '0 0 8px' }}>
-            Individualisée automatiquement via Google Sign-In. Optionnel : collez votre clé Gemini (aistudio.google.com) pour un quota personnel dédié.
-          </p>
-          <input
-            type="password"
-            placeholder="AIzaSy..."
-            defaultValue={typeof window !== 'undefined' ? localStorage.getItem('atelier_user_gemini_key') || '' : ''}
-            onChange={(e) => {
-              const val = e.target.value.trim();
-              if (val) localStorage.setItem('atelier_user_gemini_key', val);
-              else localStorage.removeItem('atelier_user_gemini_key');
-            }}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              borderRadius: 6,
-              border: '1px solid var(--border)',
-              background: 'var(--surface-2)',
-              color: 'var(--text)',
-              fontSize: 12,
-              fontFamily: 'monospace',
-            }}
-          />
-        </div>
-
-        {/* ── RGPD & Data Rights ── */}
-        <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <p className="drawer-section-title">🛡️ Données & Confidentialité (RGPD)</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button
-              onClick={() => {
-                const exportData = {
-                  email: user?.email,
-                  penName,
-                  manuscripts,
-                  exportedAt: new Date().toISOString(),
-                };
-                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `mes-manuscrits-atelier-${Date.now()}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-                background: 'var(--surface-2)',
-                color: 'var(--text)',
-                fontSize: 12,
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              📥 Exporter toutes mes données (JSON)
-            </button>
+        {/* RGPD & Data Rights */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <IconShield size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
+              Données & RGPD
+            </span>
           </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              const exportData = {
+                email: user?.email,
+                penName,
+                manuscripts,
+                exportedAt: new Date().toISOString(),
+              };
+              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `mes-manuscrits-atelier-${Date.now()}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            <IconDownload size={14} strokeWidth={2} />
+            <span>Exporter mes données (JSON)</span>
+          </button>
         </div>
 
-        {/* ── Logout & Account Deletion ── */}
-        <div className="drawer-footer" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button className="drawer-logout-btn" onClick={() => { logOut(); onClose(); }}>
-            <span>🚪</span>
-            <span>Se déconnecter</span>
+        {/* Logout & Deletion */}
+        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              logOut();
+              onClose();
+            }}
+            style={{ width: '100%' }}
+          >
+            Se déconnecter
           </button>
           <button
             onClick={async () => {
-              if (window.confirm('Êtes-vous sûr de vouloir supprimer définitivement votre compte et TOUS vos manuscrits ? Cette action est irréversible.')) {
+              if (
+                window.confirm(
+                  'Êtes-vous certain de vouloir supprimer définitivement votre compte et TOUS vos manuscrits ? Cette action est irréversible.'
+                )
+              ) {
                 for (const m of manuscripts) {
                   await deleteManuscript(m.id);
                 }
@@ -651,15 +446,15 @@ export default function ProfileDrawer({ open, onClose }: { open: boolean; onClos
             style={{
               background: 'none',
               border: 'none',
-              color: '#e53e3e',
+              color: 'var(--japandi-terracotta)',
               fontSize: 11.5,
               cursor: 'pointer',
               textDecoration: 'underline',
-              opacity: 0.8,
-              marginTop: 4,
+              textAlign: 'center',
+              padding: 4,
             }}
           >
-            🗑️ Supprimer définitivement mon compte (Droit à l'effacement)
+            Supprimer définitivement mon compte (Droit à l&apos;effacement)
           </button>
         </div>
       </div>

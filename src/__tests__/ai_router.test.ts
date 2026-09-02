@@ -13,27 +13,52 @@ describe('AI Router & Quota System (Chantier 1)', () => {
     assert.match(pac, /^\d{4}-\d{2}-\d{2}$/);
   });
 
-  test('MODEL_REGISTRY contains valid definitions for required models', () => {
-    const flash36 = MODEL_REGISTRY.find((m) => m.id === 'gemini-3.6-flash');
-    assert.ok(flash36);
-    assert.strictEqual(flash36.quotas.generation?.rpm, 5);
-    assert.strictEqual(flash36.quotas.generation?.rpd, 20);
+  test('MODEL_REGISTRY contains valid definitions for all specialized Google 2026 models', () => {
+    // 1. Audio Transcribe
+    const transcribe = MODEL_REGISTRY.find((m) => m.id === 'gemini-3.5-transcribe');
+    assert.ok(transcribe);
+    assert.ok(transcribe.capabilities.includes('transcribe'));
 
-    const flash25 = MODEL_REGISTRY.find((m) => m.id === 'gemini-2.5-flash');
-    assert.ok(flash25);
-    assert.strictEqual(flash25.quotas.groundingSearch?.rpd, 1500);
+    const transcribeLive = MODEL_REGISTRY.find((m) => m.id === 'gemini-3.5-transcribe-live');
+    assert.ok(transcribeLive);
+    assert.ok(transcribeLive.capabilities.includes('transcribe-live'));
+
+    // 2. Text & Reasoning
+    const flash37 = MODEL_REGISTRY.find((m) => m.id === 'gemini-3.7-flash');
+    assert.ok(flash37);
+    assert.strictEqual(flash37.quotas.generation?.rpm, 15);
+
+    const pro31 = MODEL_REGISTRY.find((m) => m.id === 'gemini-3.1-pro');
+    assert.ok(pro31);
+    assert.strictEqual(pro31.quotas.generation?.rpm, 5);
+
+    // 3. TTS & Images
+    const tts31 = MODEL_REGISTRY.find((m) => m.id === 'gemini-3.1-flash-tts');
+    assert.ok(tts31);
+    assert.ok(tts31.capabilities.includes('tts'));
+
+    const nanoBananaPro = MODEL_REGISTRY.find((m) => m.id === 'nano-banana-pro');
+    assert.ok(nanoBananaPro);
+    assert.ok(nanoBananaPro.capabilities.includes('image'));
   });
 
-  test('FEATURE_CHAINS defines factcheck with degradeInsteadOfFallback', () => {
-    const fc = FEATURE_CHAINS.factcheck;
-    assert.ok(fc);
-    assert.strictEqual(fc.degradeInsteadOfFallback, true);
-    assert.strictEqual(fc.requiredQuotaKind, 'groundingSearch');
+  test('FEATURE_CHAINS maps optimal specialized models for each task', () => {
+    assert.strictEqual(FEATURE_CHAINS.dictation.chain[0], 'gemini-3.5-transcribe');
+    assert.strictEqual(FEATURE_CHAINS['dictation-live'].chain[0], 'gemini-3.5-transcribe-live');
+    assert.strictEqual(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.7-flash');
+    assert.strictEqual(FEATURE_CHAINS['cover-generation'].chain[0], 'nano-banana-pro');
+    assert.strictEqual(FEATURE_CHAINS.tts.chain[0], 'gemini-3.1-flash-tts');
+    assert.strictEqual(FEATURE_CHAINS['global-analysis'].chain[0], 'gemini-3.1-pro');
   });
 
-  test('selectModel returns a valid model for dictation', async () => {
-    const selection = await selectModel('dictation');
-    assert.ok(selection.modelId);
-    assert.strictEqual(typeof selection.degraded, 'boolean');
+  test('selectModel returns specialized models for each feature', async () => {
+    const dictation = await selectModel('dictation');
+    assert.strictEqual(dictation.modelId, 'gemini-3.5-transcribe');
+
+    const textAnalysis = await selectModel('text-analysis');
+    assert.strictEqual(textAnalysis.modelId, 'gemini-3.7-flash');
+
+    const cover = await selectModel('cover-generation');
+    assert.strictEqual(cover.modelId, 'nano-banana-pro');
   });
 });

@@ -3,6 +3,7 @@
 import React from 'react';
 import { ThemeId, ExportSettings, CustomThemeOverrides } from '../../types/exportSettings';
 import { THEME_REGISTRY, resolveTheme } from '../../themes/registry';
+import { IconFeather } from '@/components/Shared/Icons';
 
 interface StepThemeProps {
   settings: ExportSettings;
@@ -23,11 +24,10 @@ export function StepTheme({ settings, onChange }: StepThemeProps) {
     onChange({
       ...settings,
       themeId,
-      // Retain or reset custom settings
     });
   };
 
-  const updateCustom = (key: keyof CustomThemeOverrides, value: any) => {
+  const updateCustom = <K extends keyof CustomThemeOverrides>(key: K, value: CustomThemeOverrides[K]) => {
     onChange({
       ...settings,
       customTheme: {
@@ -117,16 +117,19 @@ export function StepTheme({ settings, onChange }: StepThemeProps) {
       {/* 2. PANNEAU DE PERSONNALISATION SUR-MESURE */}
       <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-            🛠️ Personnaliser le Thème "{baseTheme.label}" :
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconFeather size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+            <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+              Personnaliser le Thème &laquo;&nbsp;{baseTheme.label}&nbsp;&raquo; :
+            </label>
+          </div>
           {settings.customTheme && (
             <button
               type="button"
               onClick={resetToDefaults}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
             >
-              Réinitialiser les couleurs & styles d'origine
+              Réinitialiser les couleurs & styles d&apos;origine
             </button>
           )}
         </div>
@@ -135,7 +138,7 @@ export function StepTheme({ settings, onChange }: StepThemeProps) {
           {/* Couleur d'accentuation */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>
-              Couleur d'accentuation (Titres & Ornements) :
+              Couleur d&apos;accentuation (Titres & Ornements) :
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
@@ -194,7 +197,7 @@ export function StepTheme({ settings, onChange }: StepThemeProps) {
                   color: 'var(--text)',
                 }}
               >
-                ≡ Centré
+                Centré
               </button>
               <button
                 type="button"
@@ -207,7 +210,7 @@ export function StepTheme({ settings, onChange }: StepThemeProps) {
                   color: 'var(--text)',
                 }}
               >
-                ≡ Aligné à gauche
+                Aligné à gauche
               </button>
             </div>
           </div>
@@ -224,7 +227,7 @@ export function StepTheme({ settings, onChange }: StepThemeProps) {
                 onChange={(e) => updateCustom('showOrnament', e.target.checked)}
                 style={{ cursor: 'pointer', width: 16, height: 16 }}
               />
-              <span>Afficher le motif d'ornement vectoriel sous le titre</span>
+              <span>Afficher le motif d&apos;ornement vectoriel sous le titre</span>
             </label>
           </div>
         </div>

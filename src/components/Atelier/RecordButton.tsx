@@ -1,5 +1,16 @@
 'use client';
 
+import QuotaBadge from '@/components/Shared/QuotaBadge';
+import {
+  IconMic,
+  IconPause,
+  IconPlay,
+  IconStop,
+  IconClose,
+  IconCheck,
+  IconChevronRight,
+} from '@/components/Shared/Icons';
+
 interface RecordButtonProps {
   phase: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
   level: number; // 0-1 audio level
@@ -12,8 +23,6 @@ interface RecordButtonProps {
   onReset: () => void;
   error?: string | null;
 }
-
-import QuotaBadge from '@/components/Shared/QuotaBadge';
 
 export default function RecordButton({
   phase,
@@ -39,32 +48,34 @@ export default function RecordButton({
           if (phase === 'complete' || phase === 'error') onReset();
           onStart();
         }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '8px 10px',
-          borderRadius: 'var(--radius-sm)',
-          background: 'var(--surface-2)',
-          border: '1px solid var(--border)',
-          cursor: 'pointer',
-          width: '100%',
-        }}
       >
         <div className="record-mic-badge">
-          🎙️
+          <IconMic size={16} strokeWidth={2} />
         </div>
-        <div className="record-text-compact" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span className="record-title-compact" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-            {phase === 'complete' ? '✅ Texte inséré' : phase === 'error' ? '❌ Erreur' : 'Dictée vocale IA'}
+        <div className="record-text-compact">
+          <span className="record-title-compact">
+            {phase === 'complete' ? (
+              <span className="record-status-success">
+                <IconCheck size={13} strokeWidth={2.5} />
+                <span>Texte inséré</span>
+              </span>
+            ) : phase === 'error' ? (
+              <span className="record-status-err">
+                <IconClose size={13} strokeWidth={2.5} />
+                <span>Erreur</span>
+              </span>
+            ) : (
+              'Dictée vocale Gemini'
+            )}
           </span>
-          <span className="record-sub-compact" style={{ fontSize: 11, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
-            {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : 'Appuyez pour dicter'}
+          <span className="record-sub-compact">
+            {phase === 'complete' ? 'Cliquez pour ré-enregistrer' : error || 'Appuyez pour dicter'}
           </span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-          <button className="record-btn-start-compact">
-            Dicter ➔
+        <div className="record-controls-compact">
+          <button className="record-btn-start-compact" aria-label="Démarrer la dictée">
+            <span>Dicter</span>
+            <IconChevronRight size={13} strokeWidth={2.5} />
           </button>
           <QuotaBadge />
         </div>
@@ -78,15 +89,11 @@ export default function RecordButton({
       {/* Audio level ring */}
       {isActive && (
         <div
+          className="audio-level-ring"
           style={{
-            position: 'absolute',
             width: 72 * ringScale,
             height: 72 * ringScale,
-            borderRadius: '50%',
-            border: `2px solid var(--accent)`,
             opacity: 0.15 + level * 0.4,
-            transition: 'all 0.1s ease',
-            pointerEvents: 'none',
           }}
         />
       )}
@@ -106,51 +113,55 @@ export default function RecordButton({
             ? 'Reprendre'
             : 'Traitement en cours'
         }
-        style={phase === 'processing' ? { opacity: 0.5, cursor: 'wait' } : undefined}
       >
-        {phase === 'recording' ? '⏸' : phase === 'paused' ? '▶️' : '⏳'}
+        {phase === 'recording' ? (
+          <IconPause size={20} strokeWidth={2.5} />
+        ) : phase === 'paused' ? (
+          <IconPlay size={20} strokeWidth={2.5} />
+        ) : (
+          <span className="processing-spinner mini" />
+        )}
       </button>
 
       {/* Timer */}
       {isActive && <div className="record-timer">{time}</div>}
 
       {/* Status text */}
-      <div className={`record-status ${isActive ? 'active' : ''}`} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, textAlign: 'center' }}>
-        {phase === 'recording' && <span style={{ color: '#e53e3e', fontWeight: 600 }}>🔴 Dictée en cours…</span>}
-        {phase === 'paused' && <span style={{ fontWeight: 600 }}>En pause — appuyez ▶️ pour reprendre</span>}
+      <div className={`record-status ${isActive ? 'active' : ''}`}>
+        {phase === 'recording' && <span className="recording-label">Dictée en cours…</span>}
+        {phase === 'paused' && <span>En pause — appuyez pour reprendre</span>}
         {phase === 'processing' && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--accent)' }}>
-            <span style={{ animation: 'spin 1s linear infinite' }}>⚙️</span> Gemini analyse…
+          <span className="processing-label">
+            <span className="processing-spinner" />
+            <span>Gemini 3.7 analyse la dictée…</span>
           </span>
         )}
       </div>
 
       {/* Action buttons (Stop & Cancel) */}
       {isActive && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div className="record-action-row">
           <button
-            className="btn btn-primary"
-            onClick={(e) => { e.stopPropagation(); onStop(); }}
-            style={{ fontSize: 12, padding: '6px 14px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            className="btn btn-primary btn-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStop();
+            }}
           >
-            ⏹ Terminer
+            <IconStop size={13} strokeWidth={2.2} />
+            <span>Terminer</span>
           </button>
           {onCancel && (
             <button
-              className="btn btn-secondary"
-              onClick={(e) => { e.stopPropagation(); onCancel(); }}
-              style={{
-                fontSize: 12,
-                padding: '6px 12px',
-                borderColor: '#e53e3e',
-                color: '#e53e3e',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4
+              className="btn btn-secondary btn-sm danger-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel();
               }}
               title="Annuler l'enregistrement"
             >
-              ✕ Annuler
+              <IconClose size={13} strokeWidth={2.2} />
+              <span>Annuler</span>
             </button>
           )}
         </div>

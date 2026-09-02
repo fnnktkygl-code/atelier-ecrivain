@@ -71,9 +71,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ dataUrl: `data:image/jpeg;base64,${base64}`, seed });
     }
 
-    return NextResponse.json({ error: 'Génération indisponible' }, { status: 500 });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('API Generate Cover Error:', err);
-    return NextResponse.json({ error: err?.message || 'Erreur lors de la génération' }, { status: 500 });
+    return NextResponse.json({ error: errMsg || 'Erreur lors de la génération' }, { status: 500 });
   }
 }

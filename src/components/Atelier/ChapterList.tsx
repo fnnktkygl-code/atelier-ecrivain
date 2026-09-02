@@ -1,13 +1,13 @@
 /**
- * ChapterList — Interactive chapter & manuscript sidebar
+ * ChapterList — Tiroir interactif des manuscrits et chapitres (Japandi Minimaliste)
  *
- * Implements the exact user design refonte from apercu-refonte-chapitres.html
- * - Manuscript Cards with Chevron collapse/expand
- * - Active Manuscript Badge
- * - Manuscript Kebab Menu (Renommer, Supprimer)
- * - Chapter Rows with Drag handle, Ch. Badge, Title, Word count, Kebab Menu
- * - Nouveau chapitre button per manuscript
- * - Nouveau manuscrit button at bottom
+ * Fonctionnalités :
+ * - Cartes de manuscrits accordéon avec chevrons SVG fluides
+ * - Badge de manuscrit actif
+ * - Menu d'actions (Renommer, Supprimer avec dialogue sécurisé)
+ * - Lignes de chapitre avec drag handle (desktop) et boutons de réordonnancement tactile 1-tap (mobile)
+ * - Création rapide de nouveau chapitre & nouveau manuscrit
+ * - Accès direct au Studio Couverture & Export PDF
  */
 
 'use client';
@@ -15,6 +15,21 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import type { EditableChapter, ManuscriptAction } from '@/types/editor';
+import {
+  IconBook,
+  IconPlus,
+  IconMoreVertical,
+  IconCheck,
+  IconClose,
+  IconDragHandle,
+  IconArrowUp,
+  IconArrowDown,
+  IconPalette,
+  IconChevronRight,
+  IconFolder,
+  IconEdit,
+  IconTrash,
+} from '@/components/Shared/Icons';
 
 interface ChapterListProps {
   chapters: EditableChapter[];
@@ -24,18 +39,26 @@ interface ChapterListProps {
   onOpenPdfExport?: () => void;
 }
 
-export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSidebar, onOpenPdfExport }: ChapterListProps) {
-  const { manuscript, manuscripts, selectManuscript, createManuscript, renameManuscript, deleteManuscript } = useAuth();
+export default function ChapterList({
+  chapters,
+  activeIndex,
+  dispatch,
+  onCloseSidebar,
+  onOpenPdfExport,
+}: ChapterListProps) {
+  const {
+    manuscript,
+    manuscripts,
+    selectManuscript,
+    createManuscript,
+    renameManuscript,
+    deleteManuscript,
+  } = useAuth();
 
-  // Expanded manuscript accordion state (defaults to active manuscript ID)
-  const [openManuscriptIds, setOpenManuscriptIds] = useState<string[]>(() => (manuscript?.id ? [manuscript.id] : []));
-
-  // Sync open manuscript when active manuscript changes if not already open
-  useEffect(() => {
-    if (manuscript?.id) {
-      setOpenManuscriptIds((prev) => (prev.includes(manuscript.id) ? prev : [...prev, manuscript.id]));
-    }
-  }, [manuscript?.id]);
+  // Expanded manuscript accordion state
+  const [openManuscriptIds, setOpenManuscriptIds] = useState<string[]>(() =>
+    manuscript?.id ? [manuscript.id] : []
+  );
 
   // Manuscript Kebab & Rename state
   const [msMenuId, setMsMenuId] = useState<string | null>(null);
@@ -155,6 +178,14 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
     [dispatch]
   );
 
+  const handleMoveChapter = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (toIndex < 0 || toIndex >= chapters.length || fromIndex === toIndex) return;
+      dispatch({ type: 'MOVE_CHAPTER', fromIndex, toIndex });
+    },
+    [chapters.length, dispatch]
+  );
+
   const handleDragEnd = useCallback(() => {
     if (dragFromIndex !== null && dragOverIndex !== null && dragFromIndex !== dragOverIndex) {
       dispatch({ type: 'MOVE_CHAPTER', fromIndex: dragFromIndex, toIndex: dragOverIndex });
@@ -182,21 +213,20 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
     <div className="chapter-list">
       {/* Header */}
       <div className="chapter-list-header">
-        <div className="chapter-list-title-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h3 className="sidebar-section-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700 }}>
-            📚 Mes manuscrits
-          </h3>
+        <div className="chapter-list-title-group">
+          <IconFolder size={17} strokeWidth={2} className="sidebar-section-icon" />
+          <h3 className="sidebar-section-title">Mes manuscrits</h3>
           <span className="chapter-count-badge">{manuscripts.length}</span>
         </div>
         {onCloseSidebar && (
-          <button className="sidebar-close-btn" onClick={onCloseSidebar} title="Fermer le menu">
-            ✕
+          <button className="sidebar-close-btn" onClick={onCloseSidebar} title="Fermer le panneau" aria-label="Fermer">
+            <IconClose size={16} strokeWidth={2} />
           </button>
         )}
       </div>
 
       {/* Manuscripts List */}
-      <div className="manuscripts-container" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+      <div className="manuscripts-container">
         {manuscripts.map((m) => {
           const isActive = m.id === manuscript?.id;
           const isOpen = openManuscriptIds.includes(m.id);
@@ -205,22 +235,30 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
             <div key={m.id} className={`manuscript-card ${isOpen ? 'open' : ''}`}>
               {/* Manuscript Header */}
               <div className="manuscript-header" onClick={() => toggleManuscriptCard(m.id)}>
-                <span className="chevron" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                  ›
+                <span className={`chevron ${isOpen ? 'open' : ''}`}>
+                  <IconChevronRight size={14} strokeWidth={2} />
                 </span>
-                <span className="ms-icon">📖</span>
+                <span className="ms-icon">
+                  <IconBook size={15} strokeWidth={1.8} />
+                </span>
 
                 {renamingMsId === m.id ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }} onClick={(e) => e.stopPropagation()}>
+                  <div className="ms-rename-inline" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="text"
                       value={renamingMsTitle}
                       onChange={(e) => setRenamingMsTitle(e.target.value)}
                       autoFocus
                       onKeyDown={(e) => e.key === 'Enter' && handleSaveRenameManuscript(m.id)}
-                      style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '2px 6px', fontSize: 13, fontWeight: 600 }}
+                      className="ms-rename-input"
                     />
-                    <button onClick={() => handleSaveRenameManuscript(m.id)} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 6px', fontSize: 11, cursor: 'pointer' }}>✓</button>
+                    <button
+                      onClick={() => handleSaveRenameManuscript(m.id)}
+                      className="btn-confirm-mini"
+                      title="Enregistrer"
+                    >
+                      <IconCheck size={13} strokeWidth={2.5} />
+                    </button>
                   </div>
                 ) : (
                   <span className="ms-title">{m.title}</span>
@@ -236,25 +274,34 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                       setConfirmDeleteMsId(null);
                     }}
                     title="Actions manuscrit"
+                    aria-label="Actions du manuscrit"
                   >
-                    ⋮
+                    <IconMoreVertical size={16} strokeWidth={2} />
                   </button>
 
                   {msMenuId === m.id && (
                     <div className="kebab-menu show" ref={msMenuRef}>
                       {confirmDeleteMsId === m.id ? (
-                        <>
-                          <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 600 }}>Supprimer ce manuscrit ?</div>
+                        <div className="confirm-delete-box">
+                          <span className="confirm-delete-text">Supprimer ce manuscrit ?</span>
                           <div className="confirm-row">
-                            <button onClick={() => setConfirmDeleteMsId(null)}>Non</button>
-                            <button className="danger" onClick={() => handleDeleteManuscript(m.id)}>Oui</button>
+                            <button onClick={() => setConfirmDeleteMsId(null)}>Annuler</button>
+                            <button className="danger" onClick={() => handleDeleteManuscript(m.id)}>
+                              Supprimer
+                            </button>
                           </div>
-                        </>
+                        </div>
                       ) : (
                         <>
-                          <button onClick={() => handleStartRenameManuscript(m.id, m.title)}>Renommer</button>
+                          <button onClick={() => handleStartRenameManuscript(m.id, m.title)}>
+                            <IconEdit size={14} />
+                            <span>Renommer</span>
+                          </button>
                           {manuscripts.length > 1 && (
-                            <button className="danger" onClick={() => setConfirmDeleteMsId(m.id)}>Supprimer</button>
+                            <button className="danger" onClick={() => setConfirmDeleteMsId(m.id)}>
+                              <IconTrash size={14} />
+                              <span>Supprimer</span>
+                            </button>
                           )}
                         </>
                       )}
@@ -270,12 +317,13 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                     <>
                       <div className="manuscript-meta">
                         <span>{chapters.length} chapitre{chapters.length > 1 ? 's' : ''}</span>
-                        <span>{totalWords} mots</span>
+                        <span>{totalWords.toLocaleString('fr-FR')} mots</span>
                       </div>
 
                       <div className="add-chapter-area">
                         <button className="btn-add-chapter" onClick={handleAddChapter}>
-                          ＋ Nouveau chapitre
+                          <IconPlus size={15} strokeWidth={2.2} />
+                          <span>Nouveau chapitre</span>
                         </button>
                       </div>
 
@@ -291,11 +339,14 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                               onClick={() => renamingIndex !== i && handleSelectChapter(i)}
                               onDoubleClick={() => handleStartRenameChapter(i, ch.title)}
                               onDragStart={() => setDragFromIndex(i)}
-                              onDragOver={(e) => { e.preventDefault(); setDragOverIndex(i); }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setDragOverIndex(i);
+                              }}
                               onDragEnd={handleDragEnd}
                             >
                               {renamingIndex === i ? (
-                                <div className="chapter-rename-box" onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 6, flex: 1 }}>
+                                <div className="chapter-rename-box" onClick={(e) => e.stopPropagation()}>
                                   <input
                                     ref={inputRef}
                                     className="chapter-rename-input"
@@ -307,13 +358,43 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                                       if (e.key === 'Escape') setRenamingIndex(null);
                                     }}
                                     autoFocus
-                                    style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 6, padding: '3px 6px', fontSize: 13 }}
                                   />
-                                  <button className="btn-confirm-rename" onClick={handleFinishRenameChapter} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px' }}>✓</button>
+                                  <button
+                                    className="btn-confirm-rename"
+                                    onClick={handleFinishRenameChapter}
+                                    title="Valider"
+                                  >
+                                    <IconCheck size={15} strokeWidth={2.5} />
+                                  </button>
                                 </div>
                               ) : (
                                 <>
-                                  <span className="drag-handle" title="Glisser pour réordonner">⠿</span>
+                                  <span className="drag-handle" title="Glisser pour réordonner">
+                                    <IconDragHandle size={14} />
+                                  </span>
+
+                                  {/* Quick touch reordering buttons for mobile */}
+                                  <div className="touch-reorder-group" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      className="btn-touch-reorder"
+                                      disabled={i === 0}
+                                      onClick={() => handleMoveChapter(i, i - 1)}
+                                      title="Monter le chapitre"
+                                      aria-label="Monter le chapitre"
+                                    >
+                                      <IconArrowUp size={12} strokeWidth={2.2} />
+                                    </button>
+                                    <button
+                                      className="btn-touch-reorder"
+                                      disabled={i === chapters.length - 1}
+                                      onClick={() => handleMoveChapter(i, i + 1)}
+                                      title="Descendre le chapitre"
+                                      aria-label="Descendre le chapitre"
+                                    >
+                                      <IconArrowDown size={12} strokeWidth={2.2} />
+                                    </button>
+                                  </div>
+
                                   <span className="ch-badge">{chapterNumberStr(ch.title, i)}</span>
                                   <div className="ch-info">
                                     <span className="ch-title" title={ch.title}>
@@ -332,24 +413,32 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
                                       }}
                                       title="Actions chapitre"
                                     >
-                                      ⋮
+                                      <IconMoreVertical size={15} strokeWidth={2} />
                                     </button>
 
                                     {menuIndex === i && (
                                       <div className="kebab-menu show" ref={menuRef}>
                                         {confirmDeleteIndex === i ? (
-                                          <>
-                                            <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 600 }}>Supprimer ?</div>
+                                          <div className="confirm-delete-box">
+                                            <span className="confirm-delete-text">Supprimer ce chapitre ?</span>
                                             <div className="confirm-row">
                                               <button onClick={() => setConfirmDeleteIndex(null)}>Non</button>
-                                              <button className="danger" onClick={() => handleDeleteChapter(i)}>Oui</button>
+                                              <button className="danger" onClick={() => handleDeleteChapter(i)}>
+                                                Oui
+                                              </button>
                                             </div>
-                                          </>
+                                          </div>
                                         ) : (
                                           <>
-                                            <button onClick={() => handleStartRenameChapter(i, ch.title)}>Renommer</button>
+                                            <button onClick={() => handleStartRenameChapter(i, ch.title)}>
+                                              <IconEdit size={14} />
+                                              <span>Renommer</span>
+                                            </button>
                                             {chapters.length > 1 && (
-                                              <button className="danger" onClick={() => setConfirmDeleteIndex(i)}>Supprimer</button>
+                                              <button className="danger" onClick={() => setConfirmDeleteIndex(i)}>
+                                                <IconTrash size={14} />
+                                                <span>Supprimer</span>
+                                              </button>
                                             )}
                                           </>
                                         )}
@@ -372,52 +461,39 @@ export default function ChapterList({ chapters, activeIndex, dispatch, onCloseSi
       </div>
 
       {/* Button to Create a New Manuscript */}
-      <div style={{ marginTop: 14 }}>
+      <div className="new-manuscript-area">
         {isCreatingManuscript ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="new-manuscript-form">
             <input
               type="text"
               value={newManuscriptTitle}
               onChange={(e) => setNewManuscriptTitle(e.target.value)}
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreateNewManuscript()}
-              placeholder="Titre du nouveau manuscrit..."
-              style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--accent)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 600, color: 'var(--text)', outline: 'none' }}
+              placeholder="Titre du nouveau manuscrit…"
+              className="new-manuscript-input"
             />
-            <button onClick={handleCreateNewManuscript} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>Créer</button>
-            <button onClick={() => setIsCreatingManuscript(false)} style={{ background: 'transparent', color: 'var(--text)', border: 'none', padding: '6px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+            <div className="new-manuscript-actions">
+              <button onClick={handleCreateNewManuscript} className="btn-create-ms">
+                Créer
+              </button>
+              <button onClick={() => setIsCreatingManuscript(false)} className="btn-cancel-ms" title="Annuler">
+                <IconClose size={15} />
+              </button>
+            </div>
           </div>
         ) : (
           <button className="btn-new-manuscript" onClick={() => setIsCreatingManuscript(true)}>
-            ＋ Nouveau manuscrit
+            <IconPlus size={15} strokeWidth={2.2} />
+            <span>Nouveau manuscrit</span>
           </button>
         )}
 
         {/* Button to Open PDF & Cover Studio */}
         {onOpenPdfExport && (
-          <button
-            className="btn-pdf-export-sidebar"
-            onClick={onOpenPdfExport}
-            style={{
-              width: '100%',
-              marginTop: 10,
-              padding: '10px 14px',
-              background: 'linear-gradient(135deg, var(--accent) 0%, #b8860b 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <span>🎨</span> Édition Couverture & Export PDF
+          <button className="btn-pdf-export-sidebar" onClick={onOpenPdfExport}>
+            <IconPalette size={16} strokeWidth={1.8} />
+            <span>Studio Couverture & Export PDF</span>
           </button>
         )}
       </div>

@@ -58,7 +58,7 @@ export function useAuth() {
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => isFirebaseConfigured());
   const [manuscript, setManuscript] = useState<ManuscriptMeta | null>(null);
   const [manuscripts, setManuscripts] = useState<ManuscriptMeta[]>([]);
   const [penNameState, setPenNameState] = useState('');
@@ -79,7 +79,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isFirebaseConfigured()) {
-      setLoading(false);
       return;
     }
 
@@ -116,16 +115,17 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
     try {
       await signInWithGoogle();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Sign-in error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      const authErr = err as { code?: string; message?: string };
+      if (authErr.code === 'auth/popup-closed-by-user') {
         setAuthError('La fenêtre de connexion a été fermée avant la fin.');
-      } else if (err.code === 'auth/unauthorized-domain') {
+      } else if (authErr.code === 'auth/unauthorized-domain') {
         setAuthError("Ce domaine n'est pas autorisé dans la configuration Firebase (Authorized domains).");
-      } else if (err.code === 'auth/web-storage-unsupported') {
+      } else if (authErr.code === 'auth/web-storage-unsupported') {
         setAuthError("Les cookies tiers sont bloqués (fréquent en navigation privée). Veuillez les autoriser pour vous connecter.");
       } else {
-        setAuthError(`Erreur de connexion: ${err.message || 'Erreur inconnue'}`);
+        setAuthError(`Erreur de connexion: ${authErr.message || 'Erreur inconnue'}`);
       }
     }
   };

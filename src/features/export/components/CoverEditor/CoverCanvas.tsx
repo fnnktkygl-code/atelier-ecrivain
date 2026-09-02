@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CoverConfig, BookMetadata } from '../../types/bookMeta';
 
 export function CoverCanvas({
@@ -8,7 +8,7 @@ export function CoverCanvas({
   coverConfig: CoverConfig;
   metadata: BookMetadata;
 }) {
-  const [hasError, setHasError] = useState(false);
+  const [erroredImage, setErroredImage] = useState<string | null>(null);
   const bg = coverConfig.background?.value || '#8a5a34';
   const titleColor = coverConfig.titleColor || '#ffffff';
 
@@ -17,12 +17,7 @@ export function CoverCanvas({
     ? coverConfig.imageUrl
     : coverConfig.illustrationUrl;
 
-  // Reset error when image changes
-  useEffect(() => {
-    setHasError(false);
-  }, [activeImage]);
-
-  const showImage = Boolean(activeImage && !hasError);
+  const showImage = Boolean(activeImage && erroredImage !== activeImage);
   const showText = !coverConfig.hideTextOverlay;
 
   return (
@@ -50,10 +45,11 @@ export function CoverCanvas({
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            key={activeImage}
             src={activeImage}
             alt="Couverture"
             referrerPolicy="no-referrer"
-            onError={() => setHasError(true)}
+            onError={() => setErroredImage(activeImage)}
             style={{
               position: 'absolute',
               inset: 0,

@@ -1,8 +1,7 @@
 /**
- * Editor — Main manuscript editor
+ * Editor — Editeur de blocs du manuscrit (Japandi Minimaliste)
  *
- * Assembles EditorBlocks with drag & drop reordering.
- * Receives actions from useManuscript.
+ * Assemble les EditorBlocks avec réordonnancement drag & drop ou boutons tactiles.
  */
 
 'use client';
@@ -10,6 +9,7 @@
 import { useState, useCallback } from 'react';
 import type { EditableChapter, ManuscriptAction } from '@/types/editor';
 import EditorBlock from './EditorBlock';
+import { IconFeather, IconMic } from '@/components/Shared/Icons';
 
 interface EditorProps {
   chapter: EditableChapter;
@@ -22,15 +22,15 @@ interface EditorProps {
   dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
 }
 
-export default function Editor({ 
-  chapter, 
-  chapterIndex, 
-  insertionPoint, 
-  dispatch, 
-  searchQuery = '', 
+export default function Editor({
+  chapter,
+  chapterIndex,
+  insertionPoint,
+  dispatch,
+  searchQuery = '',
   focusMode = false,
   onStartDictation,
-  dictationPhase = 'idle'
+  dictationPhase = 'idle',
 }: EditorProps) {
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
@@ -106,11 +106,13 @@ export default function Editor({
     return (
       <div className="editor-empty">
         <div className="empty-state">
-          <div className="empty-state-icon">📝</div>
+          <div className="empty-state-icon">
+            <IconFeather size={32} strokeWidth={1.5} />
+          </div>
           <div className="empty-state-text">
             Ce chapitre est vide. Commencez à écrire ou utilisez la dictée vocale.
           </div>
-          <div style={{ display: 'flex', gap: 16, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div className="empty-state-actions">
             <button
               className="btn btn-primary"
               onClick={() => {
@@ -121,7 +123,8 @@ export default function Editor({
                 }, 50);
               }}
             >
-              <span>✍️</span> Écrire
+              <IconFeather size={16} strokeWidth={2} />
+              <span>Écrire</span>
             </button>
             {onStartDictation && (
               <button
@@ -129,7 +132,8 @@ export default function Editor({
                 onClick={onStartDictation}
                 disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
               >
-                <span>🎙️</span> Dicter
+                <IconMic size={16} strokeWidth={2} />
+                <span>Dicter</span>
               </button>
             )}
           </div>

@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { CoverConfig, BookMetadata } from '../../types/bookMeta';
 
 interface CoverControlsProps {
@@ -166,27 +164,25 @@ function generateProceduralCoverArt(prompt: string, seed = Math.floor(Math.rando
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
-export function CoverControls({ coverConfig, metadata, onChange }: CoverControlsProps) {
+export function CoverControls({ coverConfig, onChange }: CoverControlsProps) {
   const [prompt, setPrompt] = useState(coverConfig.aiGeneration?.prompt || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [aiStatusIsError, setAiStatusIsError] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const [history, setHistory] = useState<CoverHistoryItem[]>([]);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
+  const [history, setHistory] = useState<CoverHistoryItem[]>(() => {
+    if (typeof window === 'undefined') return [];
     try {
       const raw = localStorage.getItem(COVER_HISTORY_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setHistory(parsed);
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-  }, []);
+    return [];
+  });
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const addToHistory = (dataUrl: string, promptText?: string) => {
     setHistory((prev) => {
@@ -551,7 +547,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
               gap: 4,
             }}
           >
-            🗑️ Retirer l'image
+            🗑️ Retirer l&apos;image
           </button>
         </div>
       )}
@@ -560,7 +556,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
       {coverConfig.mode !== 'none' && (
         <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ fontSize: 13, fontWeight: 700, display: 'block' }}>
-            2. Réglage du Texte (Indépendant de l'image) :
+            2. Réglage du Texte (Indépendant de l&apos;image) :
           </label>
 
           {/* Interrupteur Afficher / Masquer le texte */}
@@ -571,7 +567,7 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
               onChange={(e) => onChange({ ...coverConfig, hideTextOverlay: !e.target.checked })}
               style={{ cursor: 'pointer', width: 16, height: 16 }}
             />
-            <span>Afficher le Titre et l'Auteur par-dessus l'image</span>
+            <span>Afficher le Titre et l&apos;Auteur par-dessus l&apos;image</span>
           </label>
 
           {/* Couleur du texte */}
@@ -602,14 +598,14 @@ export function CoverControls({ coverConfig, metadata, onChange }: CoverControls
                 onClick={clearAllHistory}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
               >
-                Vider l'historique
+                Vider l&apos;historique
               </button>
             )}
           </div>
 
           {history.length === 0 ? (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
-              Vos illustrations générées ou importées apparaîtront ici pour basculer facilement de l'une à l'autre.
+              Vos illustrations générées ou importées apparaîtront ici pour basculer facilement de l&apos;une à l&apos;autre.
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>

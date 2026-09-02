@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   deleteDoc,
   type Firestore,
+  type DocumentData,
 } from 'firebase/firestore';
 import { getFirebaseApp } from './config';
 import { CHAPTERS } from '@/data/chapters';
@@ -33,6 +34,7 @@ export interface ManuscriptMeta {
   title: string;
   createdAt: unknown;
   updatedAt: unknown;
+  wordCount?: number;
 }
 
 export interface ChapterData {
@@ -40,6 +42,9 @@ export interface ChapterData {
   title: string;
   paragraphs: string[];
   order: number;
+  blocks?: Array<{ id?: string; content: string; type?: string; source?: string; createdAt?: number }>;
+  notes?: Array<{ key?: string; content: string }>;
+  pendingReviews?: unknown[];
 }
 
 // ── Manuscripts ──
@@ -95,14 +100,14 @@ export async function saveChapter(uid: string, manuscriptId: string, chapterId: 
 export async function saveAllChapters(
   uid: string,
   manuscriptId: string,
-  chapters: { id?: string; title: string; blocks: { content: string }[] }[]
+  chapters: { id?: string; title: string; blocks: { content: string }[]; notes?: unknown[]; pendingReviews?: unknown[] }[]
 ): Promise<void> {
   const db = getDb();
   const chaptersCol = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
   
   // 1. Fetch existing chapter docs in Firestore to clean up orphaned deleted chapters and perform diff check
   const existingSnap = await getDocs(chaptersCol);
-  const existingDocsMap = new Map<string, any>();
+  const existingDocsMap = new Map<string, DocumentData>();
   existingSnap.docs.forEach((docSnap) => {
     existingDocsMap.set(docSnap.id, docSnap.data());
   });
@@ -122,7 +127,7 @@ export async function saveAllChapters(
       existing.title !== ch.title ||
       existing.order !== idx ||
       JSON.stringify(existing.paragraphs) !== JSON.stringify(newParagraphs) ||
-      JSON.stringify(existing.notes) !== JSON.stringify((ch as any).notes || []);
+      JSON.stringify(existing.notes) !== JSON.stringify(ch.notes || []);
 
     if (isModified) {
       const chRef = doc(chaptersCol, docId);
@@ -130,8 +135,8 @@ export async function saveAllChapters(
         title: ch.title,
         paragraphs: newParagraphs,
         blocks: ch.blocks,
-        notes: (ch as any).notes || [],
-        pendingReviews: (ch as any).pendingReviews || [],
+        notes: ch.notes || [],
+        pendingReviews: ch.pendingReviews || [],
         order: idx,
       });
       hasWriteOps = true;
@@ -159,7 +164,12 @@ export async function saveAllChapters(
   const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
   batch.set(mRef, { updatedAt: serverTimestamp(), wordCount: totalWords }, { merge: true });
 
-  await batch.commit();
+  if (hasWriteOps) {
+    await batch.commit();
+  } else {
+    // Only update manuscript metadata timestamp if no chapter contents were altered
+    await setDoc(mRef, { updatedAt: serverTimestamp(), wordCount: totalWords }, { merge: true });
+  }
 }
 
 // ── Notes ──

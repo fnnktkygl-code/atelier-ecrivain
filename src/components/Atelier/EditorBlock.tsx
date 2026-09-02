@@ -1,33 +1,29 @@
 /**
- * EditorBlock — Individual editable paragraph block
+ * EditorBlock — Bloc de paragraphe éditable individuel (Japandi Minimaliste)
  *
- * Features:
- * - contentEditable for inline editing
- * - Drag handle for reordering
- * - Delete button on hover
- * - Insert button between blocks
- * - Enter splits, Backspace at start merges
- * - Visual indicator for insertion point
+ * Supporte le contentEditable avec debounce, insertion de dictée,
+ * séparation de paragraphe (Entrée) et fusion (Retour arrière).
  */
 
 'use client';
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import type { TextBlock } from '@/types/editor';
+import { IconMic, IconPlus, IconClose, IconDragHandle } from '@/components/Shared/Icons';
 
 interface EditorBlockProps {
   block: TextBlock;
   index: number;
   isInsertionPoint: boolean;
   isFocused: boolean;
-  isDimmed?: boolean;
-  searchQuery?: string;
+  isDimmed: boolean;
+  searchQuery: string;
   onUpdate: (blockId: string, content: string) => void;
   onDelete: (blockId: string) => void;
   onSplit: (blockId: string, splitAt: number) => void;
   onMergeWithPrevious: (blockId: string) => void;
   onInsertAfter: (blockId: string) => void;
-  onSetInsertionPoint: (index: number | null) => void;
+  onSetInsertionPoint: (blockIndex: number | null) => void;
   onStartDictation?: () => void;
   onFocus: (blockId: string) => void;
   onDragStart: (index: number) => void;
@@ -42,6 +38,8 @@ export default function EditorBlock({
   index,
   isInsertionPoint,
   isFocused,
+  isDimmed,
+  searchQuery,
   onUpdate,
   onDelete,
   onSplit,
@@ -55,70 +53,51 @@ export default function EditorBlock({
   onDragEnd,
   isDragOver,
   totalBlocks,
-  isDimmed = false,
-  searchQuery = '',
 }: EditorBlockProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const lastContentRef = useRef(block.content);
 
-  // Sync content from outside only when block.content changes externally
+  // Sync DOM content when block.content changes externally (e.g., undo/redo)
   useEffect(() => {
-    if (ref.current && block.content !== lastContentRef.current && document.activeElement !== ref.current) {
-      ref.current.textContent = block.content;
-      lastContentRef.current = block.content;
+    if (ref.current && ref.current.innerText !== block.content) {
+      ref.current.innerText = block.content;
     }
   }, [block.content]);
 
-  // Set initial content
+  // Focus the element if isFocused is true
   useEffect(() => {
-    if (ref.current && ref.current.textContent !== block.content) {
-      ref.current.textContent = block.content;
+    if (isFocused && ref.current && document.activeElement !== ref.current) {
+      ref.current.focus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isFocused]);
 
   const handleInput = useCallback(() => {
-    if (!ref.current) return;
-    const content = ref.current.textContent || '';
-    lastContentRef.current = content;
-    onUpdate(block.id, content);
+    if (ref.current) {
+      const text = ref.current.innerText;
+      onUpdate(block.id, text);
+    }
   }, [block.id, onUpdate]);
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      // Enter -> Split block at cursor
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         const sel = window.getSelection();
-        if (!sel || !ref.current) return;
-        
-        // Get cursor offset in text
-        const range = sel.getRangeAt(0);
-        const preRange = document.createRange();
-        preRange.selectNodeContents(ref.current);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        const splitAt = preRange.toString().length;
-        
-        onSplit(block.id, splitAt);
+        const offset = sel ? sel.anchorOffset : block.content.length;
+        onSplit(block.id, offset);
       }
 
+      // Backspace at position 0 -> Merge with previous block
       if (e.key === 'Backspace') {
         const sel = window.getSelection();
-        if (!sel || !ref.current) return;
-        
-        // Check if cursor is at the very start
-        const range = sel.getRangeAt(0);
-        const preRange = document.createRange();
-        preRange.selectNodeContents(ref.current);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        
-        if (preRange.toString().length === 0 && index > 0) {
+        if (sel && sel.anchorOffset === 0 && sel.isCollapsed && index > 0) {
           e.preventDefault();
           onMergeWithPrevious(block.id);
         }
       }
     },
-    [block.id, index, onSplit, onMergeWithPrevious]
+    [block.id, block.content.length, index, onSplit, onMergeWithPrevious]
   );
 
   const handleFocus = useCallback(() => {
@@ -132,19 +111,20 @@ export default function EditorBlock({
     }
   }, [isInsertionPoint, index, onSetInsertionPoint, onStartDictation]);
 
-  const sourceIndicator = block.source === 'dictation' ? '🎙️ Dictée' : null;
   const hasSearchMatch = searchQuery && block.content.toLowerCase().includes(searchQuery.toLowerCase());
 
   return (
     <>
-      {/* Insertion point indicator (before block) */}
+      {/* Insertion point indicator (before first block) */}
       {index === 0 && (
         <div
           className={`editor-insert-line ${isInsertionPoint && index === 0 ? 'active' : ''}`}
           onClick={() => onSetInsertionPoint(isInsertionPoint ? null : -1)}
           title="Insérer la dictée ici"
         >
-          <span className="editor-insert-line-btn">＋</span>
+          <span className="editor-insert-line-btn">
+            <IconPlus size={13} strokeWidth={2.5} />
+          </span>
         </div>
       )}
 
@@ -169,12 +149,15 @@ export default function EditorBlock({
           onDragEnd={onDragEnd}
           title="Glisser pour réorganiser"
         >
-          ⠿
+          <IconDragHandle size={14} />
         </div>
 
         {/* Source badge */}
-        {sourceIndicator && (
-          <span className="editor-block-source">{sourceIndicator}</span>
+        {block.source === 'dictation' && (
+          <span className="editor-block-source">
+            <IconMic size={12} strokeWidth={2} />
+            <span>Dictée</span>
+          </span>
         )}
 
         {/* Editable content */}
@@ -186,7 +169,7 @@ export default function EditorBlock({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
-          data-placeholder="Commencez à écrire..."
+          data-placeholder="Commencez à écrire…"
           spellCheck
           lang="fr"
         />
@@ -200,7 +183,8 @@ export default function EditorBlock({
                 onClick={handleInsertionClick}
                 title="Dicter après ce paragraphe"
               >
-                🎙️ Dicter
+                <IconMic size={13} strokeWidth={2} />
+                <span>Dicter</span>
               </button>
             )}
             {totalBlocks > 1 && (
@@ -208,8 +192,9 @@ export default function EditorBlock({
                 className="editor-block-action-btn delete"
                 onClick={() => onDelete(block.id)}
                 title="Supprimer ce bloc"
+                aria-label="Supprimer ce paragraphe"
               >
-                ✕
+                <IconClose size={13} strokeWidth={2} />
               </button>
             )}
           </div>
@@ -229,14 +214,16 @@ export default function EditorBlock({
           onClick={() => onInsertAfter(block.id)}
           title="Insérer un paragraphe vide"
         >
-          ＋ Paragraphe
+          <IconPlus size={13} strokeWidth={2.2} />
+          <span>Paragraphe</span>
         </button>
         <button
           className={`editor-insert-line-btn dictation ${isInsertionPoint ? 'active' : ''}`}
           onClick={handleInsertionClick}
-          title={isInsertionPoint ? 'Annuler le point d\'insertion' : 'Dicter à la suite de ce paragraphe'}
+          title={isInsertionPoint ? "Annuler le point d'insertion" : 'Dicter à la suite de ce paragraphe'}
         >
-          🎙️ {isInsertionPoint ? 'Point d\'insertion actif' : 'Dicter ici'}
+          <IconMic size={13} strokeWidth={2} />
+          <span>{isInsertionPoint ? "Point d'insertion actif" : 'Dicter ici'}</span>
         </button>
       </div>
     </>

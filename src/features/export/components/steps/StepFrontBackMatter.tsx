@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { BookMetadata, FrontBackMatterSection } from '../../types/bookMeta';
+import { IconBook, IconPlus, IconTrash } from '@/components/Shared/Icons';
 
 interface StepFrontBackMatterProps {
   metadata: BookMetadata;
@@ -55,42 +56,45 @@ export function StepFrontBackMatter({
             value={metadata.dedication || ''}
             onChange={(e) => onUpdateMetadata({ ...metadata, dedication: e.target.value })}
             rows={2}
-            placeholder="À ma famille, pour leur soutien..."
+            placeholder="À ma famille, pour leur soutien…"
             style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 12 }}
           />
         </div>
 
         <div>
-          <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Épigraphe (Citation d'ouverture)</label>
+          <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Épigraphe (Citation d&apos;ouverture)</label>
           <textarea
             value={metadata.epigraph || ''}
             onChange={(e) => onUpdateMetadata({ ...metadata, epigraph: e.target.value })}
             rows={2}
-            placeholder="« Tout ce qui est écrit reste... » — Victor Hugo"
+            placeholder="« Tout ce qui est écrit reste… » — Victor Hugo"
             style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 12 }}
           />
         </div>
       </div>
 
       <div>
-        <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>4e de Couverture (Résumé d'ouvrage / Quatrième de couverture)</label>
+        <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>4e de Couverture (Résumé d&apos;ouvrage)</label>
         <textarea
           value={metadata.backCoverBlurb || ''}
           onChange={(e) => onUpdateMetadata({ ...metadata, backCoverBlurb: e.target.value })}
           rows={3}
-          placeholder="Résumé captivant qui apparaîtra au dos du livre..."
+          placeholder="Résumé captivant qui apparaîtra au dos du livre…"
           style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 12 }}
         />
       </div>
 
       {/* Sections Libres (Préface, Avant-propos, Postface...) */}
       <div style={{ marginTop: 8, padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 13, fontWeight: 700 }}>📄 Sections de Texte Libre</h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <IconBook size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>Sections de Texte Libre</h4>
+        </div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
           <select
             value={newKind}
-            onChange={(e: any) => setNewKind(e.target.value)}
+            onChange={(e) => setNewKind(e.target.value as FrontBackMatterSection['kind'])}
             style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12 }}
           >
             <option value="preface">Préface</option>
@@ -103,7 +107,7 @@ export function StepFrontBackMatter({
 
           <select
             value={newPlacement}
-            onChange={(e: any) => setNewPlacement(e.target.value)}
+            onChange={(e) => setNewPlacement(e.target.value as 'front' | 'back')}
             style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12 }}
           >
             <option value="front">Avant les chapitres (Liminaires)</option>
@@ -114,16 +118,18 @@ export function StepFrontBackMatter({
             type="text"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Titre de la section (ex: Préface de l'auteur)..."
-            style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12 }}
+            placeholder="Titre de la section (ex: Préface de l'auteur)…"
+            style={{ flex: 1, minWidth: 160, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12 }}
           />
 
           <button
             type="button"
             onClick={addSection}
-            style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}
+            className="btn btn-primary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
-            ＋ Ajouter
+            <IconPlus size={13} strokeWidth={2.2} />
+            <span>Ajouter</span>
           </button>
         </div>
 
@@ -138,16 +144,17 @@ export function StepFrontBackMatter({
                 <button
                   type="button"
                   onClick={() => removeSection(sec.id)}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--japandi-terracotta)', cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                 >
-                  🗑️ Supprimer
+                  <IconTrash size={13} />
+                  <span>Supprimer</span>
                 </button>
               </div>
               <textarea
                 value={sec.content}
                 onChange={(e) => updateSectionContent(sec.id, e.target.value)}
                 rows={2}
-                placeholder={`Contenu de ${sec.title}...`}
+                placeholder={`Contenu de ${sec.title}…`}
                 style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 12 }}
               />
             </div>

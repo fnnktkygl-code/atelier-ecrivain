@@ -14,10 +14,11 @@ export default function QuotaBadge() {
       if (typeof window !== 'undefined') {
         setHasCustomKey(!!localStorage.getItem('atelier_user_gemini_key'));
       }
+      const qTranscribe = loadModelQuota('gemini-3.5-transcribe', 'generation');
+      const q37 = loadModelQuota('gemini-3.7-flash', 'generation');
       const q36 = loadModelQuota('gemini-3.6-flash', 'generation');
-      const q35 = loadModelQuota('gemini-3.5-flash', 'generation');
       const q25 = loadModelQuota('gemini-2.5-flash', 'generation');
-      setDictationDayCount(q36.dayCount + q35.dayCount + q25.dayCount);
+      setDictationDayCount(qTranscribe.dayCount + q37.dayCount + q36.dayCount + q25.dayCount);
     };
     update();
     window.addEventListener('atelier_quota_updated', update);
@@ -28,7 +29,7 @@ export default function QuotaBadge() {
     };
   }, []);
 
-  const totalLimit = 60; // 20 RPD x 3 models
+  const totalLimit = 1500;
   const remaining = Math.max(0, totalLimit - dictationDayCount);
 
   return (
@@ -75,7 +76,7 @@ export default function QuotaBadge() {
           }}
         />
         <span style={{ whiteSpace: 'nowrap' }}>
-          {hasCustomKey ? 'Clé Dédiée' : `${remaining}/${totalLimit} req.`}
+          {hasCustomKey ? 'Clé Dédiée' : 'IA Active (Gemini 3.5/3.7)'}
         </span>
       </div>
 
@@ -86,7 +87,7 @@ export default function QuotaBadge() {
             bottom: 'calc(100% + 8px)',
             right: 0,
             zIndex: 9999,
-            width: 250,
+            width: 270,
             padding: '10px 12px',
             background: 'var(--surface, #faf7f2)',
             border: '1px solid var(--border, rgba(0,0,0,0.12))',
@@ -100,15 +101,17 @@ export default function QuotaBadge() {
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--accent, #8a5a34)' }}>
-            {hasCustomKey ? '🔑 Quota Gemini (Clé Dédiée)' : '🟢 Quota Multi-Modèles Gemini'}
+            {hasCustomKey ? '🔑 Quota Gemini (Clé Dédiée)' : '🟢 Modèles Spécialisés Google 2026'}
           </div>
           {hasCustomKey ? (
-            <div>• Clé personnelle active (Quota Illimité)<br />• Dictées aujourd&apos;hui : {dictationDayCount}</div>
+            <div>• Clé personnelle active (Quota Illimité)<br />• Requêtes aujourd&apos;hui : {dictationDayCount}</div>
           ) : (
             <div>
-              • <strong>Dictée Vocale :</strong> {remaining}/{totalLimit} req. aujourd&apos;hui (3.6 / 3.5 / 2.5 Flash)<br />
-              • <strong>Recherche Sourcée :</strong> 1500 req/jour<br />
-              • <strong>Synthèse Vocale :</strong> 10 req/jour<br />
+              • <strong>Audio & Dictée :</strong> Gemini 3.5 Transcribe & Live<br />
+              • <strong>Style & Ratures :</strong> Gemini 3.7 Flash & 3.6 Flash<br />
+              • <strong>Fact-Checking :</strong> Gemini 2.5 Flash (Grounding Search)<br />
+              • <strong>Couvertures :</strong> Nano Banana Pro (Gemini 3 Pro Image)<br />
+              • <strong>Synthèse Vocale :</strong> Gemini 3.1 Flash TTS<br />
               <span style={{ fontSize: 10, color: 'var(--text-soft)', fontStyle: 'italic', marginTop: 4, display: 'block' }}>
                 Réinitialisation à minuit heure Pacifique ({getPacificDateString()})
               </span>

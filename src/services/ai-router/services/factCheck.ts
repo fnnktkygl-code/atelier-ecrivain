@@ -19,6 +19,22 @@ export interface FactCheckResponse {
   isGrounded: boolean;
 }
 
+interface GroundingChunk {
+  web?: {
+    uri?: string;
+    title?: string;
+  };
+}
+
+interface CandidateWithGrounding {
+  groundingMetadata?: {
+    groundingChunks?: GroundingChunk[];
+    searchEntryPoint?: {
+      renderedContent?: string;
+    };
+  };
+}
+
 export async function verifyTextFactCheck(text: string): Promise<FactCheckResponse> {
   const selection = await selectModel('factcheck');
 
@@ -42,18 +58,18 @@ export async function verifyTextFactCheck(text: string): Promise<FactCheckRespon
 
     const model = getGenerativeModel(ai, {
       model: selection.modelId,
-      tools: [{ googleSearch: {} } as any],
+      tools: [{ googleSearch: {} } as never],
       generationConfig: {
         responseMimeType: 'application/json',
-      },
+      } as never,
       systemInstruction: SYSTEM_PROMPT_FACTCHECK,
     });
 
     const response = await model.generateContent(text);
     await recordUsage(selection.modelId, 'groundingSearch', 'success');
 
-    const candidate = response.response.candidates?.[0];
-    const groundingMetadata = (candidate as any)?.groundingMetadata;
+    const candidate = response.response.candidates?.[0] as CandidateWithGrounding | undefined;
+    const groundingMetadata = candidate?.groundingMetadata;
     const groundingChunks = groundingMetadata?.groundingChunks ?? [];
     const searchEntryPoint = groundingMetadata?.searchEntryPoint?.renderedContent;
 
@@ -61,7 +77,7 @@ export async function verifyTextFactCheck(text: string): Promise<FactCheckRespon
     let parsed: VerificationItem[] = [];
 
     try {
-      parsed = JSON.parse(rawText);
+      parsed = JSON.parse(rawText) as VerificationItem[];
     } catch {
       parsed = [
         {
@@ -73,7 +89,7 @@ export async function verifyTextFactCheck(text: string): Promise<FactCheckRespon
 
     // Attach real verified source URLs from grounding chunks instead of LLM hallucination
     const realSources = groundingChunks
-      .map((c: any) => c.web?.uri || c.web?.title)
+      .map((c) => c.web?.uri || c.web?.title)
       .filter(Boolean)
       .join(', ');
 
@@ -96,8 +112,8 @@ export async function verifyTextFactCheck(text: string): Promise<FactCheckRespon
       searchEntryPointHtml: searchEntryPoint,
       isGrounded: groundingChunks.length > 0,
     };
-  } catch (err: any) {
-    const errMsg = err?.message || String(err);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     if (
       errMsg.includes('429') ||
       errMsg.includes('RESOURCE_EXHAUSTED') ||

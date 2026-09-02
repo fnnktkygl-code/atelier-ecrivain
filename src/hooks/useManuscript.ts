@@ -10,7 +10,7 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { getChapters, saveAllChapters, getDb } from '@/services/firebase/firestore';
-import { doc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 import type {
   ManuscriptState,
   ManuscriptAction,
@@ -21,8 +21,6 @@ import type {
 } from '@/types/editor';
 import { CHAPTERS } from '@/data/chapters';
 import { NOTES } from '@/data/notes';
-
-const STORAGE_KEY = 'atelier-manuscrit-v1';
 
 // ── Helpers ──
 
@@ -615,15 +613,20 @@ export function useManuscript() {
             const rawChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
               id: ch.id || `ch-${idx}`,
               title: ch.title || `Chapitre ${idx + 1}`,
-              blocks: (ch as any).blocks || (ch.paragraphs || []).map((p) => ({
+              blocks: (ch.blocks as TextBlock[] | undefined) || (ch.paragraphs || []).map((p) => ({
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 content: p,
                 type: 'paragraph' as const,
                 source: 'original' as const,
                 createdAt: Date.now(),
               })),
-              notes: (ch as any).notes && (ch as any).notes.length > 0 ? (ch as any).notes : staticChapters[idx]?.notes || [],
-              pendingReviews: (ch as any).pendingReviews || [],
+              notes: (ch.notes && ch.notes.length > 0 ? ch.notes : staticChapters[idx]?.notes || []).map((n, nIdx) => ({
+                id: (n as { id?: string }).id || `n-${idx}-${nIdx}`,
+                key: n.key || `Note ${nIdx + 1}`,
+                content: typeof n === 'string' ? n : n.content,
+                source: (((n as { source?: string }).source === 'ai' || (n as { source?: string }).source === 'manual') ? (n as { source?: string }).source : 'original') as 'original' | 'manual' | 'ai',
+              })),
+              pendingReviews: (ch.pendingReviews as PendingReview[] | undefined) || [],
             }));
 
             const editableChapters = normalizeChapterNotesAndSuperscripts(rawChapters);
@@ -661,12 +664,11 @@ export function useManuscript() {
     };
   }, [currentManuscriptId, currentStorageKey, user, manuscript?.id]);
 
-  // Keep a ref to the latest state
+  // Keep a ref to the latest state (updated in effect to satisfy React 19 rules)
   const stateRef = useRef(state);
-  stateRef.current = state;
-
-  // ── Multi-device Real-Time Firestore Synchronization Listener ──
-  const lastCloudSaveTimeRef = useRef<number>(Date.now());
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     if (!user || !manuscript?.id) return;

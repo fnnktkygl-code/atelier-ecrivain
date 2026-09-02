@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import ProfileDrawer from '@/components/Auth/ProfileDrawer';
+import { IconHome, IconFeather, IconBook } from './Icons';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -12,77 +13,33 @@ export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const links = [
-    { href: '/', label: 'Accueil', icon: '🏠' },
-    { href: '/atelier', label: 'Atelier', icon: '✍️' },
-    { href: '/liseuse', label: 'Liseuse', icon: '📖' },
+    { href: '/', label: 'Accueil', Icon: IconHome },
+    { href: '/atelier', label: 'Atelier', Icon: IconFeather },
+    { href: '/liseuse', label: 'Liseuse', Icon: IconBook },
   ];
 
   return (
     <>
-      <style>{`
-        .user-section {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-left: 12px;
-        }
-        .avatar-btn {
-          background: none; border: none; padding: 0;
-          cursor: pointer; position: relative;
-          display: flex; align-items: center; gap: 10px;
-          transition: opacity .2s;
-        }
-        .avatar-btn:hover { opacity: .85; }
-        .user-avatar {
-          width: 32px; height: 32px; border-radius: 50%;
-          border: 2px solid var(--accent);
-          object-fit: cover;
-          transition: box-shadow .2s;
-        }
-        .avatar-btn:hover .user-avatar {
-          box-shadow: 0 0 0 3px rgba(138,90,52,0.15);
-        }
-        .avatar-placeholder {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: var(--accent); color: var(--bg);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 14px; font-weight: 600;
-          font-family: 'Cormorant Garamond', serif;
-          border: 2px solid var(--accent);
-        }
-        .user-meta {
-          display: flex; flex-direction: column; align-items: flex-start;
-        }
-        .user-name {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 13px; font-weight: 600;
-          color: var(--text);
-          line-height: 1.2;
-        }
-        .user-manuscript {
-          font-size: 10.5px; color: var(--text-soft);
-          max-width: 260px;
-          white-space: nowrap;
-        }
-        @media (max-width: 640px) {
-          .user-meta { display: none; }
-        }
-      `}</style>
-
       <nav className="navbar">
-        <div className="navbar-brand">Atelier d&apos;Écrivain</div>
+        <div className="navbar-brand">
+          <IconFeather size={18} className="navbar-brand-icon" />
+          <span>Atelier d&apos;Écrivain</span>
+        </div>
         <ul className="navbar-nav">
-          {links.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className={`nav-link ${pathname === link.href ? 'active' : ''}`}
-              >
-                <span>{link.icon}</span>
-                <span>{link.label}</span>
-              </Link>
-            </li>
-          ))}
+          {links.map(({ href, label, Icon }) => {
+            const isActive = pathname === href;
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className={`nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <Icon size={16} strokeWidth={isActive ? 2 : 1.75} />
+                  <span>{label}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
         {user && (
           <div className="user-section">

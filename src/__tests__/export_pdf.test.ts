@@ -38,7 +38,7 @@ describe('PDF Export Module (Chantier 2)', () => {
     assert.strictEqual(theme.id, 'fantasy');
     assert.strictEqual(theme.chapterOpening, 'ornament');
 
-    const fallback = getTheme('non-existent' as any);
+    const fallback = getTheme('non-existent' as unknown as Parameters<typeof getTheme>[0]);
     assert.strictEqual(fallback.id, 'classique');
   });
 });

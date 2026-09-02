@@ -17,7 +17,7 @@ test('toSuperscript formats numbers correctly', () => {
 });
 
 // Test 2: linkNotes dynamic resolution
-function linkNotes(text: string, chapterNotes: any[] = []): string {
+function linkNotes(text: string, chapterNotes: Array<{ key?: string; content: string }> = []): string {
   const SUP_MAP: Record<string, string> = {
     '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
     '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',

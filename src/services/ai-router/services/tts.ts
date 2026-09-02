@@ -17,6 +17,13 @@ export interface TTSResponse {
   error?: string;
 }
 
+interface PartWithAudioData {
+  inlineData?: {
+    data?: string;
+    mimeType?: string;
+  };
+}
+
 export async function generateChapterSpeech(text: string): Promise<TTSResponse> {
   const selection = await selectModel('tts');
 
@@ -36,14 +43,14 @@ export async function generateChapterSpeech(text: string): Promise<TTSResponse> 
       model: selection.modelId,
       generationConfig: {
         responseMimeType: 'audio/mp3',
-      },
+      } as never,
     });
 
     const response = await model.generateContent(`Lisez le texte littéraire suivant à voix haute avec un ton clair, captivant et naturel :\n\n${text.slice(0, 8000)}`);
     await recordUsage(selection.modelId, 'generation', 'success');
 
     const candidate = response.response.candidates?.[0];
-    const part = candidate?.content?.parts?.[0] as any;
+    const part = candidate?.content?.parts?.[0] as PartWithAudioData | undefined;
 
     if (part && part.inlineData && part.inlineData.data) {
       const base64Audio = part.inlineData.data;
@@ -63,8 +70,8 @@ export async function generateChapterSpeech(text: string): Promise<TTSResponse> 
       degraded: true,
       error: 'Le format audio retourné par le modèle n’est pas lisible.',
     };
-  } catch (err: any) {
-    const errMsg = err?.message || String(err);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     if (
       errMsg.includes('429') ||
       errMsg.includes('RESOURCE_EXHAUSTED') ||

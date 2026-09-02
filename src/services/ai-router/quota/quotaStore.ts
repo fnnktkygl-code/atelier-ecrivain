@@ -1,5 +1,5 @@
 import { getDb } from '@/services/firebase/firestore';
-import { doc, setDoc, onSnapshot, increment } from 'firebase/firestore';
+import { doc, setDoc, increment } from 'firebase/firestore';
 import { QuotaKind, MODEL_REGISTRY } from '../types/modelRegistry';
 import { getPacificDateString } from './resetSchedule';
 

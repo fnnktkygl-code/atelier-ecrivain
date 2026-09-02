@@ -27,7 +27,7 @@ export async function generatePdf(
     frontBackSections,
   });
 
-  const pdfInstance = pdf(element as any);
+  const pdfInstance = pdf(element as unknown as Parameters<typeof pdf>[0]);
   const blob = await pdfInstance.toBlob();
   const buffer = await blob.arrayBuffer();
 

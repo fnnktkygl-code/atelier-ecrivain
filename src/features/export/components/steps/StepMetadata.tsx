@@ -9,7 +9,7 @@ interface StepMetadataProps {
 }
 
 export function StepMetadata({ metadata, onChange }: StepMetadataProps) {
-  const updateField = (key: keyof BookMetadata, value: any) => {
+  const updateField = <K extends keyof BookMetadata>(key: K, value: BookMetadata[K]) => {
     onChange({ ...metadata, [key]: value });
   };
 
@@ -42,7 +42,7 @@ export function StepMetadata({ metadata, onChange }: StepMetadataProps) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Nom de l'auteur *</label>
+          <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Nom de l&apos;auteur *</label>
           <input
             type="text"
             value={metadata.authorName}
@@ -81,7 +81,7 @@ export function StepMetadata({ metadata, onChange }: StepMetadataProps) {
             type="text"
             value={metadata.publisher || ''}
             onChange={(e) => updateField('publisher', e.target.value)}
-            placeholder="Auto-édition..."
+            placeholder="Auto-édition…"
             style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 13 }}
           />
         </div>
@@ -91,19 +91,19 @@ export function StepMetadata({ metadata, onChange }: StepMetadataProps) {
           <input
             type="number"
             value={metadata.copyrightYear || new Date().getFullYear()}
-            onChange={(e) => updateField('copyrightYear', parseInt(e.target.value) || new Date().getFullYear())}
+            onChange={(e) => updateField('copyrightYear', parseInt(e.target.value, 10) || new Date().getFullYear())}
             style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 13 }}
           />
         </div>
       </div>
 
       <div>
-        <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Mentions légales / Achevé d'imprimer</label>
+        <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Mentions légales / Achevé d&apos;imprimer</label>
         <textarea
           value={metadata.legalNotice || ''}
           onChange={(e) => updateField('legalNotice', e.target.value)}
           rows={2}
-          placeholder="Tous droits réservés. Dépôt légal..."
+          placeholder="Tous droits réservés. Dépôt légal…"
           style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 12, fontFamily: 'sans-serif' }}
         />
       </div>

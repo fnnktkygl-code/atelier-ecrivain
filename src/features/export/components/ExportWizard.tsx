@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { EditableChapter } from '@/types/editor';
 import { BookMetadata, CoverConfig, FrontBackMatterSection } from '../types/bookMeta';
-import { ExportSettings, ThemeId } from '../types/exportSettings';
+import { ExportSettings } from '../types/exportSettings';
 import { ExportHistoryEntry } from '../types/job';
 import {
   DEFAULT_EXPORT_SETTINGS,
@@ -22,6 +22,14 @@ import { StepCover } from './steps/StepCover';
 import { StepTheme } from './steps/StepTheme';
 import { StepLayout } from './steps/StepLayout';
 import { StepReview } from './steps/StepReview';
+import {
+  IconBook,
+  IconClose,
+  IconEdit,
+  IconPalette,
+  IconFeather,
+  IconSparkles,
+} from '@/components/Shared/Icons';
 
 interface ExportWizardProps {
   manuscriptId: string;
@@ -32,56 +40,37 @@ interface ExportWizardProps {
 }
 
 const STEPS = [
-  { id: 1, title: 'Métadonnées', icon: '📝' },
-  { id: 2, title: 'Liminaires & Textes', icon: '📄' },
-  { id: 3, title: 'Couverture', icon: '🎨' },
-  { id: 4, title: 'Thème Éditorial', icon: '✒️' },
-  { id: 5, title: 'Mise en Page', icon: '📐' },
-  { id: 6, title: 'Génération PDF', icon: '⚡' },
+  { id: 1, title: 'Métadonnées', Icon: IconEdit },
+  { id: 2, title: 'Liminaires & Textes', Icon: IconBook },
+  { id: 3, title: 'Couverture', Icon: IconPalette },
+  { id: 4, title: 'Thème Éditorial', Icon: IconFeather },
+  { id: 5, title: 'Mise en Page', Icon: IconBook },
+  { id: 6, title: 'Génération PDF', Icon: IconSparkles },
 ];
 
-export function ExportWizard({
+function ExportWizardContent({
   manuscriptId,
   manuscriptTitle,
   chapters,
-  isOpen,
   onClose,
-}: ExportWizardProps) {
+}: {
+  manuscriptId: string;
+  manuscriptTitle: string;
+  chapters: EditableChapter[];
+  onClose: () => void;
+}) {
   const [step, setStep] = useState<number>(1);
 
-  const [metadata, setMetadata] = useState<BookMetadata>({
-    title: manuscriptTitle || 'Mon Livre',
-    authorName: 'Auteur',
-    copyrightYear: new Date().getFullYear(),
-  });
-
-  const [sections, setSections] = useState<FrontBackMatterSection[]>([]);
-
-  const [coverConfig, setCoverConfig] = useState<CoverConfig>({
-    mode: 'none',
-    background: { type: 'color', value: '#8a5a34' },
-    titleColor: '#ffffff',
-  });
-
-  const [settings, setSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
-  const [history, setHistory] = useState<ExportHistoryEntry[]>([]);
+  const initialData = loadBookMetadata(manuscriptId, manuscriptTitle);
+  const [metadata, setMetadata] = useState<BookMetadata>(initialData.metadata);
+  const [sections, setSections] = useState<FrontBackMatterSection[]>(initialData.sections);
+  const [coverConfig, setCoverConfig] = useState<CoverConfig>(initialData.coverConfig);
+  const [settings, setSettings] = useState<ExportSettings>(() => loadExportSettings(manuscriptId) || DEFAULT_EXPORT_SETTINGS);
+  const [history, setHistory] = useState<ExportHistoryEntry[]>(() => loadExportHistory(manuscriptId));
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      const savedMeta = loadBookMetadata(manuscriptId, manuscriptTitle);
-      setMetadata(savedMeta.metadata);
-      setSections(savedMeta.sections);
-      setCoverConfig(savedMeta.coverConfig);
-      setSettings(loadExportSettings(manuscriptId));
-      setHistory(loadExportHistory(manuscriptId));
-    }
-  }, [isOpen, manuscriptId, manuscriptTitle]);
-
-  if (!isOpen) return null;
 
   const handleSaveAndPersist = (
     newMeta = metadata,
@@ -121,8 +110,9 @@ export function ExportWizard({
       };
       addExportHistoryEntry(manuscriptId, newEntry);
       setHistory(loadExportHistory(manuscriptId));
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Erreur lors de la génération du PDF.');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(errMsg || 'Erreur lors de la génération du PDF.');
     } finally {
       setIsGenerating(false);
     }
@@ -146,9 +136,9 @@ export function ExportWizard({
           width: '95%',
           maxWidth: 1040,
           height: '88vh',
-          background: 'var(--surface, #faf7f2)',
-          borderRadius: 14,
-          boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+          background: 'var(--surface)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-modal)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -167,13 +157,13 @@ export function ExportWizard({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 20 }}>📖</span>
+            <IconBook size={20} strokeWidth={2} style={{ color: 'var(--accent)' }} />
             <div>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
                 Studio « Exporter mon Livre en PDF »
               </h2>
               <div style={{ fontSize: 12, color: 'var(--text-soft)', marginTop: 2 }}>
-                Document de conception conforme • Rendu éditorial haut de gamme (100% Client)
+                Rendu éditorial conforme · Typographie & Couverture sur mesure
               </div>
             </div>
           </div>
@@ -183,12 +173,13 @@ export function ExportWizard({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: 20,
               cursor: 'pointer',
               color: 'var(--text-soft)',
+              padding: 4,
             }}
+            aria-label="Fermer le studio"
           >
-            ✕
+            <IconClose size={18} strokeWidth={2} />
           </button>
         </div>
 
@@ -197,7 +188,7 @@ export function ExportWizard({
           {/* Step Navigation Sidebar */}
           <div
             style={{
-              width: 220,
+              width: 230,
               borderRight: '1px solid var(--border)',
               background: 'var(--surface-2)',
               padding: '16px 12px',
@@ -207,6 +198,7 @@ export function ExportWizard({
             }}
           >
             {STEPS.map((s) => {
+              const { Icon } = s;
               const isActive = step === s.id;
               return (
                 <button
@@ -218,7 +210,7 @@ export function ExportWizard({
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 12px',
-                    borderRadius: 8,
+                    borderRadius: 'var(--radius-sm)',
                     border: 'none',
                     background: isActive ? 'var(--accent-glow)' : 'transparent',
                     color: isActive ? 'var(--accent)' : 'var(--text)',
@@ -229,7 +221,7 @@ export function ExportWizard({
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>{s.icon}</span>
+                  <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
                   <span>{s.title}</span>
                 </button>
               );
@@ -313,7 +305,7 @@ export function ExportWizard({
             ‹ Précédent
           </button>
 
-          <span style={{ fontSize: 12, opacity: 0.6 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             Étape {step} sur {STEPS.length}
           </span>
 
@@ -322,12 +314,32 @@ export function ExportWizard({
             className="btn btn-primary"
             onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))}
             disabled={step === STEPS.length}
-            style={{ padding: '8px 18px', fontSize: 13, background: 'var(--accent)' }}
+            style={{ padding: '8px 18px', fontSize: 13 }}
           >
             Suivant ›
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+export function ExportWizard({
+  manuscriptId,
+  manuscriptTitle,
+  chapters,
+  isOpen,
+  onClose,
+}: ExportWizardProps) {
+  if (!isOpen) return null;
+
+  return (
+    <ExportWizardContent
+      key={`${manuscriptId}-${isOpen}`}
+      manuscriptId={manuscriptId}
+      manuscriptTitle={manuscriptTitle}
+      chapters={chapters}
+      onClose={onClose}
+    />
   );
 }

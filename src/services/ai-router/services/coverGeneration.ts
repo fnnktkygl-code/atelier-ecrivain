@@ -17,13 +17,20 @@ export interface CoverGenResponse {
   error?: string;
 }
 
+interface PartWithInlineData {
+  inlineData?: {
+    data?: string;
+    mimeType?: string;
+  };
+}
+
 export async function generateAICoverImage(prompt: string): Promise<CoverGenResponse> {
   const selection = await selectModel('cover-generation');
 
   if (!selection.modelId) {
     return {
       degraded: true,
-      error: 'Quota de génération d’images Imagen 4 épuisé pour la journée (25/jour).',
+      error: 'Quota de génération d’images Nano Banana Pro / Imagen épuisé pour la journée.',
     };
   }
 
@@ -40,7 +47,7 @@ export async function generateAICoverImage(prompt: string): Promise<CoverGenResp
     await recordUsage(selection.modelId, 'generation', 'success');
 
     const candidate = response.response.candidates?.[0];
-    const part = candidate?.content?.parts?.[0] as any;
+    const part = candidate?.content?.parts?.[0] as PartWithInlineData | undefined;
 
     if (part && part.inlineData && part.inlineData.data) {
       const base64Img = part.inlineData.data;
@@ -53,10 +60,10 @@ export async function generateAICoverImage(prompt: string): Promise<CoverGenResp
 
     return {
       degraded: true,
-      error: 'Aucune image générée retournée.',
+      error: 'Aucune image générée retournée par le modèle.',
     };
-  } catch (err: any) {
-    const errMsg = err?.message || String(err);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     if (
       errMsg.includes('429') ||
       errMsg.includes('RESOURCE_EXHAUSTED') ||

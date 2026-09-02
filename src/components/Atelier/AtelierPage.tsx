@@ -1,10 +1,7 @@
 /**
- * AtelierPage — Main writing studio page (REFONTE)
+ * AtelierPage — Studio d'écriture principal (Japandi Minimaliste)
  *
- * Layout: Sidebar (chapters + record) | Editor | Review/Notes panels (drawer right)
- *
- * All state managed by useManuscript hook.
- * Dictation & Manual Keyboard Text analysis powered by Gemini AI.
+ * Agencement : Barre latérale (chapitres + enregistreur) | Éditeur | Tiroir droit (Révisions / Notes)
  */
 
 'use client';
@@ -23,6 +20,16 @@ import EditorToolbar from './EditorToolbar';
 import ReviewPanel from './ReviewPanel';
 import NotesPanel from './NotesPanel';
 import RecordButton from './RecordButton';
+import {
+  IconFeather,
+  IconClose,
+  IconSearch,
+  IconPause,
+  IconPlay,
+  IconStop,
+  IconSparkles,
+  IconAlertCircle,
+} from '@/components/Shared/Icons';
 
 export default function AtelierPage() {
   const { manuscript: activeManuscript } = useAuth();
@@ -41,6 +48,12 @@ export default function AtelierPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [isPdfWizardOpen, setIsPdfWizardOpen] = useState(false);
   const [isAnalyzingText, setIsAnalyzingText] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  const showFeedback = (msg: string) => {
+    setFeedbackMessage(msg);
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
 
   const handleToggleSpeech = useCallback(() => {
     if (speech.isPlaying) {
@@ -59,18 +72,17 @@ export default function AtelierPage() {
   const handleAnalyzeWrittenText = useCallback(async () => {
     const chapterContent = activeChapter?.blocks.map((b) => b.content).join('\n\n') || '';
     if (!chapterContent.trim()) {
-      alert('Veuillez d\'abord rédiger du texte dans ce chapitre avant de lancer l\'analyse IA.');
+      showFeedback('Veuillez d’abord rédiger du texte dans ce chapitre avant de lancer l’analyse.');
       return;
     }
 
     setIsAnalyzingText(true);
     try {
       const res = await analyzeWrittenText(chapterContent, { currentChapter: ms.activeChapterIndex });
-      
       const reviews: PendingReview[] = [];
 
       if (res.ratures && res.ratures.length > 0) {
-        res.ratures.forEach((r: any) => {
+        res.ratures.forEach((r) => {
           const origText = typeof r === 'string' ? r : (r.original || r.corrected || '');
           const suggText = typeof r === 'string' ? r : (r.corrected || r.original || '');
           reviews.push({
@@ -92,7 +104,7 @@ export default function AtelierPage() {
             original: c.text,
             suggestion: c.suggestion || '',
             source: c.source,
-            explanation: c.status === 'confirmed' ? 'Vérifié ✓' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
+            explanation: c.status === 'confirmed' ? 'Vérifié' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
             status: 'pending',
           });
         });
@@ -119,13 +131,16 @@ export default function AtelierPage() {
           dispatch({
             type: 'ADD_NOTE',
             chapterIndex: ms.activeChapterIndex,
-            content: `💡 Idée : ${content}`,
+            content: `Idée : ${content}`,
           });
         });
         setIsNotesOpen(true);
       }
-    } catch (err: any) {
-      alert(`Erreur d'analyse IA : ${err?.message || err}`);
+
+      showFeedback('Analyse Gemini terminée avec succès.');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      showFeedback(`Erreur d'analyse : ${errMsg}`);
     } finally {
       setIsAnalyzingText(false);
     }
@@ -157,15 +172,14 @@ export default function AtelierPage() {
     const reviews: PendingReview[] = [];
 
     if (ds.result.ratures && ds.result.ratures.length > 0) {
-      ds.result.ratures.forEach((r: any) => {
-        const origText = typeof r === 'string' ? r : (r.original || r.corrected || '');
-        const suggText = typeof r === 'string' ? r : (r.corrected || r.original || '');
+      ds.result.ratures.forEach((r) => {
+        const text = typeof r === 'string' ? r : String(r);
         reviews.push({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           type: 'rature',
-          original: origText,
-          suggestion: suggText,
-          explanation: typeof r === 'string' ? undefined : r.explanation,
+          original: text,
+          suggestion: text,
+          explanation: undefined,
           status: 'pending',
         });
       });
@@ -179,7 +193,7 @@ export default function AtelierPage() {
           original: c.text,
           suggestion: c.suggestion || '',
           source: c.source,
-          explanation: c.status === 'confirmed' ? 'Vérifié ✓' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
+          explanation: c.status === 'confirmed' ? 'Vérifié' : c.status === 'caution' ? 'À vérifier' : 'Erreur détectée',
           status: 'pending',
         });
       });
@@ -187,7 +201,7 @@ export default function AtelierPage() {
 
     if (reviews.length > 0) {
       dispatch({ type: 'ADD_REVIEWS', chapterIndex: ms.activeChapterIndex, reviews });
-      setIsReviewOpen(true);
+      setTimeout(() => setIsReviewOpen(true), 0);
     }
 
     // Add AI-generated notes
@@ -245,18 +259,27 @@ export default function AtelierPage() {
         />
       )}
 
+      {/* ── Feedback Notification Toast ── */}
+      {feedbackMessage && (
+        <div className="atelier-toast-feedback">
+          <IconSparkles size={16} strokeWidth={2} />
+          <span>{feedbackMessage}</span>
+        </div>
+      )}
+
       {/* ── Left Sidebar (Chapters + Record) ── */}
       <aside className={`atelier-sidebar ${showMobileSidebar ? 'mobile-visible' : ''}`}>
         <div className="atelier-sidebar-header">
           <h1 className="atelier-logo">
-            <span className="atelier-logo-icon">✒️</span>
-            <span>L'Atelier</span>
+            <IconFeather size={20} strokeWidth={2} className="atelier-logo-icon" />
+            <span>L&apos;Atelier</span>
           </h1>
           <button
             className="mobile-sidebar-close"
             onClick={() => setShowMobileSidebar(false)}
+            aria-label="Fermer le menu"
           >
-            ✕
+            <IconClose size={16} strokeWidth={2} />
           </button>
         </div>
 
@@ -323,66 +346,93 @@ export default function AtelierPage() {
 
           {/* Dictation Status Bar (Always visible during recording/processing) */}
           {ds.phase !== 'idle' && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '8px 20px',
-              background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
-              fontFamily: "'Cormorant Garamond', serif", fontSize: 14, color: 'var(--accent)',
-            }}>
+            <div className="dictation-status-bar">
               {ds.phase === 'recording' && (
                 <>
-                  <span style={{ fontWeight: 600 }}>🔴 Enregistrement… {dictation.formatTime(ds.duration)}</span>
-                  <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
-                    <button className="btn btn-ghost" onClick={dictation.pauseRecording} style={{ fontSize: 12, padding: '4px 10px' }}>⏸ Pause</button>
-                    <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px' }}>⏹ Terminer</button>
-                    <button className="btn btn-secondary" onClick={dictation.cancelRecording} style={{ fontSize: 12, padding: '4px 12px', borderColor: '#e53e3e', color: '#e53e3e' }}>❌ Annuler</button>
+                  <div className="dictation-status-indicator recording">
+                    <span className="recording-pulse-dot" />
+                    <span>Enregistrement en cours… {dictation.formatTime(ds.duration)}</span>
+                  </div>
+                  <div className="dictation-status-actions">
+                    <button className="btn-dictation-control" onClick={dictation.pauseRecording}>
+                      <IconPause size={14} />
+                      <span>Pause</span>
+                    </button>
+                    <button className="btn-dictation-control primary" onClick={dictation.stopRecording}>
+                      <IconStop size={14} />
+                      <span>Terminer</span>
+                    </button>
+                    <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
+                      <IconClose size={14} />
+                      <span>Annuler</span>
+                    </button>
                   </div>
                 </>
               )}
               {ds.phase === 'paused' && (
                 <>
-                  <span style={{ fontWeight: 600 }}>⏸ En pause ({dictation.formatTime(ds.duration)})</span>
-                  <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
-                    <button className="btn btn-ghost" onClick={dictation.resumeRecording} style={{ fontSize: 12, padding: '4px 10px' }}>▶️ Reprendre</button>
-                    <button className="btn btn-primary" onClick={dictation.stopRecording} style={{ fontSize: 12, padding: '4px 12px' }}>⏹ Terminer</button>
-                    <button className="btn btn-secondary" onClick={dictation.cancelRecording} style={{ fontSize: 12, padding: '4px 12px', borderColor: '#e53e3e', color: '#e53e3e' }}>❌ Annuler</button>
+                  <div className="dictation-status-indicator paused">
+                    <IconPause size={15} />
+                    <span>En pause ({dictation.formatTime(ds.duration)})</span>
+                  </div>
+                  <div className="dictation-status-actions">
+                    <button className="btn-dictation-control" onClick={dictation.resumeRecording}>
+                      <IconPlay size={14} />
+                      <span>Reprendre</span>
+                    </button>
+                    <button className="btn-dictation-control primary" onClick={dictation.stopRecording}>
+                      <IconStop size={14} />
+                      <span>Terminer</span>
+                    </button>
+                    <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
+                      <IconClose size={14} />
+                      <span>Annuler</span>
+                    </button>
                   </div>
                 </>
               )}
               {ds.phase === 'processing' && (
                 <>
-                  <span style={{ fontWeight: 600 }}>⚙️ Gemini analyse la dictée…</span>
-                  <button className="btn btn-secondary" onClick={dictation.cancelRecording} style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto', borderColor: '#e53e3e', color: '#e53e3e' }}>❌ Annuler</button>
+                  <div className="dictation-status-indicator processing">
+                    <span className="processing-spinner" />
+                    <span>Gemini 3.7 analyse et structure la dictée…</span>
+                  </div>
+                  <button className="btn-dictation-control danger" onClick={dictation.cancelRecording}>
+                    <IconClose size={14} />
+                    <span>Annuler</span>
+                  </button>
                 </>
               )}
-              {ds.phase === 'error' && <span style={{ fontWeight: 600, color: '#c0392b' }}>❌ {ds.error}</span>}
+              {ds.phase === 'error' && (
+                <div className="dictation-status-indicator error">
+                  <IconAlertCircle size={15} />
+                  <span>{ds.error}</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* Search bar */}
           {showSearch && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px',
-              background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
-            }}>
-              <span style={{ fontSize: 14 }}>🔍</span>
+            <div className="atelier-search-bar">
+              <IconSearch size={15} strokeWidth={2} />
               <input
                 type="text"
                 placeholder="Rechercher dans le manuscrit…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
-                style={{
-                  flex: 1, padding: '4px 8px', border: '1px solid var(--border)',
-                  borderRadius: 4, background: 'var(--surface)', color: 'var(--text)',
-                  fontSize: 13, outline: 'none',
-                }}
+                className="atelier-search-input"
               />
               <button
-                className="btn btn-ghost"
-                onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-                style={{ fontSize: 12, padding: '2px 8px' }}
+                className="btn-close-search"
+                onClick={() => {
+                  setShowSearch(false);
+                  setSearchQuery('');
+                }}
+                aria-label="Fermer la recherche"
               >
-                ✕
+                <IconClose size={14} strokeWidth={2} />
               </button>
             </div>
           )}

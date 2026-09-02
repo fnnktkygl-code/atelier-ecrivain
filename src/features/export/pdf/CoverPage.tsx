@@ -74,6 +74,7 @@ export function CoverPage({
     return (
       <Page size="A4" style={styles.page}>
         <View style={styles.stage}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image src={rawImage as string} style={styles.coverImage} />
           {showText && (
             <>

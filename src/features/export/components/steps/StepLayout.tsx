@@ -9,7 +9,7 @@ interface StepLayoutProps {
 }
 
 export function StepLayout({ settings, onChange }: StepLayoutProps) {
-  const updatePage = (key: string, value: any) => {
+  const updatePage = <K extends keyof ExportSettings['page']>(key: K, value: ExportSettings['page'][K]) => {
     onChange({
       ...settings,
       page: {
@@ -22,7 +22,7 @@ export function StepLayout({ settings, onChange }: StepLayoutProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <h3 style={{ margin: 0, fontSize: 16, color: 'var(--accent)' }}>
-        5. Mise en Page & Format d'Impression
+        5. Mise en Page & Format d&apos;Impression
       </h3>
 
       {/* Format & Orientation */}
@@ -49,7 +49,7 @@ export function StepLayout({ settings, onChange }: StepLayoutProps) {
           </label>
           <select
             value={settings.page.orientation}
-            onChange={(e) => updatePage('orientation', e.target.value)}
+            onChange={(e) => updatePage('orientation', e.target.value as 'portrait' | 'landscape')}
             style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: 13 }}
           >
             <option value="portrait">Portrait</option>
@@ -69,7 +69,7 @@ export function StepLayout({ settings, onChange }: StepLayoutProps) {
             min={9}
             max={15}
             value={settings.page.fontSizePt}
-            onChange={(e) => updatePage('fontSizePt', parseInt(e.target.value))}
+            onChange={(e) => updatePage('fontSizePt', parseInt(e.target.value, 10))}
             style={{ width: '100%' }}
           />
         </div>
@@ -98,7 +98,7 @@ export function StepLayout({ settings, onChange }: StepLayoutProps) {
             min={10}
             max={40}
             value={settings.page.marginInsideMm}
-            onChange={(e) => updatePage('marginInsideMm', parseInt(e.target.value))}
+            onChange={(e) => updatePage('marginInsideMm', parseInt(e.target.value, 10))}
             style={{ width: '100%' }}
           />
         </div>
@@ -121,7 +121,7 @@ export function StepLayout({ settings, onChange }: StepLayoutProps) {
             checked={settings.includeChapterNumbers}
             onChange={(e) => onChange({ ...settings, includeChapterNumbers: e.target.checked })}
           />
-          Numéroter automatiquement les chapitres (Chapitre 1, Chapitre 2...)
+          Numéroter automatiquement les chapitres (Chapitre 1, Chapitre 2…)
         </label>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>

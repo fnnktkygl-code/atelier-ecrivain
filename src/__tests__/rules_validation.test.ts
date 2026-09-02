@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 // Verification helper representing firestore.rules isValidPayload logic
-function isValidPayload(data: any): boolean {
+function isValidPayload(data: Record<string, unknown> | null | undefined): boolean {
   if (data == null) return true;
   const keys = Object.keys(data);
   if (keys.length >= 100) return false;

@@ -26,27 +26,27 @@ function computeAutoTheme(): Theme {
   return h >= 20 || h < 7 ? 'night' : 'day';
 }
 
-export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('day');
-  const [themeAuto, setThemeAutoState] = useState(false);
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('atelier-theme');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.themeAuto) {
-          setThemeAutoState(true);
-          setThemeState(computeAutoTheme());
-        } else if (parsed.theme) {
-          setThemeState(parsed.theme);
-        }
+function getInitialTheme(): { theme: Theme; themeAuto: boolean } {
+  if (typeof window === 'undefined') return { theme: 'day', themeAuto: false };
+  try {
+    const stored = localStorage.getItem('atelier-theme');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.themeAuto) {
+        return { theme: computeAutoTheme(), themeAuto: true };
       }
-    } catch {
-      // ignore
+      if (parsed.theme) {
+        return { theme: parsed.theme, themeAuto: false };
+      }
     }
-  }, []);
+  } catch {}
+  return { theme: 'day', themeAuto: false };
+}
+
+export default function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [initial] = useState(() => getInitialTheme());
+  const [theme, setThemeState] = useState<Theme>(initial.theme);
+  const [themeAuto, setThemeAutoState] = useState<boolean>(initial.themeAuto);
 
   // Apply theme class to body
   useEffect(() => {
@@ -68,9 +68,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   const persist = useCallback((t: Theme, auto: boolean) => {
     try {
       localStorage.setItem('atelier-theme', JSON.stringify({ theme: t, themeAuto: auto }));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   const setTheme = useCallback((t: Theme) => {

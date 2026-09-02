@@ -1,17 +1,19 @@
 /**
- * NotesPanel — Editable notes panel
- *
- * Features:
- * - Add notes manually
- * - Edit existing notes inline
- * - Delete notes
- * - AI-generated notes marked with badge
+ * NotesPanel — Panneau latéral de notes & annotations (Japandi Minimaliste)
  */
 
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { EditableNote, ManuscriptAction } from '@/types/editor';
+import {
+  IconPaperclip,
+  IconPlus,
+  IconClose,
+  IconEdit,
+  IconTrash,
+  IconCheck,
+} from '@/components/Shared/Icons';
 
 interface NotesPanelProps {
   notes: EditableNote[];
@@ -21,22 +23,43 @@ interface NotesPanelProps {
   onClose: () => void;
 }
 
-export default function NotesPanel({ notes, chapterIndex, dispatch, isOpen, onClose }: NotesPanelProps) {
+export default function NotesPanel({
+  notes,
+  chapterIndex,
+  dispatch,
+  isOpen,
+  onClose,
+}: NotesPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newNoteContent, setNewNoteContent] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (showAddForm && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [showAddForm]);
 
   const handleAdd = useCallback(() => {
     if (!newNoteContent.trim()) return;
-    dispatch({ type: 'ADD_NOTE', chapterIndex, content: newNoteContent.trim() });
+    dispatch({
+      type: 'ADD_NOTE',
+      chapterIndex,
+      content: newNoteContent.trim(),
+    });
     setNewNoteContent('');
     setShowAddForm(false);
-  }, [newNoteContent, chapterIndex, dispatch]);
+  }, [chapterIndex, dispatch, newNoteContent]);
 
   const handleUpdate = useCallback(
     (noteId: string, content: string) => {
-      dispatch({ type: 'UPDATE_NOTE', chapterIndex, noteId, content });
+      dispatch({
+        type: 'UPDATE_NOTE',
+        chapterIndex,
+        noteId,
+        content,
+      });
       setEditingId(null);
     },
     [chapterIndex, dispatch]
@@ -44,53 +67,58 @@ export default function NotesPanel({ notes, chapterIndex, dispatch, isOpen, onCl
 
   const handleDelete = useCallback(
     (noteId: string) => {
-      dispatch({ type: 'DELETE_NOTE', chapterIndex, noteId });
+      dispatch({
+        type: 'DELETE_NOTE',
+        chapterIndex,
+        noteId,
+      });
     },
     [chapterIndex, dispatch]
   );
 
+  if (!isOpen) return null;
+
   return (
-    <div className={`notes-panel ${isOpen ? 'open' : ''}`}>
+    <div className="notes-panel">
       {/* Header */}
-      <div className="review-panel-header">
-        <h3>
-          Notes
-          {notes.length > 0 && (
-            <span className="review-count">{notes.length}</span>
-          )}
-        </h3>
-        <div style={{ display: 'flex', gap: 6 }}>
+      <div className="notes-panel-header">
+        <div className="notes-panel-title">
+          <IconPaperclip size={17} strokeWidth={2} />
+          <h3>Notes du chapitre</h3>
+          <span className="count-badge">{notes.length}</span>
+        </div>
+        <div className="notes-panel-actions">
           <button
             className="btn-icon"
-            onClick={() => setShowAddForm(!showAddForm)}
-            style={{ width: 32, height: 32, fontSize: 16 }}
+            onClick={() => setShowAddForm(true)}
             title="Ajouter une note"
+            aria-label="Ajouter une note"
           >
-            ＋
+            <IconPlus size={16} strokeWidth={2.2} />
           </button>
-          <button className="btn-icon" onClick={onClose} style={{ width: 32, height: 32, fontSize: 14 }}>
-            ✕
+          <button className="btn-icon" onClick={onClose} title="Fermer" aria-label="Fermer le panneau">
+            <IconClose size={16} strokeWidth={2} />
           </button>
         </div>
       </div>
 
-      {/* Add form */}
+      {/* Add note form */}
       {showAddForm && (
-        <div className="note-add-form">
+        <div className="note-form">
           <textarea
             ref={inputRef}
             className="note-textarea"
             value={newNoteContent}
             onChange={(e) => setNewNoteContent(e.target.value)}
-            placeholder="Écrire une note..."
+            placeholder="Écrire une note ou une idée…"
             rows={3}
             autoFocus
           />
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn btn-ghost" onClick={() => setShowAddForm(false)} style={{ fontSize: 12, padding: '4px 12px' }}>
+          <div className="note-form-actions">
+            <button className="btn btn-ghost" onClick={() => setShowAddForm(false)}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={handleAdd} style={{ fontSize: 12, padding: '4px 12px' }}>
+            <button className="btn btn-primary" onClick={handleAdd}>
               Ajouter
             </button>
           </div>
@@ -100,10 +128,12 @@ export default function NotesPanel({ notes, chapterIndex, dispatch, isOpen, onCl
       {/* Notes list */}
       <div className="notes-list">
         {notes.length === 0 ? (
-          <div className="empty-state" style={{ padding: '24px 16px' }}>
-            <div className="empty-state-icon" style={{ fontSize: 28 }}>📎</div>
-            <div className="empty-state-text" style={{ fontSize: 13 }}>
-              Aucune note pour ce chapitre. Cliquez ＋ pour en ajouter.
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <IconPaperclip size={28} strokeWidth={1.5} />
+            </div>
+            <div className="empty-state-text">
+              Aucune note pour ce chapitre. Cliquez sur « + » pour en consigner une.
             </div>
           </div>
         ) : (
@@ -141,73 +171,69 @@ function NoteItem({
   onCancel: () => void;
   onDelete: () => void;
 }) {
-  const [editContent, setEditContent] = useState(note.content);
-  const [isHovered, setIsHovered] = useState(false);
+  const [editText, setEditText] = useState(note.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleStartEdit = () => {
-    setEditContent(note.content);
-    onStartEdit();
-  };
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.selectionStart = textareaRef.current.value.length;
+    }
+  }, [isEditing]);
 
   const handleSave = () => {
-    if (editContent.trim()) {
-      onSave(editContent.trim());
+    if (editText.trim()) {
+      onSave(editText.trim());
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && e.metaKey) handleSave();
-    if (e.key === 'Escape') onCancel();
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      onCancel();
+    }
   };
 
-  return (
-    <div
-      className="note-item"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="note-item-header">
-        <span className="note-key">{note.key}</span>
-        {note.source === 'ai' && <span className="note-ai-badge">IA</span>}
-        {note.source === 'manual' && <span className="note-manual-badge">Manuel</span>}
+  if (isEditing) {
+    return (
+      <div className="note-card editing">
+        <textarea
+          ref={textareaRef}
+          className="note-textarea"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={3}
+        />
+        <div className="note-card-actions">
+          <button className="btn btn-ghost" onClick={onCancel}>
+            Annuler
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            <IconCheck size={14} strokeWidth={2.5} />
+            <span>Enregistrer</span>
+          </button>
+        </div>
       </div>
+    );
+  }
 
-      {isEditing ? (
-        <div className="note-edit-area">
-          <textarea
-            className="note-textarea"
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={3}
-            autoFocus
-          />
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
-            <button className="btn btn-ghost" onClick={onCancel} style={{ fontSize: 11, padding: '3px 10px' }}>
-              Annuler
-            </button>
-            <button className="btn btn-primary" onClick={handleSave} style={{ fontSize: 11, padding: '3px 10px' }}>
-              Sauver
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="note-content" onClick={handleStartEdit} title="Cliquer pour modifier">
-          {note.content}
-        </div>
-      )}
-
-      {/* Actions */}
-      {isHovered && !isEditing && (
-        <div className="note-actions">
-          <button className="editor-block-action-btn" onClick={handleStartEdit} title="Modifier">
-            ✏️
+  return (
+    <div className="note-card">
+      <div className="note-card-header">
+        <span className="note-key">{note.key}</span>
+        <div className="note-card-tools">
+          <button className="note-tool-btn" onClick={onStartEdit} title="Modifier" aria-label="Modifier la note">
+            <IconEdit size={13} />
           </button>
-          <button className="editor-block-action-btn delete" onClick={onDelete} title="Supprimer">
-            ✕
+          <button className="note-tool-btn delete" onClick={onDelete} title="Supprimer" aria-label="Supprimer la note">
+            <IconTrash size={13} />
           </button>
         </div>
-      )}
+      </div>
+      <div className="note-card-content">{note.content}</div>
     </div>
   );
 }
