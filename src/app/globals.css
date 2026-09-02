@@ -998,7 +998,7 @@ a:hover {
   min-height: 0;
   height: 100%;
   overflow-y: auto;
-  padding: clamp(16px, 2.5vh, 28px) 20px 16px;
+  padding: 16px 20px 8px;
   box-sizing: border-box;
 }
 
@@ -1007,8 +1007,8 @@ a:hover {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 860px;
-  gap: clamp(16px, 2.5vh, 24px);
+  max-width: 920px;
+  gap: 14px;
 }
 
 .landing-hero {
@@ -1031,7 +1031,7 @@ a:hover {
   font-size: 11px;
   font-weight: 600;
   color: var(--accent);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .landing-badge-icon {
@@ -1040,7 +1040,7 @@ a:hover {
 
 .landing-title {
   font-family: var(--font-serif-classic);
-  font-size: clamp(28px, 4vw, 42px);
+  font-size: clamp(32px, 5vw, 48px);
   font-weight: 500;
   color: var(--text);
   line-height: 1.12;
@@ -1055,11 +1055,11 @@ a:hover {
 }
 
 .landing-subtitle {
-  font-size: clamp(13px, 1.5vw, 15px);
+  font-size: clamp(14px, 1.8vw, 16px);
   color: var(--text-soft);
-  line-height: 1.5;
-  margin-bottom: 16px;
-  max-width: 580px;
+  line-height: 1.55;
+  margin-bottom: 14px;
+  max-width: 600px;
 }
 
 .landing-cta-box {
@@ -1099,13 +1099,13 @@ a:hover {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  height: 46px;
+  height: 50px;
   border-radius: var(--radius-full);
   background: var(--surface);
   border: 1.5px solid var(--border);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -1128,7 +1128,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-muted);
   text-align: center;
 }
@@ -1143,7 +1143,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .landing-section-header {
@@ -1151,7 +1151,7 @@ a:hover {
 }
 
 .landing-section-eyebrow {
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.12em;
   font-weight: 700;
   text-transform: uppercase;
@@ -1162,7 +1162,7 @@ a:hover {
 
 .landing-section-title {
   font-family: var(--font-serif-classic);
-  font-size: clamp(18px, 2.4vw, 24px);
+  font-size: clamp(22px, 3vw, 28px);
   font-weight: 500;
   color: var(--text);
   margin: 0;
@@ -1183,7 +1183,7 @@ a:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 16px 16px;
+  padding: 18px 18px;
   box-shadow: var(--shadow-sm);
   transition: all var(--transition-fast);
   box-sizing: border-box;
@@ -1203,8 +1203,8 @@ a:hover {
 }
 
 .landing-step-icon {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--accent);
@@ -1215,21 +1215,21 @@ a:hover {
 
 .landing-step-stepnum {
   font-family: var(--font-serif-classic);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-muted);
 }
 
 .landing-step-title {
   font-family: var(--font-serif-classic);
-  font-size: 15.5px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text);
   margin-bottom: 2px;
 }
 
 .landing-step-subtitle {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--accent);
   margin-bottom: 6px;
@@ -1237,9 +1237,9 @@ a:hover {
 }
 
 .landing-step-desc {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-soft);
-  line-height: 1.45;
+  line-height: 1.5;
   margin: 0;
 }
 
