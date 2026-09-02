@@ -145,12 +145,10 @@ export async function generateWithFallback<T>(
 
   for (const modelName of chain) {
     try {
-      // Configure generation with thinkingBudget: 0 for lightning-fast output
+      // Only include thinkingConfig on Gemini 3.7 models (it causes 400 Bad Request on other models)
       const fastConfig = {
         ...generationConfig,
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
+        ...(modelName.includes('3.7') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       };
 
       let model = genAI.getGenerativeModel(
@@ -167,8 +165,13 @@ export async function generateWithFallback<T>(
         res = await execute(model, modelName);
       } catch (execErr) {
         const msg = execErr instanceof Error ? execErr.message : String(execErr);
-        // If thinkingConfig is unrecognized on an older model, retry without it
-        if (msg.includes('thinkingConfig') || msg.includes('thinking_config') || msg.includes('unknown field')) {
+        // If config error or thinkingConfig rejected, retry cleanly with base generationConfig
+        if (
+          msg.includes('thinkingConfig') ||
+          msg.includes('thinking_config') ||
+          msg.includes('unknown field') ||
+          msg.includes('invalid argument')
+        ) {
           model = genAI.getGenerativeModel(
             {
               model: modelName,

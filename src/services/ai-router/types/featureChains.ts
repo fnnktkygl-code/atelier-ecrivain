@@ -26,12 +26,12 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     degradeInsteadOfFallback: false,
     chain: [
       'gemini-3.5-transcribe', // Modèle dédié ultra-précis pour fichiers audio
-      'gemini-2.5-flash', // Modèle Flash multimodal haute vitesse & audio natif
-      'gemini-2.0-flash', // Modèle Flash rapide
-      'gemini-2.5-flash-lite',
-      'gemini-3.7-flash', // Dernier modèle Flash pour analyse et structuration
-      'gemini-3.6-flash',
+      'gemini-3.6-flash', // Modèle Flash haute vitesse et stable
       'gemini-3.5-flash',
+      'gemini-3.7-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.5-flash-lite',
     ],
   },
 
@@ -42,9 +42,10 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     degradeInsteadOfFallback: false,
     chain: [
       'gemini-3.5-transcribe-live', // Modèle dédié streaming temps réel
+      'gemini-3.6-flash',
+      'gemini-3.7-flash',
       'gemini-2.5-flash-native-audio-dialog',
       'gemini-2.5-flash',
-      'gemini-3.7-flash',
     ],
   },
 
@@ -54,11 +55,11 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     requiredQuotaKind: 'generation',
     degradeInsteadOfFallback: false,
     chain: [
-      'gemini-3.7-flash', // Dernier modèle Flash de texte (le plus avancé)
+      'gemini-3.6-flash', // Modèle Flash de référence (< 1s, support JSON natif vérifié)
+      'gemini-3.5-flash',
+      'gemini-3.7-flash',
       'gemini-2.5-flash',
       'gemini-2.0-flash',
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
       'gemini-3.1-pro',
       'gemini-2.5-flash-lite',
     ],

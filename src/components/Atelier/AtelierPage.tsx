@@ -77,6 +77,8 @@ export default function AtelierPage() {
     }
 
     setIsAnalyzingText(true);
+    showFeedback('Analyse stylistique & ratures en cours (Gemini 3.6 Flash)…');
+
     try {
       const res = await analyzeWrittenText(chapterContent, { currentChapter: ms.activeChapterIndex });
       const reviews: PendingReview[] = [];
@@ -137,7 +139,11 @@ export default function AtelierPage() {
         setIsNotesOpen(true);
       }
 
-      showFeedback('Analyse Gemini terminée avec succès.');
+      if (reviews.length > 0) {
+        showFeedback(`Analyse terminée : ${reviews.length} suggestion(s) de rature(s) prête(s).`);
+      } else {
+        showFeedback('Analyse terminée : Style fluide, aucune rature requise.');
+      }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       showFeedback(`Erreur d'analyse : ${errMsg}`);

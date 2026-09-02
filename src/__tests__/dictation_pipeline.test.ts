@@ -12,10 +12,10 @@ import { clearModelCooldown, loadModelQuota, recordModelUsage } from '../service
 import { FEATURE_CHAINS } from '../services/ai-router/types/featureChains';
 
 describe('Dictation Pipeline & Fallback System', () => {
-  test('FEATURE_CHAINS dictation prioritizes gemini-3.5-transcribe for audio and text-analysis for gemini-3.7-flash', () => {
+  test('FEATURE_CHAINS dictation prioritizes gemini-3.5-transcribe for audio and text-analysis for gemini-3.6-flash', () => {
     assert.equal(FEATURE_CHAINS.dictation.chain[0], 'gemini-3.5-transcribe');
-    assert.equal(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.7-flash');
-    assert.ok(FEATURE_CHAINS.dictation.chain.includes('gemini-2.5-flash'));
+    assert.equal(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.6-flash');
+    assert.ok(FEATURE_CHAINS.dictation.chain.includes('gemini-3.6-flash'));
   });
 
   test('normalizeAudioMimeType cleans complex browser MIME types', () => {

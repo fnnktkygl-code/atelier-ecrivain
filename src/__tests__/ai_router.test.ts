@@ -45,7 +45,7 @@ describe('AI Router & Quota System (Chantier 1)', () => {
   test('FEATURE_CHAINS maps optimal specialized models for each task', () => {
     assert.strictEqual(FEATURE_CHAINS.dictation.chain[0], 'gemini-3.5-transcribe');
     assert.strictEqual(FEATURE_CHAINS['dictation-live'].chain[0], 'gemini-3.5-transcribe-live');
-    assert.strictEqual(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.7-flash');
+    assert.strictEqual(FEATURE_CHAINS['text-analysis'].chain[0], 'gemini-3.6-flash');
     assert.strictEqual(FEATURE_CHAINS['cover-generation'].chain[0], 'nano-banana-pro');
     assert.strictEqual(FEATURE_CHAINS['global-analysis'].chain[0], 'deep-research-max-preview-04-2026');
     assert.strictEqual(FEATURE_CHAINS['deep-research'].chain[0], 'deep-research-max-preview-04-2026');
@@ -56,7 +56,7 @@ describe('AI Router & Quota System (Chantier 1)', () => {
     assert.strictEqual(dictation.modelId, 'gemini-3.5-transcribe');
 
     const textAnalysis = await selectModel('text-analysis');
-    assert.strictEqual(textAnalysis.modelId, 'gemini-3.7-flash');
+    assert.strictEqual(textAnalysis.modelId, 'gemini-3.6-flash');
 
     const deepResearch = await selectModel('deep-research');
     assert.strictEqual(deepResearch.modelId, 'deep-research-max-preview-04-2026');
