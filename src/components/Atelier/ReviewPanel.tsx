@@ -32,14 +32,19 @@ export default function ReviewPanel({
   isOpen,
   onClose,
 }: ReviewPanelProps) {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('all');
+  // Default to 'pending' to keep editor clean and uncluttered
+  const [filter, setFilter] = useState<'pending' | 'accepted' | 'rejected' | 'all'>('pending');
 
   const pendingCount = reviews.filter((r) => r.status === 'pending').length;
   const acceptedCount = reviews.filter((r) => r.status === 'accepted').length;
   const rejectedCount = reviews.filter((r) => r.status === 'rejected').length;
+  const archivedCount = acceptedCount + rejectedCount;
   const totalCount = reviews.length;
 
-  const filtered = reviews.filter((r) => filter === 'all' || r.status === filter);
+  const filtered = reviews.filter((r) => {
+    if (filter === 'all') return true;
+    return r.status === filter;
+  });
 
   const handleAccept = (reviewId: string) => {
     dispatch({ type: 'ACCEPT_REVIEW', chapterIndex, reviewId });
@@ -47,6 +52,11 @@ export default function ReviewPanel({
 
   const handleReject = (reviewId: string) => {
     dispatch({ type: 'REJECT_REVIEW', chapterIndex, reviewId });
+  };
+
+  const handleClearArchived = () => {
+    dispatch({ type: 'CLEAR_ARCHIVED_REVIEWS', chapterIndex });
+    setFilter('pending');
   };
 
   if (!isOpen) return null;
@@ -57,12 +67,12 @@ export default function ReviewPanel({
       <div className="review-panel-header">
         <div className="review-panel-title">
           <IconScissors size={17} strokeWidth={2} />
-          <h3>Révisions & Suggestions</h3>
+          <h3>Révisions & Ratures</h3>
           {pendingCount > 0 ? (
-            <span className="review-count">{pendingCount} en attente</span>
-          ) : totalCount > 0 ? (
+            <span className="review-count">{pendingCount} à traiter</span>
+          ) : archivedCount > 0 ? (
             <span className="review-count archived">
-              {totalCount} archivée{totalCount > 1 ? 's' : ''}
+              {archivedCount} résolue{archivedCount > 1 ? 's' : ''}
             </span>
           ) : null}
         </div>
@@ -75,18 +85,14 @@ export default function ReviewPanel({
       <div className="review-disclaimer">
         <IconLightbulb size={15} strokeWidth={2} />
         <span>
-          <strong>Historique :</strong> Retrouvez toutes les suggestions de style et corrections factuelles.
+          {pendingCount > 0
+            ? 'Suggestions stylistiques et factuelles pour affiner votre texte.'
+            : 'Toutes les suggestions de ce passage ont été traitées.'}
         </span>
       </div>
 
       {/* Filter tabs */}
       <div className="review-filters">
-        <button
-          className={`pill ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          Toutes ({totalCount})
-        </button>
         <button
           className={`pill ${filter === 'pending' ? 'active' : ''}`}
           onClick={() => setFilter('pending')}
@@ -105,6 +111,12 @@ export default function ReviewPanel({
         >
           Rejetées ({rejectedCount})
         </button>
+        <button
+          className={`pill ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          Toutes ({totalCount})
+        </button>
       </div>
 
       {/* Review items */}
@@ -115,9 +127,24 @@ export default function ReviewPanel({
               <IconSparkles size={28} strokeWidth={1.5} />
             </div>
             <div className="empty-state-text">
-              {filter === 'pending'
-                ? 'Aucune révision en attente. Dictez ou analysez votre texte pour recevoir des suggestions.'
-                : 'Aucune révision dans cette catégorie.'}
+              {filter === 'pending' ? (
+                archivedCount > 0 ? (
+                  <div className="review-all-resolved">
+                    <p className="resolved-title">Toutes les suggestions sont traitées !</p>
+                    <p className="resolved-desc">
+                      Vos décisions sont conservées dans les onglets <strong>Acceptées ({acceptedCount})</strong> et <strong>Rejetées ({rejectedCount})</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  'Aucune révision en attente. Dictez au micro ou analysez votre texte pour recevoir des suggestions.'
+                )
+              ) : filter === 'accepted' ? (
+                'Aucune proposition acceptée pour le moment.'
+              ) : filter === 'rejected' ? (
+                'Aucune proposition rejetée.'
+              ) : (
+                'Aucune révision enregistrée dans ce chapitre.'
+              )}
             </div>
           </div>
         ) : (
@@ -131,6 +158,20 @@ export default function ReviewPanel({
           ))
         )}
       </div>
+
+      {/* Footer action to purge archives */}
+      {archivedCount > 0 && (
+        <div className="review-panel-footer">
+          <button
+            className="btn-clear-archive"
+            onClick={handleClearArchived}
+            title="Effacer les révisions acceptées et rejetées pour libérer l’historique"
+          >
+            <IconClose size={13} strokeWidth={2} />
+            <span>Purger les {archivedCount} révision{archivedCount > 1 ? 's' : ''} archivée{archivedCount > 1 ? 's' : ''}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

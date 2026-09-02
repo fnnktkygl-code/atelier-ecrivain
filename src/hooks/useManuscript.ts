@@ -640,58 +640,77 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const review = ch.pendingReviews.find((r) => r.id === action.reviewId);
 
       if (review && review.status === 'pending') {
-        const targetNoteNum = ch.notes.length + 1;
-        const supChar = toSuperscript(targetNoteNum);
-
-        // 1. Attach ONLY the superscript marker to target phrase in story block
         const target = review.original ? review.original.trim() : '';
-        let marked = false;
+        const suggestion = review.suggestion ? review.suggestion.trim() : '';
 
-        if (target && target.length > 2) {
+        // 1. If it's a style rature with a suggested replacement, apply the text edit directly in blocks!
+        if (review.type === 'rature' && target && suggestion && target !== suggestion) {
+          let replaced = false;
           ch.blocks = ch.blocks.map((block) => {
-            if (!marked && block.content.includes(target)) {
-              marked = true;
+            if (!replaced && block.content.includes(target)) {
+              replaced = true;
               return {
                 ...block,
-                content: block.content.replace(target, `${target}${supChar}`),
+                content: block.content.replace(target, suggestion),
               };
             }
             return block;
           });
         }
 
-        // If target phrase was not matched, attach to end of paragraph
-        if (!marked && ch.blocks.length > 0) {
-          const lastIdx = ch.blocks.length - 1;
-          const lastBlock = ch.blocks[lastIdx];
-          const updatedContent = lastBlock.content ? `${lastBlock.content}${supChar}` : supChar;
-          ch.blocks = ch.blocks.map((b, idx) =>
-            idx === lastIdx ? { ...b, content: updatedContent } : b
-          );
+        // 2. If it's a factual correction or has a source/footnote, attach note superscript
+        if (review.type === 'correction' || review.source) {
+          const targetNoteNum = ch.notes.length + 1;
+          const supChar = toSuperscript(targetNoteNum);
+          let marked = false;
+
+          if (target && target.length > 2) {
+            ch.blocks = ch.blocks.map((block) => {
+              if (!marked && block.content.includes(target)) {
+                marked = true;
+                return {
+                  ...block,
+                  content: block.content.replace(target, `${target}${supChar}`),
+                };
+              }
+              return block;
+            });
+          }
+
+          if (!marked && ch.blocks.length > 0) {
+            const lastIdx = ch.blocks.length - 1;
+            const lastBlock = ch.blocks[lastIdx];
+            const updatedContent = lastBlock.content ? `${lastBlock.content}${supChar}` : supChar;
+            ch.blocks = ch.blocks.map((b, idx) =>
+              idx === lastIdx ? { ...b, content: updatedContent } : b
+            );
+          }
+
+          const noteKey = `Note ${targetNoteNum}`;
+          const noteContent = review.source
+            ? `${review.suggestion || review.original} — Source : ${review.source}`
+            : `${review.suggestion || review.original}${review.explanation ? ` (${review.explanation})` : ''}`;
+
+          if (!ch.notes.some((n) => n.content === noteContent)) {
+            ch.notes = [
+              ...ch.notes,
+              {
+                id: uid(),
+                key: noteKey,
+                content: noteContent,
+                source: 'ai',
+              },
+            ];
+          }
         }
 
-        // 2. Add citation/source to notes
-        const noteKey = `Note ${targetNoteNum}`;
-        const noteContent = review.source
-          ? `${review.suggestion || review.original} — Source : ${review.source}`
-          : `${review.suggestion || review.original}${review.explanation ? ` (${review.explanation})` : ''}`;
-
-        if (!ch.notes.some((n) => n.content === noteContent)) {
-          ch.notes = [
-            ...ch.notes,
-            {
-              id: uid(),
-              key: noteKey,
-              content: noteContent,
-              source: 'ai',
-            },
-          ];
-        }
-
-        // 3. Mark review status as accepted
-        ch.pendingReviews = ch.pendingReviews.map((r) =>
+        // 3. Mark review status as accepted and cap archived items to last 50
+        const updatedReviews = ch.pendingReviews.map((r) =>
           r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
         );
+        const pending = updatedReviews.filter((r) => r.status === 'pending');
+        const resolved = updatedReviews.filter((r) => r.status !== 'pending');
+        ch.pendingReviews = [...pending, ...resolved.slice(-50)];
       }
 
       chapters[action.chapterIndex] = ch;
@@ -707,9 +726,27 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     case 'REJECT_REVIEW': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      ch.pendingReviews = ch.pendingReviews.map((r) =>
+      const updatedReviews = ch.pendingReviews.map((r) =>
         r.id === action.reviewId ? { ...r, status: 'rejected' as const } : r
       );
+      const pending = updatedReviews.filter((r) => r.status === 'pending');
+      const resolved = updatedReviews.filter((r) => r.status !== 'pending');
+      ch.pendingReviews = [...pending, ...resolved.slice(-50)];
+      chapters[action.chapterIndex] = ch;
+      return {
+        ...state,
+        chapters,
+        isDirty: true,
+        lastSaved: now,
+        saveStatus: 'saving',
+      };
+    }
+
+    case 'CLEAR_ARCHIVED_REVIEWS': {
+      const chapters = [...state.chapters];
+      if (!chapters[action.chapterIndex]) return state;
+      const ch = { ...chapters[action.chapterIndex] };
+      ch.pendingReviews = ch.pendingReviews.filter((r) => r.status === 'pending');
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -774,7 +811,7 @@ const UNDOABLE_ACTIONS = new Set([
   'SPLIT_BLOCK', 'MERGE_BLOCKS', 'INSERT_DICTATION',
   'ADD_CHAPTER', 'RENAME_CHAPTER', 'DELETE_CHAPTER', 'MOVE_CHAPTER',
   'ADD_NOTE', 'UPDATE_NOTE', 'DELETE_NOTE',
-  'ACCEPT_REVIEW', 'REJECT_REVIEW',
+  'ACCEPT_REVIEW', 'REJECT_REVIEW', 'CLEAR_ARCHIVED_REVIEWS',
 ]);
 
 export function undoableReducer(state: UndoableState, action: ManuscriptAction | { type: 'UNDO' } | { type: 'REDO' }): UndoableState {

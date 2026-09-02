@@ -2460,13 +2460,15 @@ a:hover {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 340px;
+  width: 380px;
+  max-width: min(92vw, 420px);
   background: var(--surface);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   z-index: 20;
   box-shadow: var(--shadow-md);
+  box-sizing: border-box;
 }
 
 .review-panel-header,
@@ -2514,26 +2516,34 @@ a:hover {
   border-bottom: 1px solid var(--border);
   font-size: 11.5px;
   color: var(--text-soft);
+  line-height: 1.4;
 }
 
 .review-filters {
   display: flex;
-  gap: 4px;
-  padding: 8px 14px;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto;
+  background: var(--surface);
 }
 
 .pill {
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-radius: var(--radius-full);
   background: transparent;
   border: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-soft);
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+.pill:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
 }
 .pill.active {
   background: var(--accent);
@@ -2559,6 +2569,8 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .review-item-header {
@@ -2606,6 +2618,8 @@ a:hover {
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .review-label {
@@ -2619,11 +2633,15 @@ a:hover {
 .review-text-strike {
   text-decoration: line-through;
   color: var(--japandi-terracotta);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .review-text-new {
   color: var(--japandi-moss);
   font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .review-explanation {
@@ -2635,6 +2653,9 @@ a:hover {
   background: var(--surface);
   padding: 6px 8px;
   border-radius: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
 }
 
 .review-source {
@@ -2643,6 +2664,8 @@ a:hover {
   gap: 5px;
   font-size: 11px;
   color: var(--accent);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .review-actions {
@@ -2660,6 +2683,54 @@ a:hover {
   cursor: pointer;
   padding: 0;
   text-align: left;
+}
+
+.review-panel-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  display: flex;
+  justify-content: center;
+}
+
+.btn-clear-archive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: 100%;
+  justify-content: center;
+}
+.btn-clear-archive:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--japandi-terracotta);
+  border-color: var(--japandi-terracotta);
+}
+
+.review-all-resolved {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+.resolved-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.resolved-desc {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.5;
 }
 
 /* Notes specific */

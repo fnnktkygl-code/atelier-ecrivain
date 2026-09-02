@@ -82,6 +82,7 @@ export type ManuscriptAction =
   | { type: 'ADD_REVIEWS'; chapterIndex: number; reviews: PendingReview[] }
   | { type: 'ACCEPT_REVIEW'; chapterIndex: number; reviewId: string }
   | { type: 'REJECT_REVIEW'; chapterIndex: number; reviewId: string }
+  | { type: 'CLEAR_ARCHIVED_REVIEWS'; chapterIndex: number }
   // Insertion point
   | { type: 'SET_INSERTION_POINT'; blockIndex: number | null }
   // Persistence
