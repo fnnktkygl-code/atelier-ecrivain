@@ -222,6 +222,10 @@ export async function saveAllChapters(
   manuscriptId: string,
   chapters: { id?: string; title: string; blocks: { id?: string; content: string; type?: string; source?: string }[]; notes?: unknown[]; pendingReviews?: unknown[] }[]
 ): Promise<void> {
+  if (!chapters || chapters.length === 0) {
+    return;
+  }
+
   const db = getDb();
   const chaptersCol = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
   
@@ -269,13 +273,15 @@ export async function saveAllChapters(
     }
   });
 
-  // 2. Delete orphaned docs
-  existingSnap.docs.forEach((docSnap) => {
-    if (!currentDocIds.has(docSnap.id)) {
-      batch.delete(docSnap.ref);
-      hasWriteOps = true;
-    }
-  });
+  // 2. Delete orphaned docs only if we have active valid chapters
+  if (chapters.length > 0) {
+    existingSnap.docs.forEach((docSnap) => {
+      if (!currentDocIds.has(docSnap.id)) {
+        batch.delete(docSnap.ref);
+        hasWriteOps = true;
+      }
+    });
+  }
 
   const totalWords = chapters.reduce(
     (sum, ch) =>

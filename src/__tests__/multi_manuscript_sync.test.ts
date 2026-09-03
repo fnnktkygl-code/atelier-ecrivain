@@ -99,4 +99,9 @@ test('Multi-Manuscript Cloud & Local Isolation', async (t) => {
     assert.equal(loaded2.chapters.length, 7, 'Mon Amour must retain exactly its 7 chapters without cross-over');
     assert.equal(loaded2.chapters[6].title, 'Ch 7 — Mon Amour');
   });
+
+  await t.test('initial state and freshly loaded states are strictly not dirty', () => {
+    const initialState = createInitialState('new-mobile-client');
+    assert.equal(initialState.isDirty, false, 'New mobile client must not be marked dirty before user types');
+  });
 });

@@ -913,12 +913,18 @@ export function useManuscript() {
   }, [state, currentManuscriptId]);
 
   // 2. REAL-TIME CLOUD FIRESTORE SYNCHRONIZATION (Debounced 500ms)
+  // CRITICAL: Only push when the author has dirty changes authored on THIS device
   useEffect(() => {
     if (!user || !manuscript?.id) return;
     if (typeof window === 'undefined') return;
 
+    // Never sync to cloud unless state is actively dirty from a user edit!
+    if (!state.isDirty) {
+      return;
+    }
+
     const chaptersJson = JSON.stringify(state.chapters);
-    if (chaptersJson === lastSyncedJsonRef.current && !state.isDirty) {
+    if (chaptersJson === lastSyncedJsonRef.current) {
       return;
     }
 
@@ -932,11 +938,14 @@ export function useManuscript() {
       dispatch({ type: 'SET_SAVE_STATUS', status: 'offline' });
     }
 
+    const targetUid = user.uid;
+    const targetManuscriptId = manuscript.id;
+    const chaptersToSave = state.chapters;
+
     cloudSaveTimerRef.current = setTimeout(async () => {
       try {
-        const currentChapters = stateRef.current.chapters;
-        await saveAllChapters(user.uid, manuscript.id, currentChapters);
-        lastSyncedJsonRef.current = JSON.stringify(currentChapters);
+        await saveAllChapters(targetUid, targetManuscriptId, chaptersToSave);
+        lastSyncedJsonRef.current = JSON.stringify(chaptersToSave);
         dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
       } catch (err) {
         console.error('[useManuscript] Firestore debounced sync error:', err);
@@ -950,24 +959,30 @@ export function useManuscript() {
         clearTimeout(cloudSaveTimerRef.current);
       }
     };
-  }, [state.chapters, state.isDirty, user, manuscript?.id]);
+  }, [state.chapters, state.isDirty, user?.uid, manuscript?.id]);
 
   // 3. INITIAL LOAD & REAL-TIME MULTI-DEVICE CLOUD RECONCILIATION
   useEffect(() => {
     let unsub: (() => void) | null = null;
     let cancelled = false;
 
-    // A. Immediately load local storage first
+    // Cancel any pending debounced save from a previous manuscript
+    if (cloudSaveTimerRef.current) {
+      clearTimeout(cloudSaveTimerRef.current);
+    }
+
+    // A. Load local storage first if available
     const localState = loadStoredManuscript(currentManuscriptId);
     if (localState && localState.chapters.length > 0) {
-      dispatch({ type: 'LOAD_STATE', state: localState });
+      dispatch({ type: 'LOAD_STATE', state: { ...localState, isDirty: false } });
       lastSyncedJsonRef.current = JSON.stringify(localState.chapters);
     } else {
       const defaultState = createInitialState(currentManuscriptId);
-      dispatch({ type: 'LOAD_STATE', state: defaultState });
+      dispatch({ type: 'LOAD_STATE', state: { ...defaultState, isDirty: false } });
+      lastSyncedJsonRef.current = JSON.stringify(defaultState.chapters);
     }
 
-    // B. Real-time Firestore Sync & Recovery
+    // B. Real-time Firestore Sync
     if (user && manuscript?.id) {
       try {
         const db = getDb();
@@ -978,7 +993,7 @@ export function useManuscript() {
 
         unsub = onSnapshot(
           q,
-          async (snapshot) => {
+          (snapshot) => {
             if (cancelled) return;
 
             if (!snapshot.empty) {
@@ -1010,11 +1025,12 @@ export function useManuscript() {
               const cloudJson = JSON.stringify(cloudNormalized);
               const curJson = JSON.stringify(stateRef.current.chapters);
 
+              // If cloud data differs and current state is not actively dirty locally -> Load cloud data!
               if (cloudJson !== curJson && !stateRef.current.isDirty) {
                 lastSyncedJsonRef.current = cloudJson;
                 const newState: ManuscriptState = {
                   chapters: cloudNormalized,
-                  activeChapterIndex: Math.min(stateRef.current.activeChapterIndex, cloudNormalized.length - 1),
+                  activeChapterIndex: Math.min(stateRef.current.activeChapterIndex, Math.max(0, cloudNormalized.length - 1)),
                   insertionPoint: null,
                   isDirty: false,
                   lastSaved: Date.now(),
@@ -1023,21 +1039,6 @@ export function useManuscript() {
                 };
                 dispatch({ type: 'LOAD_STATE', state: newState });
                 saveManuscriptToStorage(currentManuscriptId, newState);
-              }
-            } else {
-              // Cloud has 0 chapters for this manuscript!
-              const currentLocal = loadStoredManuscript(currentManuscriptId);
-              if (currentLocal && currentLocal.chapters.length > 0) {
-                // We have chapters locally (e.g. written on PC) -> Immediately push to Cloud!
-                await saveAllChapters(user.uid, manuscript.id, currentLocal.chapters);
-                lastSyncedJsonRef.current = JSON.stringify(currentLocal.chapters);
-                dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
-              } else {
-                // Initialize cloud with default chapter
-                const initChapters = createInitialState(currentManuscriptId).chapters;
-                await saveAllChapters(user.uid, manuscript.id, initChapters);
-                lastSyncedJsonRef.current = JSON.stringify(initChapters);
-                dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
               }
             }
           },
