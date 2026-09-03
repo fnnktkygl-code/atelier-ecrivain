@@ -122,6 +122,18 @@ export default function EditorToolbar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ⌘S / Ctrl+S → Force cloud save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        onForceSave?.();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onForceSave]);
+
   const formatSaveTime = (ts: number | null) => {
     if (!ts) return '';
     const d = new Date(ts);
@@ -223,6 +235,17 @@ export default function EditorToolbar({
         )}
         <span className="editor-toolbar-title">{chapterTitle}</span>
         <span className="editor-save-indicator">{renderSaveIndicator()}</span>
+        {onForceSave && (
+          <Tooltip content="Sauvegarder manuellement vers le cloud" shortcut="⌘S">
+            <button
+              className="btn-icon btn-force-save"
+              onClick={onForceSave}
+              aria-label="Sauvegarder maintenant"
+            >
+              <IconCloudUpload size={15} strokeWidth={2} />
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       {/* ── Îlot 2 : Création & Polissage IA ── */}

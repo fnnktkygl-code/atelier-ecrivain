@@ -2088,6 +2088,25 @@ a:hover {
   animation: pulse 1.5s infinite;
 }
 
+.btn-force-save {
+  width: 28px;
+  height: 28px;
+  color: var(--text-soft);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-force-save:hover {
+  color: var(--accent);
+  background: var(--surface-2);
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+.btn-force-save:active {
+  transform: scale(0.95);
+}
+
 .pdf-export-btn {
   color: var(--japandi-moss);
 }
