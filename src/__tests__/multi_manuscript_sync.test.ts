@@ -198,4 +198,60 @@ test('Multi-Manuscript Cloud & Local Isolation', async (t) => {
     assert.equal(active.id, 'ms-mon-amour');
     assert.equal(active.title, 'Mon amour avec un grand A');
   });
+
+  await t.test('deduplicateChapterList eliminates duplicate chapters 1..4 while preserving all real chapters', async () => {
+    const { deduplicateChapterList } = await import('../services/firebase/firestore');
+
+    // Simulate the exact mobile bug state: 8 chapters where chapters 1 to 4 are duplicated
+    // due to ID alias mismatch (ch-1 vs ch-static-1) and duplicate sync
+    const duplicatedChapters = [
+      { id: 'ch-1', title: 'Chapitre 1 — Les dieux à l\'image des hommes', order: 0, blocks: [{ id: 'b1', content: 'Paragraphe 1 complet avec du texte.' }] },
+      { id: 'ch-static-1', title: 'Chapitre 1 — Les dieux à l\'image des hommes', order: 0, blocks: [{ id: 'b1-s', content: 'Paragraphe 1' }] },
+      { id: 'ch-2', title: 'Chapitre 2 — La morale à géométrie variable', order: 1, blocks: [{ id: 'b2', content: 'Texte chapitre 2' }] },
+      { id: 'ch-static-2', title: 'Chapitre 2 — La morale à géométrie variable', order: 1, blocks: [{ id: 'b2-s', content: 'Texte chapitre 2' }] },
+      { id: 'ch-3', title: 'Chapitre 3 — L\'argument moral des athées', order: 2, blocks: [{ id: 'b3', content: 'Texte chapitre 3' }] },
+      { id: 'ch-static-3', title: 'Chapitre 3 — L\'argument moral des athées', order: 2, blocks: [{ id: 'b3-s', content: 'Texte chapitre 3' }] },
+      { id: 'ch-4', title: 'Chapitre 4 — La vraie spiritualité', order: 3, blocks: [{ id: 'b4', content: 'Texte chapitre 4' }] },
+      { id: 'ch-static-4', title: 'Chapitre 4 — La vraie spiritualité', order: 3, blocks: [{ id: 'b4-s', content: 'Texte chapitre 4' }] },
+    ];
+
+    const { deduplicated, duplicateIds } = deduplicateChapterList(duplicatedChapters);
+
+    // Must be exactly 4 clean chapters!
+    assert.equal(deduplicated.length, 4);
+    assert.equal(deduplicated[0].id, 'ch-1');
+    assert.equal(deduplicated[0].order, 0);
+    assert.equal(deduplicated[1].id, 'ch-2');
+    assert.equal(deduplicated[1].order, 1);
+    assert.equal(deduplicated[2].id, 'ch-3');
+    assert.equal(deduplicated[2].order, 2);
+    assert.equal(deduplicated[3].id, 'ch-4');
+    assert.equal(deduplicated[3].order, 3);
+
+    // Kept the richer version of chapter 1
+    assert.equal(deduplicated[0].blocks[0].content, 'Paragraphe 1 complet avec du texte.');
+
+    // Exactly 4 duplicate IDs marked for deletion from Firestore
+    assert.equal(duplicateIds.length, 4);
+    assert.deepEqual(duplicateIds, ['ch-static-1', 'ch-static-2', 'ch-static-3', 'ch-static-4']);
+  });
+
+  await t.test('deduplicateChapterList preserves 7 distinct chapters without false positives', async () => {
+    const { deduplicateChapterList } = await import('../services/firebase/firestore');
+
+    const sevenChapters = [
+      { id: 'ch-1', title: 'Chapitre 1 — Le Début', order: 0, blocks: [{ content: 'Intro' }] },
+      { id: 'ch-2', title: 'Chapitre 2 — La Rencontre', order: 1, blocks: [{ content: 'Suite' }] },
+      { id: 'ch-3', title: 'Chapitre 3 — Le Doute', order: 2, blocks: [{ content: 'Doute' }] },
+      { id: 'ch-4', title: 'Chapitre 4 — L\'Eveil', order: 3, blocks: [{ content: 'Eveil' }] },
+      { id: 'ch-5', title: 'Chapitre 5 — Le Choix', order: 4, blocks: [{ content: 'Choix' }] },
+      { id: 'ch-6', title: 'Chapitre 6 — L\'Epreuve', order: 5, blocks: [{ content: 'Epreuve' }] },
+      { id: 'ch-7', title: 'Chapitre 7 — La Paix', order: 6, blocks: [{ content: 'Conclusion' }] },
+    ];
+
+    const { deduplicated, duplicateIds } = deduplicateChapterList(sevenChapters);
+
+    assert.equal(deduplicated.length, 7);
+    assert.equal(duplicateIds.length, 0);
+  });
 });

@@ -164,21 +164,193 @@ export async function deleteManuscript(uid: string, manuscriptId: string): Promi
 }
 
 // ── Chapters ──
+
+export interface DeduplicatableChapter {
+  id?: string;
+  title: string;
+  order?: number;
+  blocks?: Array<{ id?: string; content?: string; type?: string; source?: string; createdAt?: number }>;
+  paragraphs?: string[];
+  notes?: unknown[];
+  pendingReviews?: unknown[];
+}
+
+/**
+ * Normalizes title for comparing chapter identities:
+ * Strips accents, punctuation, hyphens, and multiple whitespaces.
+ */
+export function normalizeTitleForComparison(title?: string): string {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/—|-|–/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Maps chapter ID aliases to a canonical key.
+ * Example: 'ch-static-1' -> 'ch-1'
+ */
+export function getCanonicalChapterKey(id?: string): string {
+  if (!id) return '';
+  return id.replace('ch-static-', 'ch-');
+}
+
+/**
+ * Extracts a normalized snippet of the chapter's first non-empty text content
+ * for content-based duplicate detection.
+ */
+export function getFirstParagraphSnippet(ch: DeduplicatableChapter): string {
+  if (ch.blocks && ch.blocks.length > 0) {
+    const first = ch.blocks.find((b) => b && b.content && b.content.trim().length > 0);
+    if (first && first.content) {
+      return first.content.substring(0, 100).trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+  }
+  if (ch.paragraphs && ch.paragraphs.length > 0) {
+    const first = ch.paragraphs.find((p) => p && p.trim().length > 0);
+    if (first) {
+      return first.substring(0, 100).trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+  }
+  return '';
+}
+
+/**
+ * Returns total non-whitespace characters in chapter content.
+ */
+export function getChapterContentLength(ch: DeduplicatableChapter): number {
+  if (ch.blocks && ch.blocks.length > 0) {
+    return ch.blocks.reduce((sum, b) => sum + (b.content?.trim().length || 0), 0);
+  }
+  if (ch.paragraphs && ch.paragraphs.length > 0) {
+    return ch.paragraphs.reduce((sum, p) => sum + (p?.trim().length || 0), 0);
+  }
+  return 0;
+}
+
+/**
+ * Given two chapters representing the same chapter, picks the primary/keeper
+ * and marks the redundant one for removal.
+ */
+function selectPrimaryChapter<T extends DeduplicatableChapter>(
+  a: T,
+  b: T
+): { keeper: T; duplicate: T } {
+  const lenA = getChapterContentLength(a);
+  const lenB = getChapterContentLength(b);
+
+  // 1. Keep the chapter with strictly more content
+  if (lenA > lenB) return { keeper: a, duplicate: b };
+  if (lenB > lenA) return { keeper: b, duplicate: a };
+
+  // 2. If content is equal, prefer standard 'ch-X' ID over 'ch-static-X'
+  const isAStandard = a.id && /^ch-\d+$/.test(a.id);
+  const isBStandard = b.id && /^ch-\d+$/.test(b.id);
+  if (isAStandard && !isBStandard) return { keeper: a, duplicate: b };
+  if (isBStandard && !isAStandard) return { keeper: b, duplicate: a };
+
+  // 3. Prefer chapter that has structured blocks over raw paragraphs
+  const hasBlocksA = a.blocks && a.blocks.length > 0;
+  const hasBlocksB = b.blocks && b.blocks.length > 0;
+  if (hasBlocksA && !hasBlocksB) return { keeper: a, duplicate: b };
+  if (hasBlocksB && !hasBlocksA) return { keeper: b, duplicate: a };
+
+  // 4. Default: keep 'a'
+  return { keeper: a, duplicate: b };
+}
+
+/**
+ * Robust chapter deduplication across multi-device synchronizations:
+ * Eliminates duplicate documents caused by ID mismatches (e.g. ch-1 vs ch-static-1),
+ * duplicate seeds, or concurrent saves.
+ */
+export function deduplicateChapterList<T extends DeduplicatableChapter>(
+  list: T[]
+): { deduplicated: T[]; duplicateIds: string[] } {
+  const deduplicated: T[] = [];
+  const duplicateIds: string[] = [];
+
+  for (const candidate of list) {
+    const normTitle = normalizeTitleForComparison(candidate.title);
+    const canonId = getCanonicalChapterKey(candidate.id);
+    const snippet = getFirstParagraphSnippet(candidate);
+
+    const existingIndex = deduplicated.findIndex((kept) => {
+      // 1. Canonical ID match (e.g. ch-1 vs ch-static-1)
+      if (canonId && canonId === getCanonicalChapterKey(kept.id)) {
+        return true;
+      }
+      // 2. Normalized title match (if not empty)
+      if (normTitle && normTitle === normalizeTitleForComparison(kept.title)) {
+        return true;
+      }
+      // 3. Content snippet match (if meaningful content exists)
+      if (snippet && snippet.length >= 20 && snippet === getFirstParagraphSnippet(kept)) {
+        return true;
+      }
+      return false;
+    });
+
+    if (existingIndex === -1) {
+      deduplicated.push({ ...candidate });
+    } else {
+      const kept = deduplicated[existingIndex];
+      const { keeper, duplicate } = selectPrimaryChapter(kept, candidate);
+      deduplicated[existingIndex] = keeper;
+      if (duplicate.id) {
+        duplicateIds.push(duplicate.id);
+      }
+    }
+  }
+
+  // Re-index contiguous order 0, 1, 2...
+  deduplicated.forEach((ch, idx) => {
+    ch.order = idx;
+  });
+
+  return { deduplicated, duplicateIds };
+}
+
 export async function getChapters(uid: string, manuscriptId: string): Promise<ChapterData[]> {
   const db = getDb();
   const colRef = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
   const snap = await getDocs(colRef);
-  const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+  const rawDocs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
 
   // In-memory robust sort to prevent Firestore index omissions
-  docs.sort((a, b) => {
+  rawDocs.sort((a, b) => {
     const orderA = typeof a.order === 'number' ? a.order : 9999;
     const orderB = typeof b.order === 'number' ? b.order : 9999;
     if (orderA !== orderB) return orderA - orderB;
     return (a.id || '').localeCompare(b.id || '');
   });
 
-  return docs;
+  const { deduplicated, duplicateIds } = deduplicateChapterList(rawDocs);
+
+  // Self-heal Firestore by asynchronously deleting duplicate docs
+  if (duplicateIds.length > 0) {
+    const batch = writeBatch(db);
+    duplicateIds.forEach((dupId) => {
+      batch.delete(doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', dupId));
+    });
+    const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
+    batch.set(
+      mRef,
+      sanitizeFirestoreObject({
+        chapterCount: deduplicated.length,
+        chaptersCount: deduplicated.length,
+        updatedAt: serverTimestamp(),
+      }),
+      { merge: true }
+    );
+    batch.commit().catch((e) => console.warn('[getChapters] Error cleaning duplicate chapters in Firestore:', e));
+  }
+
+  return deduplicated;
 }
 
 /** Subscribe in real-time to chapter updates across devices */
@@ -193,14 +365,35 @@ export function subscribeToChapters(
   return onSnapshot(
     colRef,
     (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
-      docs.sort((a, b) => {
+      const rawDocs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+      rawDocs.sort((a, b) => {
         const orderA = typeof a.order === 'number' ? a.order : 9999;
         const orderB = typeof b.order === 'number' ? b.order : 9999;
         if (orderA !== orderB) return orderA - orderB;
         return (a.id || '').localeCompare(b.id || '');
       });
-      onUpdate(docs);
+
+      const { deduplicated, duplicateIds } = deduplicateChapterList(rawDocs);
+
+      if (duplicateIds.length > 0) {
+        const batch = writeBatch(db);
+        duplicateIds.forEach((dupId) => {
+          batch.delete(doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', dupId));
+        });
+        const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
+        batch.set(
+          mRef,
+          sanitizeFirestoreObject({
+            chapterCount: deduplicated.length,
+            chaptersCount: deduplicated.length,
+            updatedAt: serverTimestamp(),
+          }),
+          { merge: true }
+        );
+        batch.commit().catch((e) => console.warn('[subscribeToChapters] Error cleaning duplicate chapters in Firestore:', e));
+      }
+
+      onUpdate(deduplicated);
     },
     (err) => {
       if (onError) onError(err);
@@ -280,12 +473,15 @@ export async function saveAllChapters(
     console.warn('[saveAllChapters] Anti-wipe triggered: Blocked overwriting populated cloud chapters with empty placeholder.');
     return;
   }
+
+  // Deduplicate input chapters to guarantee no duplicates are written to Firestore
+  const { deduplicated: cleanChapters } = deduplicateChapterList(chapters);
   
   const batch = writeBatch(db);
   const currentDocIds = new Set<string>();
   let hasWriteOps = false;
 
-  chapters.forEach((ch, idx) => {
+  cleanChapters.forEach((ch, idx) => {
     const docId = ch.id || `ch-${idx + 1}`;
     currentDocIds.add(docId);
     const newParagraphs = ch.blocks.map((b) => b.content || '');
@@ -319,7 +515,7 @@ export async function saveAllChapters(
   });
 
   // 2. Delete orphaned docs only if we have active valid chapters and not an empty placeholder
-  if (chapters.length > 0 && !isSingleEmptyPlaceholder) {
+  if (cleanChapters.length > 0 && !isSingleEmptyPlaceholder) {
     existingSnap.docs.forEach((docSnap) => {
       if (!currentDocIds.has(docSnap.id)) {
         batch.delete(docSnap.ref);
@@ -328,7 +524,7 @@ export async function saveAllChapters(
     });
   }
 
-  const totalWords = chapters.reduce(
+  const totalWords = cleanChapters.reduce(
     (sum, ch) =>
       sum +
       ch.blocks.reduce(
@@ -344,8 +540,8 @@ export async function saveAllChapters(
     sanitizeFirestoreObject({
       updatedAt: serverTimestamp(),
       wordCount: totalWords,
-      chapterCount: chapters.length,
-      chaptersCount: chapters.length,
+      chapterCount: cleanChapters.length,
+      chaptersCount: cleanChapters.length,
     }),
     { merge: true }
   );

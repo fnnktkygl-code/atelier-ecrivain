@@ -20,6 +20,7 @@ import {
   getDb,
   getManuscriptMeta,
   toTimestampMillis,
+  deduplicateChapterList,
   type ChapterData,
 } from '@/services/firebase/firestore';
 import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
@@ -170,7 +171,7 @@ export function migrateFromStatic(): EditableChapter[] {
     const blocks: TextBlock[] = ch.paragraphs.map((p) => makeBlock(p, 'original'));
     const title = ch.title.split('—')[1]?.trim() || ch.title;
     return {
-      id: `ch-static-${idx + 1}`,
+      id: `ch-${idx + 1}`,
       title: `Chapitre ${idx + 1} — ${title}`,
       blocks: blocks.length > 0 ? blocks : [makeBlock('', 'manual')],
       notes: [],
@@ -224,9 +225,11 @@ export function loadStoredManuscript(manuscriptId: string = 'default'): Manuscri
             pendingReviews: Array.isArray(ch.pendingReviews) ? ch.pendingReviews : [],
           }));
 
+          const cleanValidChapters = deduplicateChapterList(validChapters).deduplicated;
+
           const candidateState: ManuscriptState = {
-            chapters: normalizeChapterNotesAndSuperscripts(validChapters),
-            activeChapterIndex: typeof parsed.activeChapterIndex === 'number' && parsed.activeChapterIndex < validChapters.length ? parsed.activeChapterIndex : 0,
+            chapters: normalizeChapterNotesAndSuperscripts(cleanValidChapters),
+            activeChapterIndex: typeof parsed.activeChapterIndex === 'number' && parsed.activeChapterIndex < cleanValidChapters.length ? parsed.activeChapterIndex : 0,
             insertionPoint: parsed.insertionPoint ?? null,
             isDirty: false,
             lastSaved: typeof parsed.lastSaved === 'number' ? parsed.lastSaved : Date.now(),
@@ -1073,18 +1076,22 @@ export function useManuscript() {
           };
         });
 
-        const cloudNormalized = normalizeChapterNotesAndSuperscripts(mappedChapters);
+        const cleanCloudChapters = deduplicateChapterList(mappedChapters).deduplicated;
+        const cloudNormalized = normalizeChapterNotesAndSuperscripts(cleanCloudChapters);
+
+        const cleanLocalChapters = deduplicateChapterList(localChaptersForComparison).deduplicated;
+        const localNormalized = normalizeChapterNotesAndSuperscripts(cleanLocalChapters);
 
         // CRITICAL RECONCILIATION:
         // Compare LOCAL chapters (from localStorage snapshot) against CLOUD chapters.
         // If local has MORE chapters than cloud → local wins, push all to cloud.
         // If cloud has MORE or EQUAL → cloud wins, load into React state.
-        if (localChaptersForComparison.length > cloudNormalized.length && localHasRealContent) {
+        if (localNormalized.length > cloudNormalized.length && localHasRealContent) {
           // Local device (e.g. laptop) has MORE chapters than Cloud (e.g. 7 vs 4):
           // Push the richer local state to cloud so all devices can see them.
-          saveAllChapters(targetUid, targetManuscriptId, localChaptersForComparison)
+          saveAllChapters(targetUid, targetManuscriptId, localNormalized)
             .then(() => {
-              lastSyncedJsonRef.current = JSON.stringify(localChaptersForComparison);
+              lastSyncedJsonRef.current = JSON.stringify(localNormalized);
               dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
             })
             .catch((e) => console.warn('[useManuscript] Error pushing richer local state to cloud:', e));
