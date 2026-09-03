@@ -201,7 +201,27 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         try {
           const mId = await migrateStaticData(u.uid);
-          const list = await getManuscripts(u.uid);
+          let list = await getManuscripts(u.uid);
+
+          // Auto-cleanup: delete ghost manuscripts (untitled or 'Sans titre') if user has real named books
+          const realBooks = list.filter(
+            (m) => m.title && m.title.trim() !== '' && m.title !== 'Sans titre' && m.title !== 'Mon Premier Manuscrit'
+          );
+          const ghostBooks = list.filter(
+            (m) => !m.title || m.title.trim() === '' || m.title === 'Sans titre'
+          );
+          if (realBooks.length > 0 && ghostBooks.length > 0) {
+            for (const ghost of ghostBooks) {
+              try {
+                await deleteManuscriptDB(u.uid, ghost.id);
+              } catch (e) {
+                console.warn('[AuthProvider] Failed to delete ghost manuscript:', ghost.id, e);
+              }
+            }
+            // Refresh list after cleanup
+            list = await getManuscripts(u.uid);
+          }
+
           setManuscripts(list);
           if (typeof window !== 'undefined') {
             localStorage.setItem('atelier_cached_manuscripts', JSON.stringify(list));

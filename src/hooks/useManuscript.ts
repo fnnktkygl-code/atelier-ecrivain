@@ -986,17 +986,22 @@ export function useManuscript() {
   useEffect(() => {
     let unsub: (() => void) | null = null;
     let cancelled = false;
+    let initialReconciliationDone = false;
 
     // Cancel any pending debounced save from a previous manuscript
     if (cloudSaveTimerRef.current) {
       clearTimeout(cloudSaveTimerRef.current);
     }
 
-    // A. Load local storage first if available
+    // A. Load local storage first if available — capture this IMMUTABLY for reconciliation
     const localState = loadStoredManuscript(currentManuscriptId);
-    if (localState && localState.chapters.length > 0) {
-      dispatch({ type: 'LOAD_STATE', state: { ...localState, isDirty: false } });
-      lastSyncedJsonRef.current = JSON.stringify(localState.chapters);
+    const localChaptersSnapshot = localState && localState.chapters.length > 0
+      ? localState.chapters
+      : null;
+
+    if (localChaptersSnapshot) {
+      dispatch({ type: 'LOAD_STATE', state: { ...localState!, isDirty: false } });
+      lastSyncedJsonRef.current = JSON.stringify(localChaptersSnapshot);
     } else {
       const defaultState = createInitialState(currentManuscriptId);
       dispatch({ type: 'LOAD_STATE', state: { ...defaultState, isDirty: false } });
@@ -1011,21 +1016,27 @@ export function useManuscript() {
       const processIncomingCloudChapters = (cloudDocs: ChapterData[]) => {
         if (cancelled || !cloudDocs) return;
 
+        // Determine the "richest local source" for initial reconciliation:
+        // Use the immutable localStorage snapshot (captured at mount), NOT stateRef.current
+        // which may still be a 1-chapter placeholder on mobile before cloud data arrives.
+        const localChaptersForComparison = !initialReconciliationDone && localChaptersSnapshot
+          ? localChaptersSnapshot
+          : stateRef.current.chapters;
+
+        const localHasRealContent = localChaptersForComparison.length > 0 &&
+          localChaptersForComparison.some((c) => c.blocks.some((b) => b.content && b.content.trim().length > 0));
+
         // If cloud is empty but local client has rich chapters, auto-seed to cloud
         if (cloudDocs.length === 0) {
-          const currentChapters = stateRef.current.chapters;
-          if (
-            currentChapters &&
-            currentChapters.length > 0 &&
-            currentChapters.some((c) => c.blocks.some((b) => b.content && b.content.trim().length > 0))
-          ) {
-            saveAllChapters(targetUid, targetManuscriptId, currentChapters)
+          if (localHasRealContent) {
+            saveAllChapters(targetUid, targetManuscriptId, localChaptersForComparison)
               .then(() => {
-                lastSyncedJsonRef.current = JSON.stringify(currentChapters);
+                lastSyncedJsonRef.current = JSON.stringify(localChaptersForComparison);
                 dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
               })
               .catch((e) => console.warn('[useManuscript] Error seeding empty cloud manuscript with local chapters:', e));
           }
+          initialReconciliationDone = true;
           return;
         }
 
@@ -1063,23 +1074,28 @@ export function useManuscript() {
         });
 
         const cloudNormalized = normalizeChapterNotesAndSuperscripts(mappedChapters);
-        const cloudJson = JSON.stringify(cloudNormalized);
-        const currentChapters = stateRef.current.chapters;
-        const curJson = JSON.stringify(currentChapters);
 
-        // If local device (e.g. laptop) has MORE chapters than Cloud (e.g. 7 vs 4):
-        // NEVER downgrade local state! Instead, push the full local chapters to Cloud!
-        if (currentChapters.length > cloudNormalized.length) {
-          saveAllChapters(targetUid, targetManuscriptId, currentChapters)
+        // CRITICAL RECONCILIATION:
+        // Compare LOCAL chapters (from localStorage snapshot) against CLOUD chapters.
+        // If local has MORE chapters than cloud → local wins, push all to cloud.
+        // If cloud has MORE or EQUAL → cloud wins, load into React state.
+        if (localChaptersForComparison.length > cloudNormalized.length && localHasRealContent) {
+          // Local device (e.g. laptop) has MORE chapters than Cloud (e.g. 7 vs 4):
+          // Push the richer local state to cloud so all devices can see them.
+          saveAllChapters(targetUid, targetManuscriptId, localChaptersForComparison)
             .then(() => {
-              lastSyncedJsonRef.current = JSON.stringify(currentChapters);
+              lastSyncedJsonRef.current = JSON.stringify(localChaptersForComparison);
               dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
             })
             .catch((e) => console.warn('[useManuscript] Error pushing richer local state to cloud:', e));
+          initialReconciliationDone = true;
           return;
         }
 
-        // If cloud data differs and current state is not actively dirty locally -> Load cloud data!
+        // Cloud has equal or more chapters → accept cloud data
+        const cloudJson = JSON.stringify(cloudNormalized);
+        const curJson = JSON.stringify(stateRef.current.chapters);
+
         if (cloudJson !== curJson && !stateRef.current.isDirty) {
           lastSyncedJsonRef.current = cloudJson;
           const newState: ManuscriptState = {
@@ -1094,6 +1110,8 @@ export function useManuscript() {
           dispatch({ type: 'LOAD_STATE', state: newState });
           saveManuscriptToStorage(currentManuscriptId, newState);
         }
+
+        initialReconciliationDone = true;
       };
 
       // 1. Direct promise fetch for immediate zero-delay loading on mobile networks
