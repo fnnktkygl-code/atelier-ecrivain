@@ -86,6 +86,7 @@ export default function EditorToolbar({
   lastCloudSync = null,
   saveStatus = 'saved',
   isCloudConnected = false,
+  onForceSave,
   pendingReviewCount,
   noteCount,
   isReviewOpen,
@@ -158,8 +159,14 @@ export default function EditorToolbar({
     if (saveStatus === 'synced' && isCloudConnected) {
       const timeStr = formatSaveTime(lastCloudSync || lastSaved);
       return (
-        <Tooltip content={`Synchronisé avec le cloud (${timeStr}). Disponible sur tous vos appareils.`}>
-          <span className="save-status-indicator synced">
+        <Tooltip content={`Synchronisé avec le cloud (${timeStr}). Cliquez pour forcer la synchronisation.`}>
+          <span
+            className="save-status-indicator synced clickable-save-pill"
+            onClick={onForceSave}
+            role="button"
+            tabIndex={0}
+            style={{ cursor: 'pointer' }}
+          >
             <IconCloudCheck size={13} strokeWidth={2} />
             <span>Enregistré ({timeStr})</span>
           </span>
@@ -181,8 +188,14 @@ export default function EditorToolbar({
     if (lastSaved) {
       const timeStr = formatSaveTime(lastSaved);
       return (
-        <Tooltip content={`Enregistré localement sur votre navigateur (${timeStr}).`}>
-          <span className="save-status-indicator synced">
+        <Tooltip content={`Enregistré localement sur votre navigateur (${timeStr}). Cliquez pour synchroniser.`}>
+          <span
+            className="save-status-indicator synced clickable-save-pill"
+            onClick={onForceSave}
+            role="button"
+            tabIndex={0}
+            style={{ cursor: 'pointer' }}
+          >
             <IconCloudCheck size={13} strokeWidth={2} />
             <span>Enregistré ({timeStr})</span>
           </span>

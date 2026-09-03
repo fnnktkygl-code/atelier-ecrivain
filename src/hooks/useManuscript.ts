@@ -234,13 +234,20 @@ export function loadStoredManuscript(manuscriptId: string = 'default'): Manuscri
             saveStatus: 'saved',
           };
 
+          // Prioritize version with the MOST chapters, or latest timestamp if equal
           if (!bestParsed) {
             bestParsed = candidateState;
           } else {
-            const curSaved = candidateState.lastSaved || 0;
-            const bestSaved = bestParsed.lastSaved || 0;
-            if (curSaved >= bestSaved) {
+            const candidateCount = candidateState.chapters.length;
+            const bestCount = bestParsed.chapters.length;
+            if (candidateCount > bestCount) {
               bestParsed = candidateState;
+            } else if (candidateCount === bestCount) {
+              const curSaved = candidateState.lastSaved || 0;
+              const bestSaved = bestParsed.lastSaved || 0;
+              if (curSaved >= bestSaved) {
+                bestParsed = candidateState;
+              }
             }
           }
         }
@@ -1027,7 +1034,20 @@ export function useManuscript() {
 
         const cloudNormalized = normalizeChapterNotesAndSuperscripts(mappedChapters);
         const cloudJson = JSON.stringify(cloudNormalized);
-        const curJson = JSON.stringify(stateRef.current.chapters);
+        const currentChapters = stateRef.current.chapters;
+        const curJson = JSON.stringify(currentChapters);
+
+        // If local device (e.g. laptop) has MORE chapters than Cloud (e.g. 7 vs 4):
+        // NEVER downgrade local state! Instead, push the full local chapters to Cloud!
+        if (currentChapters.length > cloudNormalized.length) {
+          saveAllChapters(targetUid, targetManuscriptId, currentChapters)
+            .then(() => {
+              lastSyncedJsonRef.current = JSON.stringify(currentChapters);
+              dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
+            })
+            .catch((e) => console.warn('[useManuscript] Error pushing richer local state to cloud:', e));
+          return;
+        }
 
         // If cloud data differs and current state is not actively dirty locally -> Load cloud data!
         if (cloudJson !== curJson && !stateRef.current.isDirty) {
