@@ -5,7 +5,7 @@ import { CHAPTERS } from '@/data/chapters';
 import { NOTES } from '@/data/notes';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useTheme } from '@/components/Shared/ThemeProvider';
-import { getChapters } from '@/services/firebase/firestore';
+import { getChapters, subscribeToChapters } from '@/services/firebase/firestore';
 import { normalizeChapterNotesAndSuperscripts } from '@/hooks/useManuscript';
 import { useSpeech } from '@/hooks/useSpeech';
 import {
@@ -330,6 +330,8 @@ export default function LiseusePage() {
     window.addEventListener('storage', handleStorage);
     window.addEventListener('atelier_manuscript_updated', handleCustomUpdate);
 
+    let unsub: (() => void) | null = null;
+
     if (user && manuscript?.id) {
       getChapters(user.uid, manuscript.id)
         .then((fsChapters) => {
@@ -338,11 +340,20 @@ export default function LiseusePage() {
           }
         })
         .catch(() => {});
+
+      try {
+        unsub = subscribeToChapters(user.uid, manuscript.id, (fsChapters) => {
+          if (fsChapters && fsChapters.length > 0) {
+            setChapters(formatChaptersForLiseuse(fsChapters));
+          }
+        });
+      } catch {}
     }
 
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('atelier_manuscript_updated', handleCustomUpdate);
+      if (unsub) unsub();
     };
   }, [currentManuscriptId, user, manuscript?.id]);
 

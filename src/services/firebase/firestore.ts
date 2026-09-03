@@ -74,7 +74,16 @@ export interface ChapterData {
 export async function getManuscripts(uid: string): Promise<ManuscriptMeta[]> {
   const db = getDb();
   const snap = await getDocs(collection(db, 'users', uid, 'manuscripts'));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ManuscriptMeta));
+  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ManuscriptMeta));
+
+  // Sort by most recently modified / created first
+  list.sort((a, b) => {
+    const timeA = toTimestampMillis(a.updatedAt) || toTimestampMillis(a.createdAt) || 0;
+    const timeB = toTimestampMillis(b.updatedAt) || toTimestampMillis(b.createdAt) || 0;
+    return timeB - timeA;
+  });
+
+  return list;
 }
 
 export async function createManuscript(
@@ -93,7 +102,7 @@ export async function createManuscript(
         {
           title: 'Chapitre 1 — Nouveau chapitre',
           paragraphs: [''],
-          blocks: [{ id: `b-${Date.now()}`, content: '', type: 'paragraph', source: 'manual', createdAt: Date.now() }],
+          blocks: [{ id: `b-${Date.now()}-0`, content: '', type: 'paragraph', source: 'manual', createdAt: Date.now() }],
           notes: [],
           pendingReviews: [],
         },
@@ -104,6 +113,7 @@ export async function createManuscript(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     chapterCount: chaptersToSeed.length,
+    chaptersCount: chaptersToSeed.length,
     wordCount: 0,
   }));
 
@@ -148,12 +158,19 @@ export async function deleteManuscript(uid: string, manuscriptId: string): Promi
 // ── Chapters ──
 export async function getChapters(uid: string, manuscriptId: string): Promise<ChapterData[]> {
   const db = getDb();
-  const q = query(
-    collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters'),
-    orderBy('order')
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+  const colRef = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
+  const snap = await getDocs(colRef);
+  const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+
+  // In-memory robust sort to prevent Firestore index omissions
+  docs.sort((a, b) => {
+    const orderA = typeof a.order === 'number' ? a.order : 9999;
+    const orderB = typeof b.order === 'number' ? b.order : 9999;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.id || '').localeCompare(b.id || '');
+  });
+
+  return docs;
 }
 
 /** Subscribe in real-time to chapter updates across devices */
@@ -164,14 +181,17 @@ export function subscribeToChapters(
   onError?: (err: Error) => void
 ): () => void {
   const db = getDb();
-  const q = query(
-    collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters'),
-    orderBy('order')
-  );
+  const colRef = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
   return onSnapshot(
-    q,
+    colRef,
     (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+      docs.sort((a, b) => {
+        const orderA = typeof a.order === 'number' ? a.order : 9999;
+        const orderB = typeof b.order === 'number' ? b.order : 9999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.id || '').localeCompare(b.id || '');
+      });
       onUpdate(docs);
     },
     (err) => {
@@ -341,7 +361,7 @@ export async function migrateStaticData(uid: string): Promise<string> {
   // Check if user already has manuscripts
   const existing = await getManuscripts(uid);
   if (existing.length > 0) {
-    return existing[0].id; // Already migrated
+    return existing[0].id; // Already migrated, returns most recently updated manuscript
   }
 
   // Create the manuscript
@@ -351,31 +371,47 @@ export async function migrateStaticData(uid: string): Promise<string> {
   const batch = writeBatch(db);
 
   // Manuscript meta
-  batch.set(mRef, {
+  batch.set(mRef, sanitizeFirestoreObject({
     title: "Mon Premier Manuscrit",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+    chapterCount: CHAPTERS.length,
+    chaptersCount: CHAPTERS.length,
+    wordCount: 1363,
+  }));
 
   // Chapters
   CHAPTERS.forEach((ch, idx) => {
-    const chRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${idx}`);
-    batch.set(chRef, {
+    const chRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${idx + 1}`);
+    const blocks = ch.paragraphs.map((p, pIdx) => ({
+      id: `b-mig-${idx + 1}-${pIdx}`,
+      content: p,
+      type: 'paragraph',
+      source: 'original',
+      createdAt: Date.now(),
+    }));
+
+    batch.set(chRef, sanitizeFirestoreObject({
       title: ch.title,
       paragraphs: ch.paragraphs,
+      blocks,
+      notes: [],
+      pendingReviews: [],
       order: idx,
-    });
+      updatedAt: serverTimestamp(),
+    }));
   });
 
   // Notes
   const notesRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'meta', 'notes');
   batch.set(notesRef, NOTES);
 
-  // User profile with default pen name
-  batch.set(doc(db, 'users', uid, 'profile', 'info'), {
+  // User profile with default pen name and active manuscript
+  batch.set(doc(db, 'users', uid, 'profile', 'info'), sanitizeFirestoreObject({
     penName: '',
+    lastActiveManuscriptId: manuscriptId,
     createdAt: serverTimestamp(),
-  });
+  }));
 
   await batch.commit();
   return manuscriptId;
@@ -394,12 +430,13 @@ export async function setPenName(uid: string, penName: string): Promise<void> {
   await setDoc(doc(db, 'users', uid, 'profile', 'info'), { penName }, { merge: true });
 }
 
-// ── Profile Settings (avatar color, email visibility) ──
+// ── Profile Settings (avatar color, email visibility, last active manuscript) ──
 export interface ProfileSettings {
   penName?: string;
   avatarColor?: string;
   avatarUrl?: string;
   showEmail?: boolean;
+  lastActiveManuscriptId?: string;
 }
 
 export async function getProfileSettings(uid: string): Promise<ProfileSettings> {

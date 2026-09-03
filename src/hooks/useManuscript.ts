@@ -15,10 +15,12 @@ import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import {
   getChapters,
+  subscribeToChapters,
   saveAllChapters,
   getDb,
   getManuscriptMeta,
   toTimestampMillis,
+  type ChapterData,
 } from '@/services/firebase/firestore';
 import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 import type {
@@ -144,7 +146,7 @@ export function normalizeChapterNotesAndSuperscripts(chapters: EditableChapter[]
       const noteContent = existingNote ? existingNote.content : (NOTES[oldKey] || `Note ${idx + 1}`);
 
       return {
-        id: existingNote ? existingNote.id : uid(),
+        id: existingNote ? existingNote.id : `n-${ch.id || 'ch'}-${idx + 1}`,
         key: `Note ${idx + 1}`,
         content: noteContent,
         category: 'footnote' as const,
@@ -982,72 +984,91 @@ export function useManuscript() {
       lastSyncedJsonRef.current = JSON.stringify(defaultState.chapters);
     }
 
-    // B. Real-time Firestore Sync
+    // B. Real-time Cloud Sync & Direct Fetch
     if (user && manuscript?.id) {
+      const targetUid = user.uid;
+      const targetManuscriptId = manuscript.id;
+
+      const processIncomingCloudChapters = (cloudDocs: ChapterData[]) => {
+        if (cancelled || !cloudDocs || cloudDocs.length === 0) return;
+
+        const mappedChapters: EditableChapter[] = cloudDocs.map((data, idx) => {
+          const chId = data.id || `ch-${idx + 1}`;
+          const blocks = data.blocks && data.blocks.length > 0
+            ? data.blocks.map((b, bIdx) => ({
+                id: b.id || `b-${chId}-${bIdx}`,
+                content: typeof b.content === 'string' ? b.content : '',
+                type: (b.type as TextBlock['type']) || 'paragraph',
+                source: (b.source as TextBlock['source']) || 'original',
+                createdAt: b.createdAt || Date.now(),
+              }))
+            : (data.paragraphs || []).map((p: string, pIdx: number) => ({
+                id: `b-${chId}-${pIdx}`,
+                content: p,
+                type: 'paragraph' as const,
+                source: 'original' as const,
+                createdAt: Date.now(),
+              }));
+
+          return {
+            id: chId,
+            title: data.title || `Chapitre ${idx + 1}`,
+            blocks: blocks.length > 0 ? blocks : [makeBlock('', 'manual')],
+            notes: (data.notes || []).map((n, nIdx) => ({
+              id: (n as { id?: string }).id || `n-${idx}-${nIdx}`,
+              key: (n as { key?: string }).key || `Note ${nIdx + 1}`,
+              content: typeof n === 'string' ? n : (n as { content?: string }).content || '',
+              source: (((n as { source?: string }).source === 'ai' || (n as { source?: string }).source === 'manual') ? (n as { source?: string }).source : 'original') as 'original' | 'manual' | 'ai',
+              category: (n as { category?: string }).category === 'margin' ? ('margin' as const) : ('footnote' as const),
+            })),
+            pendingReviews: (data.pendingReviews as PendingReview[] | undefined) || [],
+          };
+        });
+
+        const cloudNormalized = normalizeChapterNotesAndSuperscripts(mappedChapters);
+        const cloudJson = JSON.stringify(cloudNormalized);
+        const curJson = JSON.stringify(stateRef.current.chapters);
+
+        // If cloud data differs and current state is not actively dirty locally -> Load cloud data!
+        if (cloudJson !== curJson && !stateRef.current.isDirty) {
+          lastSyncedJsonRef.current = cloudJson;
+          const newState: ManuscriptState = {
+            chapters: cloudNormalized,
+            activeChapterIndex: Math.min(stateRef.current.activeChapterIndex, Math.max(0, cloudNormalized.length - 1)),
+            insertionPoint: null,
+            isDirty: false,
+            lastSaved: Date.now(),
+            lastCloudSync: Date.now(),
+            saveStatus: 'synced',
+          };
+          dispatch({ type: 'LOAD_STATE', state: newState });
+          saveManuscriptToStorage(currentManuscriptId, newState);
+        }
+      };
+
+      // 1. Direct promise fetch for immediate zero-delay loading on mobile networks
+      getChapters(targetUid, targetManuscriptId)
+        .then((docs: ChapterData[]) => {
+          processIncomingCloudChapters(docs);
+        })
+        .catch((err: unknown) => {
+          console.warn('[useManuscript] Direct getChapters fetch error:', err);
+        });
+
+      // 2. Real-time onSnapshot listener for instant cross-device multi-tab synchronization
       try {
-        const db = getDb();
-        const q = query(
-          collection(db, 'users', user.uid, 'manuscripts', manuscript.id, 'chapters'),
-          orderBy('order')
-        );
-
-        unsub = onSnapshot(
-          q,
-          (snapshot) => {
-            if (cancelled) return;
-
-            if (!snapshot.empty) {
-              const staticChapters = migrateFromStatic();
-              const rawChapters: EditableChapter[] = snapshot.docs.map((docSnap, idx) => {
-                const data = docSnap.data();
-                return {
-                  id: docSnap.id || `ch-${idx + 1}`,
-                  title: data.title || `Chapitre ${idx + 1}`,
-                  blocks: data.blocks || (data.paragraphs || []).map((p: string) => ({
-                    id: uid(),
-                    content: p,
-                    type: 'paragraph' as const,
-                    source: 'original' as const,
-                    createdAt: Date.now(),
-                  })),
-                  notes: (data.notes && data.notes.length > 0 ? data.notes : staticChapters[idx]?.notes || []).map((n: unknown, nIdx: number) => ({
-                    id: (n as { id?: string }).id || `n-${idx}-${nIdx}`,
-                    key: (n as { key?: string }).key || `Note ${nIdx + 1}`,
-                    content: typeof n === 'string' ? n : (n as { content?: string }).content || '',
-                    source: (((n as { source?: string }).source === 'ai' || (n as { source?: string }).source === 'manual') ? (n as { source?: string }).source : 'original') as 'original' | 'manual' | 'ai',
-                    category: (n as { category?: string }).category === 'margin' ? ('margin' as const) : ('footnote' as const),
-                  })),
-                  pendingReviews: (data.pendingReviews as PendingReview[] | undefined) || [],
-                };
-              });
-
-              const cloudNormalized = normalizeChapterNotesAndSuperscripts(rawChapters);
-              const cloudJson = JSON.stringify(cloudNormalized);
-              const curJson = JSON.stringify(stateRef.current.chapters);
-
-              // If cloud data differs and current state is not actively dirty locally -> Load cloud data!
-              if (cloudJson !== curJson && !stateRef.current.isDirty) {
-                lastSyncedJsonRef.current = cloudJson;
-                const newState: ManuscriptState = {
-                  chapters: cloudNormalized,
-                  activeChapterIndex: Math.min(stateRef.current.activeChapterIndex, Math.max(0, cloudNormalized.length - 1)),
-                  insertionPoint: null,
-                  isDirty: false,
-                  lastSaved: Date.now(),
-                  lastCloudSync: Date.now(),
-                  saveStatus: 'synced',
-                };
-                dispatch({ type: 'LOAD_STATE', state: newState });
-                saveManuscriptToStorage(currentManuscriptId, newState);
-              }
-            }
+        unsub = subscribeToChapters(
+          targetUid,
+          targetManuscriptId,
+          (docs: ChapterData[]) => {
+            processIncomingCloudChapters(docs);
           },
-          (err) => {
-            console.warn('[useManuscript] onSnapshot listener error:', err);
+          (err: Error) => {
+            console.warn('[useManuscript] subscribeToChapters listener error:', err);
           }
         );
       } catch (e) {
-        console.warn('[useManuscript] Firestore init listener error:', e);
+        console.warn('[useManuscript] subscribeToChapters init error:', e);
       }
     }
 

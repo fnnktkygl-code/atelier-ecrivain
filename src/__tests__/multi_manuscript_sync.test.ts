@@ -104,4 +104,62 @@ test('Multi-Manuscript Cloud & Local Isolation', async (t) => {
     const initialState = createInitialState('new-mobile-client');
     assert.equal(initialState.isDirty, false, 'New mobile client must not be marked dirty before user types');
   });
+
+  await t.test('simulates mobile client loading 7 cloud chapters on clean cache without losing chapters', () => {
+    // Simulate cleared cache on mobile
+    mockStorage.clear();
+
+    // Manuscript "Mon Amour" (ms-mon-amour) has 7 chapters in cloud
+    const cloudChapters = [
+      { id: 'ch-1', title: 'Ch 1 — Le Renouveau', blocks: [{ id: 'b-1', content: 'Paragraphe 1', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+      { id: 'ch-2', title: 'Ch 2 — L’Aurore', blocks: [{ id: 'b-2', content: 'Paragraphe 2', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+      { id: 'ch-3', title: 'Ch 3 — Les Silences', blocks: [{ id: 'b-3', content: 'Paragraphe 3', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+      { id: 'ch-4', title: 'Ch 4 — L’Écoute', blocks: [{ id: 'b-4', content: 'Paragraphe 4', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+      { id: 'ch-5', title: 'Ch 5 — Le Regard', blocks: [{ id: 'b-5', content: 'Paragraphe 5', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+      { id: 'ch-6', title: 'Ch 6 — L’Union', blocks: [{ id: 'b-6', content: 'Paragraphe 6', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+      { id: 'ch-7', title: 'Ch 7 — Mon Amour', blocks: [{ id: 'b-7', content: 'Paragraphe 7', type: 'paragraph' as const, source: 'manual' as const, createdAt: 100 }], notes: [], pendingReviews: [] },
+    ];
+
+    // On mobile load with clean cache:
+    const initialMobileState = createInitialState('ms-mon-amour');
+    assert.equal(initialMobileState.chapters.length, 1);
+    assert.equal(initialMobileState.isDirty, false);
+
+    // When cloud chapters arrive, they populate state and persist to local storage
+    const cloudSyncState = {
+      ...initialMobileState,
+      chapters: cloudChapters,
+      lastSaved: Date.now(),
+      lastCloudSync: Date.now(),
+      saveStatus: 'synced' as const,
+    };
+    saveManuscriptToStorage('ms-mon-amour', cloudSyncState);
+
+    // Next read from local storage on mobile returns all 7 chapters
+    const restoredMobile = loadStoredManuscript('ms-mon-amour');
+    assert.ok(restoredMobile);
+    assert.equal(restoredMobile.chapters.length, 7);
+    assert.equal(restoredMobile.chapters[6].title, 'Ch 7 — Mon Amour');
+  });
+
+  await t.test('chapter ordering in memory sorts correctly even when some docs have missing order field', () => {
+    const rawDocs = [
+      { id: 'ch-3', title: 'Chapitre 3', order: 2 },
+      { id: 'ch-1', title: 'Chapitre 1', order: 0 },
+      { id: 'ch-2', title: 'Chapitre 2', order: 1 },
+      { id: 'ch-legacy', title: 'Chapitre Ancien' }, // Missing order field
+    ];
+
+    const sorted = [...rawDocs].sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 9999;
+      const orderB = typeof b.order === 'number' ? b.order : 9999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.id || '').localeCompare(b.id || '');
+    });
+
+    assert.equal(sorted[0].id, 'ch-1');
+    assert.equal(sorted[1].id, 'ch-2');
+    assert.equal(sorted[2].id, 'ch-3');
+    assert.equal(sorted[3].id, 'ch-legacy');
+  });
 });

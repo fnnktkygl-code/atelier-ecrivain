@@ -60,6 +60,15 @@ export default function ChapterList({
     manuscript?.id ? [manuscript.id] : []
   );
 
+  // Automatically keep active manuscript accordion open
+  useEffect(() => {
+    if (manuscript?.id) {
+      setOpenManuscriptIds((prev) =>
+        prev.includes(manuscript.id) ? prev : [...prev, manuscript.id]
+      );
+    }
+  }, [manuscript?.id]);
+
   // Manuscript Kebab & Rename state
   const [msMenuId, setMsMenuId] = useState<string | null>(null);
   const [renamingMsId, setRenamingMsId] = useState<string | null>(null);
@@ -105,10 +114,12 @@ export default function ChapterList({
     const target = manuscripts.find((m) => m.id === id);
     if (target && target.id !== manuscript?.id) {
       selectManuscript(target);
+      setOpenManuscriptIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    } else {
+      setOpenManuscriptIds((prev) =>
+        prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
+      );
     }
-    setOpenManuscriptIds((prev) =>
-      prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
-    );
   };
 
   const handleStartRenameManuscript = (id: string, currentTitle: string) => {

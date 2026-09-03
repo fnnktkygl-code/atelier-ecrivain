@@ -138,11 +138,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
           const mId = await migrateStaticData(u.uid);
           const list = await getManuscripts(u.uid);
           setManuscripts(list);
-          const active = list.find((m) => m.id === mId) || list[0] || null;
+
+          const profileSettings = await getProfileSettings(u.uid);
+          const storedMsId = typeof window !== 'undefined' ? localStorage.getItem('atelier_last_active_manuscript_id') : null;
+          const targetId = profileSettings.lastActiveManuscriptId || storedMsId || mId;
+
+          const active = (targetId && list.find((m) => m.id === targetId)) || list[0] || null;
           setManuscript(active);
+
+          if (active && typeof window !== 'undefined') {
+            localStorage.setItem('atelier_last_active_manuscript_id', active.id);
+          }
+
           const name = await getPenName(u.uid);
           setPenNameState(name);
-          const profileSettings = await getProfileSettings(u.uid);
           setAvatarColor(profileSettings.avatarColor || '');
           setAvatarUrl(profileSettings.avatarUrl || '');
           setShowEmailState(profileSettings.showEmail !== false);
@@ -192,6 +201,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   const selectManuscript = (m: ManuscriptMeta) => {
     setManuscript(m);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('atelier_last_active_manuscript_id', m.id);
+    }
+    if (user) {
+      updateProfileSettingsDB(user.uid, { lastActiveManuscriptId: m.id }).catch(() => {});
+    }
   };
 
   const addManuscript = async (title: string) => {
@@ -200,7 +215,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
     const newM = list.find((m) => m.id === id) || null;
-    if (newM) setManuscript(newM);
+    if (newM) {
+      setManuscript(newM);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('atelier_last_active_manuscript_id', newM.id);
+      }
+      updateProfileSettingsDB(user.uid, { lastActiveManuscriptId: newM.id }).catch(() => {});
+    }
   };
 
   const deleteManuscriptHandler = async (manuscriptId: string) => {
@@ -209,7 +230,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
     if (manuscript?.id === manuscriptId) {
-      setManuscript(list[0] || null);
+      const nextActive = list[0] || null;
+      setManuscript(nextActive);
+      if (nextActive && typeof window !== 'undefined') {
+        localStorage.setItem('atelier_last_active_manuscript_id', nextActive.id);
+      }
+      if (nextActive) {
+        updateProfileSettingsDB(user.uid, { lastActiveManuscriptId: nextActive.id }).catch(() => {});
+      }
     }
   };
 
