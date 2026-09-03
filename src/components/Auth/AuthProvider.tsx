@@ -56,6 +56,40 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+export function resolveActiveManuscript(list: ManuscriptMeta[], preferredId?: string | null): ManuscriptMeta | null {
+  if (!list || list.length === 0) return null;
+
+  if (preferredId) {
+    const candidate = list.find((m) => m.id === preferredId);
+    if (candidate && candidate.title && candidate.title.trim() !== '' && candidate.title !== 'Sans titre') {
+      return candidate;
+    }
+  }
+
+  // 1. Look for custom named user book (e.g. "Mon amour avec un...")
+  const customNamed = list.find(
+    (m) =>
+      m.title &&
+      m.title.trim() !== '' &&
+      m.title !== 'Sans titre' &&
+      m.title !== 'Mon Premier Manuscrit' &&
+      m.title !== 'Dieu à l’image des hommes'
+  );
+  if (customNamed) return customNamed;
+
+  // 2. Look for any named book
+  const anyNamed = list.find((m) => m.title && m.title.trim() !== '' && m.title !== 'Sans titre');
+  if (anyNamed) return anyNamed;
+
+  // 3. Fallback to preferred candidate if nothing better exists
+  if (preferredId) {
+    const candidate = list.find((m) => m.id === preferredId);
+    if (candidate) return candidate;
+  }
+
+  return list[0] || null;
+}
+
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
@@ -118,8 +152,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         const activeId = localStorage.getItem('atelier_last_active_manuscript_id');
         if (rawMsList) {
           const list = JSON.parse(rawMsList) as ManuscriptMeta[];
-          const found = (activeId && list.find((m) => m.id === activeId)) || list[0];
-          if (found) return found;
+          return resolveActiveManuscript(list, activeId);
         }
       } catch {}
     }
@@ -176,9 +209,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
           const profileSettings = await getProfileSettings(u.uid);
           const storedMsId = typeof window !== 'undefined' ? localStorage.getItem('atelier_last_active_manuscript_id') : null;
-          const targetId = profileSettings.lastActiveManuscriptId || storedMsId || mId;
+          const targetId = storedMsId || profileSettings.lastActiveManuscriptId || mId;
 
-          const active = (targetId && list.find((m) => m.id === targetId)) || list[0] || null;
+          const active = resolveActiveManuscript(list, targetId);
           setManuscript(active);
 
           if (active && typeof window !== 'undefined') {
@@ -258,6 +291,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const id = await createManuscriptDB(user.uid, title);
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('atelier_cached_manuscripts', JSON.stringify(list));
+    }
     const newM = list.find((m) => m.id === id) || null;
     if (newM) {
       setManuscript(newM);
@@ -273,8 +309,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     await deleteManuscriptDB(user.uid, manuscriptId);
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('atelier_cached_manuscripts', JSON.stringify(list));
+    }
     if (manuscript?.id === manuscriptId) {
-      const nextActive = list[0] || null;
+      const nextActive = resolveActiveManuscript(list);
       setManuscript(nextActive);
       if (nextActive && typeof window !== 'undefined') {
         localStorage.setItem('atelier_last_active_manuscript_id', nextActive.id);
@@ -305,6 +344,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     await updateManuscriptTitle(user.uid, manuscriptId, title);
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('atelier_cached_manuscripts', JSON.stringify(list));
+    }
     if (manuscript?.id === manuscriptId) {
       const updated = list.find((m) => m.id === manuscriptId) || null;
       if (updated) setManuscript(updated);

@@ -272,7 +272,7 @@ export default function ChapterList({
                     </button>
                   </div>
                 ) : (
-                  <span className="ms-title">{m.title}</span>
+                  <span className="ms-title">{m.title?.trim() || 'Sans titre'}</span>
                 )}
 
                 <span className="ms-count-pill">

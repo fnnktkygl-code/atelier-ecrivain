@@ -183,4 +183,19 @@ test('Multi-Manuscript Cloud & Local Isolation', async (t) => {
     clearCachedUser();
     assert.equal(getCachedUser(), null);
   });
+
+  await t.test('resolveActiveManuscript prioritizes real user book over untitled ghost duplicate', async () => {
+    const { resolveActiveManuscript } = await import('../components/Auth/AuthProvider');
+    
+    const manuscriptsList = [
+      { id: 'ms-ghost', title: 'Sans titre', chapterCount: 4, createdAt: 100 },
+      { id: 'ms-mon-amour', title: 'Mon amour avec un grand A', chapterCount: 7, createdAt: 200 },
+    ] as any;
+
+    // Even if ghost id was in preferredId or first in list, resolveActiveManuscript picks the real book
+    const active = resolveActiveManuscript(manuscriptsList, 'ms-ghost');
+    assert.ok(active);
+    assert.equal(active.id, 'ms-mon-amour');
+    assert.equal(active.title, 'Mon amour avec un grand A');
+  });
 });

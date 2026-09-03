@@ -74,7 +74,15 @@ export interface ChapterData {
 export async function getManuscripts(uid: string): Promise<ManuscriptMeta[]> {
   const db = getDb();
   const snap = await getDocs(collection(db, 'users', uid, 'manuscripts'));
-  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ManuscriptMeta));
+  const list = snap.docs.map((d) => {
+    const data = d.data();
+    const rawTitle = typeof data.title === 'string' ? data.title.trim() : '';
+    return {
+      id: d.id,
+      ...data,
+      title: rawTitle || 'Sans titre',
+    } as ManuscriptMeta;
+  });
 
   // Sort by most recently modified / created first
   list.sort((a, b) => {
@@ -422,20 +430,44 @@ export async function migrateStaticData(uid: string): Promise<string> {
   // Check if user already has manuscripts
   const existing = await getManuscripts(uid);
   if (existing.length > 0) {
-    // Check if any manuscript has chapters
+    // 1. Prioritize custom user-named manuscript with chapters
+    const customNamedWithChapters = existing.find(
+      (m) =>
+        m.title &&
+        m.title !== 'Sans titre' &&
+        m.title !== 'Mon Premier Manuscrit' &&
+        m.title !== 'Dieu à l’image des hommes' &&
+        (m.chapterCount ?? m.chaptersCount ?? 0) > 0
+    );
+    if (customNamedWithChapters) {
+      return customNamedWithChapters.id;
+    }
+
+    // 2. Prioritize any custom named manuscript
+    const customNamed = existing.find(
+      (m) =>
+        m.title &&
+        m.title !== 'Sans titre' &&
+        m.title !== 'Mon Premier Manuscrit' &&
+        m.title !== 'Dieu à l’image des hommes'
+    );
+    if (customNamed) {
+      return customNamed.id;
+    }
+
+    // 3. Check if any existing manuscript has chapters
     for (const m of existing) {
       const chs = await getChapters(uid, m.id);
       if (chs.length > 0) {
         return m.id;
       }
     }
-    // All existing manuscripts are empty -> self-heal the first one with foundational chapters
-    const targetId = existing[0].id;
-    await seedDefaultChapters(uid, targetId, existing[0].title || "Dieu à l’image des hommes");
-    return targetId;
+
+    // All existing manuscripts are empty -> return the primary one without creating a duplicate
+    return existing[0].id;
   }
 
-  // Create the initial manuscript
+  // Create the initial manuscript ONLY if user has 0 manuscripts
   const mRef = doc(collection(db, 'users', uid, 'manuscripts'));
   const manuscriptId = mRef.id;
   await seedDefaultChapters(uid, manuscriptId);
