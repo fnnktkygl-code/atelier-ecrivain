@@ -3894,3 +3894,17 @@ a:hover {
   color: var(--japandi-terracotta);
   border-color: var(--japandi-terracotta);
 }
+
+.ms-count-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  margin-left: auto;
+  margin-right: 6px;
+}
+

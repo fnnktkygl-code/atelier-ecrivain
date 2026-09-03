@@ -197,16 +197,6 @@ export function loadStoredManuscript(manuscriptId: string = 'default'): Manuscri
       keysToTry.push('atelier_manuscript_default', 'atelier-manuscrit-default', 'atelier-manuscrit-v1');
     }
 
-    // Also scan any matching keys in localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith('atelier_manuscript_') || k.startsWith('atelier-manuscrit'))) {
-        if (!keysToTry.includes(k)) {
-          keysToTry.push(k);
-        }
-      }
-    }
-
     let bestParsed: ManuscriptState | null = null;
 
     for (const key of keysToTry) {
@@ -300,7 +290,6 @@ export function saveManuscriptToStorage(manuscriptId: string = 'default', state:
         detail: {
           manuscriptId,
           lastSaved: state.lastSaved,
-          chapterCount: state.chapters.length,
         },
       })
     );
@@ -320,8 +309,23 @@ export function createInitialState(manuscriptId: string = 'default'): Manuscript
     };
   }
 
+  // If this is default or static demo, use static demo chapters
+  // If this is a specific user manuscript (e.g. newly created book), initialize with 1 clean chapter
+  const isDefaultOrDemo = manuscriptId === 'default' || manuscriptId === 'ms-1';
+  const initialChapters: EditableChapter[] = isDefaultOrDemo
+    ? migrateFromStatic()
+    : [
+        {
+          id: 'ch-1',
+          title: 'Chapitre 1 — Nouveau chapitre',
+          blocks: [makeBlock('', 'manual')],
+          notes: [],
+          pendingReviews: [],
+        },
+      ];
+
   return {
-    chapters: migrateFromStatic(),
+    chapters: initialChapters,
     activeChapterIndex: 0,
     insertionPoint: null,
     isDirty: false,
@@ -360,10 +364,15 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const newBlock = makeBlock(action.content || '', 'manual', action.blockType || 'paragraph');
       if (action.afterBlockId === null) {
         ch.blocks = [newBlock, ...ch.blocks];
-      } else {
+      } else if (action.afterBlockId) {
         const idx = ch.blocks.findIndex((b) => b.id === action.afterBlockId);
-        ch.blocks = [...ch.blocks];
-        ch.blocks.splice(idx + 1, 0, newBlock);
+        if (idx !== -1) {
+          ch.blocks = [...ch.blocks.slice(0, idx + 1), newBlock, ...ch.blocks.slice(idx + 1)];
+        } else {
+          ch.blocks = [...ch.blocks, newBlock];
+        }
+      } else {
+        ch.blocks = [...ch.blocks, newBlock];
       }
       chapters[action.chapterIndex] = ch;
       return {
@@ -378,10 +387,11 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     case 'DELETE_BLOCK': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      ch.blocks = ch.blocks.filter((b) => b.id !== action.blockId);
-      // Always keep at least one block
-      if (ch.blocks.length === 0) {
+      if (ch.blocks.length <= 1) {
+        // Keep at least one empty block
         ch.blocks = [makeBlock('', 'manual')];
+      } else {
+        ch.blocks = ch.blocks.filter((b) => b.id !== action.blockId);
       }
       chapters[action.chapterIndex] = ch;
       return {
@@ -413,15 +423,23 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     case 'SPLIT_BLOCK': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      const idx = ch.blocks.findIndex((b) => b.id === action.blockId);
-      if (idx === -1) return state;
-      const block = ch.blocks[idx];
-      const before = block.content.slice(0, action.splitAt);
-      const after = block.content.slice(action.splitAt);
-      const blocks = [...ch.blocks];
-      blocks[idx] = { ...block, content: before };
-      blocks.splice(idx + 1, 0, makeBlock(after, block.source, block.type));
-      ch.blocks = blocks;
+      const blockIdx = ch.blocks.findIndex((b) => b.id === action.blockId);
+      if (blockIdx === -1) return state;
+
+      const currentBlock = ch.blocks[blockIdx];
+      const splitPos = typeof action.splitAt === 'number' ? action.splitAt : 0;
+      const before = currentBlock.content.slice(0, splitPos);
+      const after = currentBlock.content.slice(splitPos);
+
+      const updatedCurrent = { ...currentBlock, content: before };
+      const newBlock = makeBlock(after, currentBlock.source || 'manual', currentBlock.type || 'paragraph');
+
+      ch.blocks = [
+        ...ch.blocks.slice(0, blockIdx),
+        updatedCurrent,
+        newBlock,
+        ...ch.blocks.slice(blockIdx + 1),
+      ];
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -438,13 +456,19 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const prevIdx = ch.blocks.findIndex((b) => b.id === action.withPreviousId);
       const curIdx = ch.blocks.findIndex((b) => b.id === action.blockId);
       if (prevIdx === -1 || curIdx === -1) return state;
-      const blocks = [...ch.blocks];
-      const p1 = blocks[prevIdx].content || '';
-      const p2 = blocks[curIdx].content || '';
+
+      const prevBlock = ch.blocks[prevIdx];
+      const curBlock = ch.blocks[curIdx];
+      const p1 = prevBlock.content || '';
+      const p2 = curBlock.content || '';
       const needsSpace = p1 && p2 && !/\s$/.test(p1) && !/^\s/.test(p2) && !/[.,!?;:]$/.test(p1);
       const mergedContent = p1 + (needsSpace ? ' ' : '') + p2;
-      blocks[prevIdx] = { ...blocks[prevIdx], content: mergedContent };
+
+      const updatedPrev = { ...prevBlock, content: mergedContent };
+      const blocks = [...ch.blocks];
+      blocks[prevIdx] = updatedPrev;
       blocks.splice(curIdx, 1);
+
       ch.blocks = blocks;
       chapters[action.chapterIndex] = ch;
       return {
@@ -495,8 +519,14 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     }
 
     // ── Chapter operations ──
+    case 'SET_ACTIVE_CHAPTER':
+      return {
+        ...state,
+        activeChapterIndex: Math.max(0, Math.min(action.index, state.chapters.length - 1)),
+        insertionPoint: null,
+      };
+
     case 'ADD_CHAPTER': {
-      const chapters = [...state.chapters];
       const newChapter: EditableChapter = {
         id: uid(),
         title: action.title,
@@ -504,11 +534,10 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
         notes: [],
         pendingReviews: [],
       };
-      chapters.push(newChapter);
       return {
         ...state,
-        chapters,
-        activeChapterIndex: chapters.length - 1,
+        chapters: [...state.chapters, newChapter],
+        activeChapterIndex: state.chapters.length,
         isDirty: true,
         lastSaved: now,
         saveStatus: 'saving',
@@ -517,7 +546,12 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
 
     case 'RENAME_CHAPTER': {
       const chapters = [...state.chapters];
-      chapters[action.chapterIndex] = { ...chapters[action.chapterIndex], title: action.title };
+      if (chapters[action.chapterIndex]) {
+        chapters[action.chapterIndex] = {
+          ...chapters[action.chapterIndex],
+          title: action.title,
+        };
+      }
       return {
         ...state,
         chapters,
@@ -530,11 +564,11 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     case 'DELETE_CHAPTER': {
       if (state.chapters.length <= 1) return state; // Keep at least one
       const chapters = state.chapters.filter((_, i) => i !== action.chapterIndex);
-      const activeChapterIndex = Math.min(state.activeChapterIndex, chapters.length - 1);
+      const newActive = Math.min(state.activeChapterIndex, chapters.length - 1);
       return {
         ...state,
         chapters,
-        activeChapterIndex,
+        activeChapterIndex: newActive,
         isDirty: true,
         lastSaved: now,
         saveStatus: 'saving',
@@ -545,48 +579,35 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const chapters = [...state.chapters];
       const [moved] = chapters.splice(action.fromIndex, 1);
       chapters.splice(action.toIndex, 0, moved);
-      // Adjust active index
-      let activeChapterIndex = state.activeChapterIndex;
-      if (state.activeChapterIndex === action.fromIndex) {
-        activeChapterIndex = action.toIndex;
-      } else if (action.fromIndex < state.activeChapterIndex && action.toIndex >= state.activeChapterIndex) {
-        activeChapterIndex--;
-      } else if (action.fromIndex > state.activeChapterIndex && action.toIndex <= state.activeChapterIndex) {
-        activeChapterIndex++;
-      }
       return {
         ...state,
         chapters,
-        activeChapterIndex,
+        activeChapterIndex: action.toIndex,
         isDirty: true,
         lastSaved: now,
         saveStatus: 'saving',
       };
     }
 
-    case 'SET_ACTIVE_CHAPTER':
-      return {
-        ...state,
-        activeChapterIndex: action.index,
-        insertionPoint: null,
-      };
-
     // ── Note operations ──
     case 'ADD_NOTE': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
       const category = action.category || 'footnote';
-      const footnoteCount = ch.notes.filter((n) => n.category !== 'margin').length;
-      const nextKey = category === 'margin' ? 'Pense-bête' : `Note ${footnoteCount + 1}`;
-      const note: EditableNote = {
+
+      const existingFootnotes = ch.notes.filter((n) => n.category !== 'margin');
+      const nextNoteNum = existingFootnotes.length + 1;
+      const key = category === 'margin' ? 'Pense-bête' : `Note ${nextNoteNum}`;
+
+      const newNote: EditableNote = {
         id: uid(),
-        key: nextKey,
+        key,
         content: action.content,
         category,
         source: 'manual',
-        attachedToBlockId: action.attachedToBlockId,
       };
-      ch.notes = [...ch.notes, note];
+
+      ch.notes = [...ch.notes, newNote];
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -601,9 +622,7 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
       ch.notes = ch.notes.map((n) =>
-        n.id === action.noteId
-          ? { ...n, content: action.content, ...(action.category ? { category: action.category } : {}) }
-          : n
+        n.id === action.noteId ? { ...n, content: action.content } : n
       );
       chapters[action.chapterIndex] = ch;
       return {
@@ -629,19 +648,16 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       };
     }
 
-    // ── Review operations (Ratures & Polissage du Chapitre) ──
+    // ── Review operations ──
     case 'ADD_REVIEWS': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      const existingPending = ch.pendingReviews.filter((r) => r.status === 'pending');
-      const resolved = ch.pendingReviews.filter((r) => r.status !== 'pending');
+      const existingReviews = ch.pendingReviews || [];
+      const currentActivePending = existingReviews.filter((r) => r.status === 'pending');
+      const maxAllowedNew = Math.max(0, 15 - currentActivePending.length);
+      const reviewsToAdd = action.reviews.slice(0, maxAllowedNew);
 
-      // Enforce strict chapter limit: Max 15 active pending suggestions per chapter
-      const remainingQuota = Math.max(0, 15 - existingPending.length);
-      const incoming = action.reviews.slice(0, remainingQuota > 0 ? remainingQuota : 15);
-      
-      const newPending = [...existingPending, ...incoming].slice(0, 15);
-      ch.pendingReviews = [...newPending, ...resolved.slice(-50)];
+      ch.pendingReviews = [...existingReviews, ...reviewsToAdd];
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -656,98 +672,27 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
       const review = ch.pendingReviews.find((r) => r.id === action.reviewId);
-
-      if (review && review.status === 'pending') {
-        const target = review.original ? review.original.trim() : '';
-        const suggestion = review.suggestion ? review.suggestion.trim() : '';
-
-        // 1. If it's a style rature with a suggested replacement, apply resilient replacement
-        if (review.type === 'rature' && target && suggestion && target !== suggestion) {
-          let replaced = false;
-
-          // Target specific block if attachedToBlockId is available
-          if (review.attachedToBlockId) {
-            ch.blocks = ch.blocks.map((block) => {
-              if (block.id === review.attachedToBlockId && block.content.includes(target)) {
-                replaced = true;
-                return { ...block, content: block.content.replace(target, suggestion) };
-              }
-              return block;
-            });
-          }
-
-          // Fallback: search across blocks
-          if (!replaced) {
-            ch.blocks = ch.blocks.map((block) => {
-              if (!replaced && block.content.includes(target)) {
-                replaced = true;
-                return {
-                  ...block,
-                  content: block.content.replace(target, suggestion),
-                };
-              }
-              return block;
-            });
-          }
+      if (review && review.suggestion) {
+        let replacementDone = false;
+        if (review.attachedToBlockId) {
+          ch.blocks = ch.blocks.map((b) => {
+            if (b.id === review.attachedToBlockId && b.content.includes(review.original)) {
+              replacementDone = true;
+              return { ...b, content: b.content.replace(review.original, review.suggestion!) };
+            }
+            return b;
+          });
         }
-
-        // 2. If it's a factual correction or has a source, attach footnote
-        if (review.type === 'correction' || review.source) {
-          const footnoteCount = ch.notes.filter((n) => n.category !== 'margin').length;
-          const targetNoteNum = footnoteCount + 1;
-          const supChar = toSuperscript(targetNoteNum);
-          let marked = false;
-
-          if (target && target.length > 2) {
-            ch.blocks = ch.blocks.map((block) => {
-              if (!marked && block.content.includes(target)) {
-                marked = true;
-                return {
-                  ...block,
-                  content: block.content.replace(target, `${target}${supChar}`),
-                };
-              }
-              return block;
-            });
-          }
-
-          if (!marked && ch.blocks.length > 0) {
-            const lastIdx = ch.blocks.length - 1;
-            const lastBlock = ch.blocks[lastIdx];
-            const updatedContent = lastBlock.content ? `${lastBlock.content}${supChar}` : supChar;
-            ch.blocks = ch.blocks.map((b, idx) =>
-              idx === lastIdx ? { ...b, content: updatedContent } : b
-            );
-          }
-
-          const noteKey = `Note ${targetNoteNum}`;
-          const noteContent = review.source
-            ? `${review.suggestion || review.original} — Source : ${review.source}`
-            : `${review.suggestion || review.original}${review.explanation ? ` (${review.explanation})` : ''}`;
-
-          if (!ch.notes.some((n) => n.content === noteContent)) {
-            ch.notes = [
-              ...ch.notes,
-              {
-                id: uid(),
-                key: noteKey,
-                content: noteContent,
-                category: 'footnote',
-                source: 'ai',
-              },
-            ];
-          }
+        if (!replacementDone) {
+          ch.blocks = ch.blocks.map((b) => ({
+            ...b,
+            content: b.content.replace(review.original, review.suggestion!),
+          }));
         }
-
-        // 3. Mark review status as accepted and cap archived items to last 50
-        const updatedReviews = ch.pendingReviews.map((r) =>
-          r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
-        );
-        const pending = updatedReviews.filter((r) => r.status === 'pending');
-        const resolved = updatedReviews.filter((r) => r.status !== 'pending');
-        ch.pendingReviews = [...pending, ...resolved.slice(-50)];
       }
-
+      ch.pendingReviews = ch.pendingReviews.map((r) =>
+        r.id === action.reviewId ? { ...r, status: 'accepted' as const } : r
+      );
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -761,12 +706,9 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
     case 'REJECT_REVIEW': {
       const chapters = [...state.chapters];
       const ch = { ...chapters[action.chapterIndex] };
-      const updatedReviews = ch.pendingReviews.map((r) =>
+      ch.pendingReviews = ch.pendingReviews.map((r) =>
         r.id === action.reviewId ? { ...r, status: 'rejected' as const } : r
       );
-      const pending = updatedReviews.filter((r) => r.status === 'pending');
-      const resolved = updatedReviews.filter((r) => r.status !== 'pending');
-      ch.pendingReviews = [...pending, ...resolved.slice(-50)];
       chapters[action.chapterIndex] = ch;
       return {
         ...state,
@@ -781,22 +723,24 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
       const chapters = [...state.chapters];
       if (!chapters[action.chapterIndex]) return state;
       const ch = { ...chapters[action.chapterIndex] };
-      const pending = ch.pendingReviews.filter((r) => r.status === 'pending');
+      const pendingList = ch.pendingReviews.filter((r) => r.status === 'pending' && r.suggestion);
 
-      // Sequentially apply all pending reviews
-      pending.forEach((review) => {
-        const target = review.original ? review.original.trim() : '';
-        const suggestion = review.suggestion ? review.suggestion.trim() : '';
-
-        if (review.type === 'rature' && target && suggestion && target !== suggestion) {
-          let replaced = false;
-          ch.blocks = ch.blocks.map((block) => {
-            if (!replaced && block.content.includes(target)) {
-              replaced = true;
-              return { ...block, content: block.content.replace(target, suggestion) };
+      pendingList.forEach((review) => {
+        let replacementDone = false;
+        if (review.attachedToBlockId) {
+          ch.blocks = ch.blocks.map((b) => {
+            if (b.id === review.attachedToBlockId && b.content.includes(review.original)) {
+              replacementDone = true;
+              return { ...b, content: b.content.replace(review.original, review.suggestion!) };
             }
-            return block;
+            return b;
           });
+        }
+        if (!replacementDone) {
+          ch.blocks = ch.blocks.map((b) => ({
+            ...b,
+            content: b.content.replace(review.original, review.suggestion!),
+          }));
         }
       });
 
@@ -959,7 +903,6 @@ export function useManuscript() {
   const lastSyncedJsonRef = useRef<string>('');
 
   // 1. INSTANT LOCAL STORAGE AUTO-SAVE
-  // Every single action immediately persists to LocalStorage with 0ms delay!
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -975,7 +918,6 @@ export function useManuscript() {
     if (typeof window === 'undefined') return;
 
     const chaptersJson = JSON.stringify(state.chapters);
-    // Skip if already synced to Firestore and not dirty
     if (chaptersJson === lastSyncedJsonRef.current && !state.isDirty) {
       return;
     }
@@ -984,7 +926,6 @@ export function useManuscript() {
       clearTimeout(cloudSaveTimerRef.current);
     }
 
-    // Set status to syncing if online
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       dispatch({ type: 'SET_SAVE_STATUS', status: 'syncing' });
     } else {
@@ -1011,159 +952,109 @@ export function useManuscript() {
     };
   }, [state.chapters, state.isDirty, user, manuscript?.id]);
 
-  // 3. INITIAL LOAD & MULTI-DEVICE CLOUD RECONCILIATION
-  // Reconciles local cache vs cloud whenever active manuscript or user changes
+  // 3. INITIAL LOAD & REAL-TIME MULTI-DEVICE CLOUD RECONCILIATION
   useEffect(() => {
+    let unsub: (() => void) | null = null;
     let cancelled = false;
 
-    // Load local storage first
+    // A. Immediately load local storage first
     const localState = loadStoredManuscript(currentManuscriptId);
     if (localState && localState.chapters.length > 0) {
       dispatch({ type: 'LOAD_STATE', state: localState });
+      lastSyncedJsonRef.current = JSON.stringify(localState.chapters);
+    } else {
+      const defaultState = createInitialState(currentManuscriptId);
+      dispatch({ type: 'LOAD_STATE', state: defaultState });
     }
 
-    // Fetch from Firestore if logged in
+    // B. Real-time Firestore Sync & Recovery
     if (user && manuscript?.id) {
-      (async () => {
-        try {
-          const [fsMeta, fsChapters] = await Promise.all([
-            getManuscriptMeta(user.uid, manuscript.id),
-            getChapters(user.uid, manuscript.id),
-          ]);
+      try {
+        const db = getDb();
+        const q = query(
+          collection(db, 'users', user.uid, 'manuscripts', manuscript.id, 'chapters'),
+          orderBy('order')
+        );
 
-          if (cancelled) return;
+        unsub = onSnapshot(
+          q,
+          async (snapshot) => {
+            if (cancelled) return;
 
-          const cloudUpdatedAt = toTimestampMillis(fsMeta?.updatedAt);
-          const localLastSaved = localState?.lastSaved || 0;
+            if (!snapshot.empty) {
+              const staticChapters = migrateFromStatic();
+              const rawChapters: EditableChapter[] = snapshot.docs.map((docSnap, idx) => {
+                const data = docSnap.data();
+                return {
+                  id: docSnap.id || `ch-${idx + 1}`,
+                  title: data.title || `Chapitre ${idx + 1}`,
+                  blocks: data.blocks || (data.paragraphs || []).map((p: string) => ({
+                    id: uid(),
+                    content: p,
+                    type: 'paragraph' as const,
+                    source: 'original' as const,
+                    createdAt: Date.now(),
+                  })),
+                  notes: (data.notes && data.notes.length > 0 ? data.notes : staticChapters[idx]?.notes || []).map((n: unknown, nIdx: number) => ({
+                    id: (n as { id?: string }).id || `n-${idx}-${nIdx}`,
+                    key: (n as { key?: string }).key || `Note ${nIdx + 1}`,
+                    content: typeof n === 'string' ? n : (n as { content?: string }).content || '',
+                    source: (((n as { source?: string }).source === 'ai' || (n as { source?: string }).source === 'manual') ? (n as { source?: string }).source : 'original') as 'original' | 'manual' | 'ai',
+                    category: (n as { category?: string }).category === 'margin' ? ('margin' as const) : ('footnote' as const),
+                  })),
+                  pendingReviews: (data.pendingReviews as PendingReview[] | undefined) || [],
+                };
+              });
 
-          if (fsChapters && fsChapters.length > 0) {
-            const staticChapters = migrateFromStatic();
-            const rawChapters: EditableChapter[] = fsChapters.map((ch, idx) => ({
-              id: ch.id || `ch-${idx + 1}`,
-              title: ch.title || `Chapitre ${idx + 1}`,
-              blocks: (ch.blocks as TextBlock[] | undefined) || (ch.paragraphs || []).map((p) => ({
-                id: uid(),
-                content: p,
-                type: 'paragraph' as const,
-                source: 'original' as const,
-                createdAt: Date.now(),
-              })),
-              notes: (ch.notes && ch.notes.length > 0 ? ch.notes : staticChapters[idx]?.notes || []).map((n, nIdx) => ({
-                id: (n as { id?: string }).id || `n-${idx}-${nIdx}`,
-                key: n.key || `Note ${nIdx + 1}`,
-                content: typeof n === 'string' ? n : n.content,
-                source: (((n as { source?: string }).source === 'ai' || (n as { source?: string }).source === 'manual') ? (n as { source?: string }).source : 'original') as 'original' | 'manual' | 'ai',
-              })),
-              pendingReviews: (ch.pendingReviews as PendingReview[] | undefined) || [],
-            }));
+              const cloudNormalized = normalizeChapterNotesAndSuperscripts(rawChapters);
+              const cloudJson = JSON.stringify(cloudNormalized);
+              const curJson = JSON.stringify(stateRef.current.chapters);
 
-            const cloudNormalized = normalizeChapterNotesAndSuperscripts(rawChapters);
-
-            // Conflict resolution:
-            // If Cloud is strictly newer than Local (> 2s), Cloud wins (e.g., user wrote on phone 5 mins ago)
-            // If Local is newer or equal, Local wins and immediately updates Cloud!
-            if (!localState || cloudUpdatedAt > (localLastSaved + 2000)) {
-              const newState: ManuscriptState = {
-                chapters: cloudNormalized,
-                activeChapterIndex: localState?.activeChapterIndex || 0,
-                insertionPoint: null,
-                isDirty: false,
-                lastSaved: cloudUpdatedAt || Date.now(),
-                lastCloudSync: cloudUpdatedAt || Date.now(),
-                saveStatus: 'synced',
-              };
-              dispatch({ type: 'LOAD_STATE', state: newState });
-              saveManuscriptToStorage(currentManuscriptId, newState);
-              lastSyncedJsonRef.current = JSON.stringify(cloudNormalized);
-            } else if (localState && localState.chapters.length > 0) {
-              // Local is ahead of cloud -> Push local to cloud!
-              saveAllChapters(user.uid, manuscript.id, localState.chapters).then(() => {
-                lastSyncedJsonRef.current = JSON.stringify(localState.chapters);
+              if (cloudJson !== curJson && !stateRef.current.isDirty) {
+                lastSyncedJsonRef.current = cloudJson;
+                const newState: ManuscriptState = {
+                  chapters: cloudNormalized,
+                  activeChapterIndex: Math.min(stateRef.current.activeChapterIndex, cloudNormalized.length - 1),
+                  insertionPoint: null,
+                  isDirty: false,
+                  lastSaved: Date.now(),
+                  lastCloudSync: Date.now(),
+                  saveStatus: 'synced',
+                };
+                dispatch({ type: 'LOAD_STATE', state: newState });
+                saveManuscriptToStorage(currentManuscriptId, newState);
+              }
+            } else {
+              // Cloud has 0 chapters for this manuscript!
+              const currentLocal = loadStoredManuscript(currentManuscriptId);
+              if (currentLocal && currentLocal.chapters.length > 0) {
+                // We have chapters locally (e.g. written on PC) -> Immediately push to Cloud!
+                await saveAllChapters(user.uid, manuscript.id, currentLocal.chapters);
+                lastSyncedJsonRef.current = JSON.stringify(currentLocal.chapters);
                 dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
-              }).catch((e) => console.warn('Cloud initial push error:', e));
+              } else {
+                // Initialize cloud with default chapter
+                const initChapters = createInitialState(currentManuscriptId).chapters;
+                await saveAllChapters(user.uid, manuscript.id, initChapters);
+                lastSyncedJsonRef.current = JSON.stringify(initChapters);
+                dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
+              }
             }
-          } else if (localState && localState.chapters.length > 0) {
-            // Cloud has 0 chapters -> Initialize cloud from local state!
-            saveAllChapters(user.uid, manuscript.id, localState.chapters).then(() => {
-              lastSyncedJsonRef.current = JSON.stringify(localState.chapters);
-              dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
-            }).catch((e) => console.warn('Cloud empty initialization error:', e));
+          },
+          (err) => {
+            console.warn('[useManuscript] onSnapshot listener error:', err);
           }
-        } catch (err) {
-          console.warn('[useManuscript] Firestore reconciliation error:', err);
-        }
-      })();
+        );
+      } catch (e) {
+        console.warn('[useManuscript] Firestore init listener error:', e);
+      }
     }
 
     return () => {
       cancelled = true;
-    };
-  }, [currentManuscriptId, user, manuscript?.id]);
-
-  // 4. REAL-TIME CROSS-DEVICE SNAPSHOT LISTENER
-  // Enables live updates if another device modifies the manuscript
-  useEffect(() => {
-    if (!user || !manuscript?.id) return;
-    let unsub: (() => void) | null = null;
-
-    try {
-      const db = getDb();
-      const q = query(
-        collection(db, 'users', user.uid, 'manuscripts', manuscript.id, 'chapters'),
-        orderBy('order')
-      );
-
-      unsub = onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) return;
-
-        // Skip remote sync while user is currently typing/dirty
-        if (stateRef.current.isDirty) {
-          return;
-        }
-
-        const staticChapters = migrateFromStatic();
-        const rawChapters: EditableChapter[] = snapshot.docs.map((docSnap, idx) => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id || `ch-${idx + 1}`,
-            title: data.title || `Chapitre ${idx + 1}`,
-            blocks: data.blocks || (data.paragraphs || []).map((p: string) => ({
-              id: uid(),
-              content: p,
-              type: 'paragraph' as const,
-              source: 'original' as const,
-              createdAt: Date.now(),
-            })),
-            notes: data.notes && data.notes.length > 0 ? data.notes : staticChapters[idx]?.notes || [],
-            pendingReviews: data.pendingReviews || [],
-          };
-        });
-
-        const remoteChapters = normalizeChapterNotesAndSuperscripts(rawChapters);
-        const remoteJson = JSON.stringify(remoteChapters);
-
-        if (remoteJson !== JSON.stringify(stateRef.current.chapters)) {
-          lastSyncedJsonRef.current = remoteJson;
-          const newState: ManuscriptState = {
-            ...stateRef.current,
-            chapters: remoteChapters,
-            isDirty: false,
-            lastSaved: Date.now(),
-            lastCloudSync: Date.now(),
-            saveStatus: 'synced',
-          };
-          dispatch({ type: 'LOAD_STATE', state: newState });
-          saveManuscriptToStorage(currentManuscriptId, newState);
-        }
-      });
-    } catch (e) {
-      console.warn('[useManuscript] onSnapshot listener error:', e);
-    }
-
-    return () => {
       if (unsub) unsub();
     };
-  }, [user, manuscript?.id, currentManuscriptId]);
+  }, [user?.uid, manuscript?.id, currentManuscriptId]);
 
   // 5. FLUSH ON UNMOUNT, VISIBILITY CHANGE & BEFOREUNLOAD
   useEffect(() => {

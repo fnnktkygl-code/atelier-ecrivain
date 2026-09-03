@@ -264,6 +264,10 @@ export default function ChapterList({
                   <span className="ms-title">{m.title}</span>
                 )}
 
+                <span className="ms-count-pill">
+                  {isActive ? `${chapters.length} ch.` : `${m.chapterCount ?? m.chaptersCount ?? '—'} ch.`}
+                </span>
+
                 {isActive && <span className="badge-active">Actif</span>}
 
                 <div className="kebab-wrap" onClick={(e) => e.stopPropagation()}>

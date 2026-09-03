@@ -12,6 +12,7 @@ import {
   orderBy,
   serverTimestamp,
   deleteDoc,
+  onSnapshot,
   type Firestore,
   type DocumentData,
 } from 'firebase/firestore';
@@ -28,6 +29,26 @@ export function getDb(): Firestore {
   return dbInstance;
 }
 
+// ── Recursive Firestore sanitizer: removes undefined values to prevent FirebaseError ──
+export function sanitizeFirestoreObject<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizeFirestoreObject(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (value !== undefined) {
+        result[key] = sanitizeFirestoreObject(value);
+      }
+    }
+    return result as T;
+  }
+  return obj;
+}
+
 // ── Types ──
 export interface ManuscriptMeta {
   id: string;
@@ -35,6 +56,8 @@ export interface ManuscriptMeta {
   createdAt: unknown;
   updatedAt: unknown;
   wordCount?: number;
+  chapterCount?: number;
+  chaptersCount?: number;
 }
 
 export interface ChapterData {
@@ -43,7 +66,7 @@ export interface ChapterData {
   paragraphs: string[];
   order: number;
   blocks?: Array<{ id?: string; content: string; type?: string; source?: string; createdAt?: number }>;
-  notes?: Array<{ key?: string; content: string }>;
+  notes?: Array<{ key?: string; content: string; id?: string; source?: string; category?: string }>;
   pendingReviews?: unknown[];
 }
 
@@ -54,27 +77,72 @@ export async function getManuscripts(uid: string): Promise<ManuscriptMeta[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ManuscriptMeta));
 }
 
-export async function createManuscript(uid: string, title: string): Promise<string> {
+export async function createManuscript(
+  uid: string,
+  title: string,
+  initialChapters?: { title: string; paragraphs?: string[]; blocks?: { id?: string; content: string; type?: string; source?: string; createdAt?: number }[]; notes?: unknown[]; pendingReviews?: unknown[] }[]
+): Promise<string> {
   const db = getDb();
-  const ref = doc(collection(db, 'users', uid, 'manuscripts'));
-  await setDoc(ref, {
+  const mRef = doc(collection(db, 'users', uid, 'manuscripts'));
+  const manuscriptId = mRef.id;
+  const batch = writeBatch(db);
+
+  const chaptersToSeed = (initialChapters && initialChapters.length > 0)
+    ? initialChapters
+    : [
+        {
+          title: 'Chapitre 1 — Nouveau chapitre',
+          paragraphs: [''],
+          blocks: [{ id: `b-${Date.now()}`, content: '', type: 'paragraph', source: 'manual', createdAt: Date.now() }],
+          notes: [],
+          pendingReviews: [],
+        },
+      ];
+
+  batch.set(mRef, sanitizeFirestoreObject({
     title,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    chapterCount: chaptersToSeed.length,
+    wordCount: 0,
+  }));
+
+  chaptersToSeed.forEach((ch, idx) => {
+    const chRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${idx + 1}`);
+    batch.set(chRef, sanitizeFirestoreObject({
+      title: ch.title,
+      paragraphs: ch.paragraphs || (ch.blocks ? ch.blocks.map((b) => b.content) : ['']),
+      blocks: ch.blocks || [{ id: `b-${Date.now()}-${idx}`, content: '', type: 'paragraph', source: 'manual', createdAt: Date.now() }],
+      notes: ch.notes || [],
+      pendingReviews: ch.pendingReviews || [],
+      order: idx,
+      updatedAt: serverTimestamp(),
+    }));
   });
-  return ref.id;
+
+  await batch.commit();
+  return manuscriptId;
 }
 
 export async function updateManuscriptTitle(uid: string, manuscriptId: string, title: string): Promise<void> {
   const db = getDb();
   const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId);
-  await setDoc(ref, { title, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(ref, sanitizeFirestoreObject({ title, updatedAt: serverTimestamp() }), { merge: true });
 }
 
 export async function deleteManuscript(uid: string, manuscriptId: string): Promise<void> {
   const db = getDb();
+  
+  // Clean chapters subcollection
+  const chaptersCol = collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters');
+  const snap = await getDocs(chaptersCol);
+  const batch = writeBatch(db);
+  snap.docs.forEach((d) => batch.delete(d.ref));
+  
+  // Delete manuscript doc
   const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId);
-  await deleteDoc(ref);
+  batch.delete(ref);
+  await batch.commit();
 }
 
 // ── Chapters ──
@@ -86,6 +154,30 @@ export async function getChapters(uid: string, manuscriptId: string): Promise<Ch
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+}
+
+/** Subscribe in real-time to chapter updates across devices */
+export function subscribeToChapters(
+  uid: string,
+  manuscriptId: string,
+  onUpdate: (chapters: ChapterData[]) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const db = getDb();
+  const q = query(
+    collection(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters'),
+    orderBy('order')
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as ChapterData) }));
+      onUpdate(docs);
+    },
+    (err) => {
+      if (onError) onError(err);
+    }
+  );
 }
 
 export function toTimestampMillis(val: unknown): number {
@@ -119,10 +211,10 @@ export async function getManuscriptMeta(uid: string, manuscriptId: string): Prom
 export async function saveChapter(uid: string, manuscriptId: string, chapterId: string, chapter: ChapterData): Promise<void> {
   const db = getDb();
   const ref = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', chapterId);
-  await setDoc(ref, chapter);
+  await setDoc(ref, sanitizeFirestoreObject(chapter));
   // Update manuscript timestamp
   const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
-  await setDoc(mRef, { updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(mRef, sanitizeFirestoreObject({ updatedAt: serverTimestamp() }), { merge: true });
 }
 
 export async function saveAllChapters(
@@ -145,7 +237,7 @@ export async function saveAllChapters(
   let hasWriteOps = false;
 
   chapters.forEach((ch, idx) => {
-    const docId = ch.id || `ch-${idx}`;
+    const docId = ch.id || `ch-${idx + 1}`;
     currentDocIds.add(docId);
     const newParagraphs = ch.blocks.map((b) => b.content || '');
     const existing = existingDocsMap.get(docId);
@@ -161,15 +253,18 @@ export async function saveAllChapters(
 
     if (isModified) {
       const chRef = doc(chaptersCol, docId);
-      batch.set(chRef, {
-        title: ch.title,
-        paragraphs: newParagraphs,
-        blocks: ch.blocks,
-        notes: ch.notes || [],
-        pendingReviews: ch.pendingReviews || [],
-        order: idx,
-        updatedAt: serverTimestamp(),
-      });
+      batch.set(
+        chRef,
+        sanitizeFirestoreObject({
+          title: ch.title,
+          paragraphs: newParagraphs,
+          blocks: ch.blocks,
+          notes: ch.notes || [],
+          pendingReviews: ch.pendingReviews || [],
+          order: idx,
+          updatedAt: serverTimestamp(),
+        })
+      );
       hasWriteOps = true;
     }
   });
@@ -195,11 +290,11 @@ export async function saveAllChapters(
   const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
   batch.set(
     mRef,
-    {
+    sanitizeFirestoreObject({
       updatedAt: serverTimestamp(),
       wordCount: totalWords,
       chapterCount: chapters.length,
-    },
+    }),
     { merge: true }
   );
 
@@ -209,11 +304,11 @@ export async function saveAllChapters(
     // Only update manuscript metadata timestamp if no chapter contents were altered
     await setDoc(
       mRef,
-      {
+      sanitizeFirestoreObject({
         updatedAt: serverTimestamp(),
         wordCount: totalWords,
         chapterCount: chapters.length,
-      },
+      }),
       { merge: true }
     );
   }
