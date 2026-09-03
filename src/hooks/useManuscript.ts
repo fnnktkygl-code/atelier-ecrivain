@@ -318,6 +318,18 @@ export function createInitialState(manuscriptId: string = 'default'): Manuscript
     };
   }
 
+  // Check default fallback cache
+  if (manuscriptId === 'default' || manuscriptId === 'ms-1') {
+    const defaultStored = loadStoredManuscript('default');
+    if (defaultStored && defaultStored.chapters.length > 0) {
+      return {
+        ...defaultStored,
+        isDirty: false,
+        saveStatus: 'saved',
+      };
+    }
+  }
+
   // If this is default or static demo, use static demo chapters
   // If this is a specific user manuscript (e.g. newly created book), initialize with 1 clean chapter
   const isDefaultOrDemo = manuscriptId === 'default' || manuscriptId === 'ms-1';
@@ -997,7 +1009,25 @@ export function useManuscript() {
       const targetManuscriptId = manuscript.id;
 
       const processIncomingCloudChapters = (cloudDocs: ChapterData[]) => {
-        if (cancelled || !cloudDocs || cloudDocs.length === 0) return;
+        if (cancelled || !cloudDocs) return;
+
+        // If cloud is empty but local client has rich chapters, auto-seed to cloud
+        if (cloudDocs.length === 0) {
+          const currentChapters = stateRef.current.chapters;
+          if (
+            currentChapters &&
+            currentChapters.length > 0 &&
+            currentChapters.some((c) => c.blocks.some((b) => b.content && b.content.trim().length > 0))
+          ) {
+            saveAllChapters(targetUid, targetManuscriptId, currentChapters)
+              .then(() => {
+                lastSyncedJsonRef.current = JSON.stringify(currentChapters);
+                dispatch({ type: 'MARK_CLOUD_SYNCED', timestamp: Date.now() });
+              })
+              .catch((e) => console.warn('[useManuscript] Error seeding empty cloud manuscript with local chapters:', e));
+          }
+          return;
+        }
 
         const mappedChapters: EditableChapter[] = cloudDocs.map((data, idx) => {
           const chId = data.id || `ch-${idx + 1}`;

@@ -255,6 +255,23 @@ export async function saveAllChapters(
   existingSnap.docs.forEach((docSnap) => {
     existingDocsMap.set(docSnap.id, docSnap.data());
   });
+
+  // Anti-wipe safety guard: prevent a single empty placeholder from wiping populated cloud chapters
+  const isSingleEmptyPlaceholder =
+    chapters.length === 1 &&
+    chapters[0].blocks.every((b) => !b.content || !b.content.trim()) &&
+    (chapters[0].title.includes('Nouveau chapitre') || chapters[0].title === 'Chapitre 1');
+
+  const existingHasRealContent =
+    existingSnap.docs.length > 1 ||
+    (existingSnap.docs.length === 1 &&
+      ((existingSnap.docs[0].data().paragraphs || []).some((p: string) => p && p.trim().length > 0) ||
+       (existingSnap.docs[0].data().blocks || []).some((b: { content?: string }) => b?.content && b.content.trim().length > 0)));
+
+  if (isSingleEmptyPlaceholder && existingHasRealContent) {
+    console.warn('[saveAllChapters] Anti-wipe triggered: Blocked overwriting populated cloud chapters with empty placeholder.');
+    return;
+  }
   
   const batch = writeBatch(db);
   const currentDocIds = new Set<string>();
@@ -293,8 +310,8 @@ export async function saveAllChapters(
     }
   });
 
-  // 2. Delete orphaned docs only if we have active valid chapters
-  if (chapters.length > 0) {
+  // 2. Delete orphaned docs only if we have active valid chapters and not an empty placeholder
+  if (chapters.length > 0 && !isSingleEmptyPlaceholder) {
     existingSnap.docs.forEach((docSnap) => {
       if (!currentDocIds.has(docSnap.id)) {
         batch.delete(docSnap.ref);
@@ -320,6 +337,7 @@ export async function saveAllChapters(
       updatedAt: serverTimestamp(),
       wordCount: totalWords,
       chapterCount: chapters.length,
+      chaptersCount: chapters.length,
     }),
     { merge: true }
   );
@@ -334,6 +352,7 @@ export async function saveAllChapters(
         updatedAt: serverTimestamp(),
         wordCount: totalWords,
         chapterCount: chapters.length,
+        chaptersCount: chapters.length,
       }),
       { merge: true }
     );
@@ -354,33 +373,11 @@ export async function saveNotes(uid: string, manuscriptId: string, notes: Record
   await setDoc(ref, notes);
 }
 
-// ── Migration: copy static data to Firestore on first login ──
-export async function migrateStaticData(uid: string): Promise<string> {
+// ── Seed / Self-heal default foundational chapters ──
+export async function seedDefaultChapters(uid: string, manuscriptId: string, title: string = "Dieu à l’image des hommes"): Promise<void> {
   const db = getDb();
-
-  // Check if user already has manuscripts
-  const existing = await getManuscripts(uid);
-  if (existing.length > 0) {
-    return existing[0].id; // Already migrated, returns most recently updated manuscript
-  }
-
-  // Create the manuscript
-  const mRef = doc(collection(db, 'users', uid, 'manuscripts'));
-  const manuscriptId = mRef.id;
-
   const batch = writeBatch(db);
 
-  // Manuscript meta
-  batch.set(mRef, sanitizeFirestoreObject({
-    title: "Mon Premier Manuscrit",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    chapterCount: CHAPTERS.length,
-    chaptersCount: CHAPTERS.length,
-    wordCount: 1363,
-  }));
-
-  // Chapters
   CHAPTERS.forEach((ch, idx) => {
     const chRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'chapters', `ch-${idx + 1}`);
     const blocks = ch.paragraphs.map((p, pIdx) => ({
@@ -402,18 +399,54 @@ export async function migrateStaticData(uid: string): Promise<string> {
     }));
   });
 
-  // Notes
+  const mRef = doc(db, 'users', uid, 'manuscripts', manuscriptId);
+  batch.set(mRef, sanitizeFirestoreObject({
+    title,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    chapterCount: CHAPTERS.length,
+    chaptersCount: CHAPTERS.length,
+    wordCount: 1363,
+  }), { merge: true });
+
   const notesRef = doc(db, 'users', uid, 'manuscripts', manuscriptId, 'meta', 'notes');
   batch.set(notesRef, NOTES);
 
+  await batch.commit();
+}
+
+// ── Migration: copy static data to Firestore on first login or self-heal empty state ──
+export async function migrateStaticData(uid: string): Promise<string> {
+  const db = getDb();
+
+  // Check if user already has manuscripts
+  const existing = await getManuscripts(uid);
+  if (existing.length > 0) {
+    // Check if any manuscript has chapters
+    for (const m of existing) {
+      const chs = await getChapters(uid, m.id);
+      if (chs.length > 0) {
+        return m.id;
+      }
+    }
+    // All existing manuscripts are empty -> self-heal the first one with foundational chapters
+    const targetId = existing[0].id;
+    await seedDefaultChapters(uid, targetId, existing[0].title || "Dieu à l’image des hommes");
+    return targetId;
+  }
+
+  // Create the initial manuscript
+  const mRef = doc(collection(db, 'users', uid, 'manuscripts'));
+  const manuscriptId = mRef.id;
+  await seedDefaultChapters(uid, manuscriptId);
+
   // User profile with default pen name and active manuscript
-  batch.set(doc(db, 'users', uid, 'profile', 'info'), sanitizeFirestoreObject({
+  await setDoc(doc(db, 'users', uid, 'profile', 'info'), sanitizeFirestoreObject({
     penName: '',
     lastActiveManuscriptId: manuscriptId,
     createdAt: serverTimestamp(),
-  }));
+  }), { merge: true });
 
-  await batch.commit();
   return manuscriptId;
 }
 

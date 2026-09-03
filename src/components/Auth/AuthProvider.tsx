@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthChange, signInWithGoogle, signOut } from '@/services/firebase/auth';
+import { onAuthChange, signInWithGoogle, signOut, getCachedUser, clearCachedUser } from '@/services/firebase/auth';
 import { migrateStaticData, getManuscripts, createManuscript as createManuscriptDB, updateManuscriptTitle, deleteManuscript as deleteManuscriptDB, getPenName, setPenName, getProfileSettings, updateProfileSettings as updateProfileSettingsDB, type ManuscriptMeta, type ProfileSettings } from '@/services/firebase/firestore';
 import { isFirebaseConfigured } from '@/services/firebase/config';
 
@@ -61,30 +61,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
       return { uid: 'mock-writer', displayName: 'Richard', email: 'richard@ecrivain.fr' } as unknown as User;
     }
-    return null;
+    return getCachedUser();
   });
+
   const [loading, setLoading] = useState(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
       return false;
     }
+    // If cached user exists, don't block render in loading state
+    if (getCachedUser()) {
+      return false;
+    }
     return isFirebaseConfigured();
   });
-  const [manuscript, setManuscript] = useState<ManuscriptMeta | null>(() => {
-    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
-      return {
-        id: 'ms-1',
-        title: 'Dieu à l’image des hommes',
-        author: 'Richard',
-        wordCount: 1363,
-        chaptersCount: 3,
-        lastModified: Date.now(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        coverUrl: '',
-      };
-    }
-    return null;
-  });
+
   const [manuscripts, setManuscripts] = useState<ManuscriptMeta[]>(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
       return [{
@@ -92,21 +82,60 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         title: 'Dieu à l’image des hommes',
         author: 'Richard',
         wordCount: 1363,
-        chaptersCount: 3,
+        chaptersCount: 4,
         lastModified: Date.now(),
         createdAt: Date.now(),
         updatedAt: Date.now(),
         coverUrl: '',
       }];
     }
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('atelier_cached_manuscripts');
+        if (raw) return JSON.parse(raw) as ManuscriptMeta[];
+      } catch {}
+    }
     return [];
   });
+
+  const [manuscript, setManuscript] = useState<ManuscriptMeta | null>(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
+      return {
+        id: 'ms-1',
+        title: 'Dieu à l’image des hommes',
+        author: 'Richard',
+        wordCount: 1363,
+        chaptersCount: 4,
+        lastModified: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        coverUrl: '',
+      };
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const rawMsList = localStorage.getItem('atelier_cached_manuscripts');
+        const activeId = localStorage.getItem('atelier_last_active_manuscript_id');
+        if (rawMsList) {
+          const list = JSON.parse(rawMsList) as ManuscriptMeta[];
+          const found = (activeId && list.find((m) => m.id === activeId)) || list[0];
+          if (found) return found;
+        }
+      } catch {}
+    }
+    return null;
+  });
+
   const [penNameState, setPenNameState] = useState(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('mock=true')) {
       return 'Richard';
     }
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('atelier_cached_pen_name') || '';
+    }
     return '';
   });
+
   const [avatarColor, setAvatarColor] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [showEmailState, setShowEmailState] = useState(true);
@@ -120,6 +149,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     const list = await getManuscripts(user.uid);
     setManuscripts(list);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('atelier_cached_manuscripts', JSON.stringify(list));
+    }
   }, [user]);
 
   useEffect(() => {
@@ -138,6 +170,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
           const mId = await migrateStaticData(u.uid);
           const list = await getManuscripts(u.uid);
           setManuscripts(list);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('atelier_cached_manuscripts', JSON.stringify(list));
+          }
 
           const profileSettings = await getProfileSettings(u.uid);
           const storedMsId = typeof window !== 'undefined' ? localStorage.getItem('atelier_last_active_manuscript_id') : null;
@@ -152,6 +187,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
           const name = await getPenName(u.uid);
           setPenNameState(name);
+          if (typeof window !== 'undefined' && name) {
+            localStorage.setItem('atelier_cached_pen_name', name);
+          }
+
           setAvatarColor(profileSettings.avatarColor || '');
           setAvatarUrl(profileSettings.avatarUrl || '');
           setShowEmailState(profileSettings.showEmail !== false);
@@ -159,9 +198,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
           console.error('Error loading user data:', err);
         }
       } else {
+        clearCachedUser();
         setManuscript(null);
         setManuscripts([]);
         setPenNameState('');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('atelier_cached_manuscripts');
+          localStorage.removeItem('atelier_cached_pen_name');
+        }
       }
       setLoading(false);
     });

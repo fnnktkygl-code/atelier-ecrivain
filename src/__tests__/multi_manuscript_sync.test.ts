@@ -162,4 +162,25 @@ test('Multi-Manuscript Cloud & Local Isolation', async (t) => {
     assert.equal(sorted[2].id, 'ch-3');
     assert.equal(sorted[3].id, 'ch-legacy');
   });
+
+  await t.test('cached user and active manuscript persist across mobile page refreshes', async () => {
+    const { getCachedUser, setCachedUser, clearCachedUser } = await import('../services/firebase/auth');
+    
+    // Set user upon sign in
+    setCachedUser({
+      uid: 'writer-user-123',
+      displayName: 'Richard',
+      email: 'richard@ecrivain.fr',
+    } as any);
+
+    // Verify synchronous retrieval on next load / refresh
+    const cached = getCachedUser();
+    assert.ok(cached);
+    assert.equal(cached.uid, 'writer-user-123');
+    assert.equal(cached.displayName, 'Richard');
+
+    // Clean up
+    clearCachedUser();
+    assert.equal(getCachedUser(), null);
+  });
 });
