@@ -18,7 +18,12 @@ export class LiveSpeechRecognizer {
   private isListening = false;
   private onChunk: LiveSpeechChunkCallback;
   private onError?: (error: string) => void;
-  private accumulatedText = '';
+  // Accumulated text from previous sessions (when restarting on silence)
+  private baseText = '';
+  // Confirmed final text in the current session
+  private currentSessionFinal = '';
+  // Tentative interim text in the current session
+  private currentSessionInterim = '';
 
   constructor(onChunk: LiveSpeechChunkCallback, onError?: (error: string) => void) {
     this.onChunk = onChunk;
@@ -43,16 +48,21 @@ export class LiveSpeechRecognizer {
       this.recognition.interimResults = true;
       this.recognition.lang = 'fr-FR';
       this.recognition.maxAlternatives = 1;
-      this.accumulatedText = '';
 
-      let currentSessionFinal = '';
+      this.baseText = '';
+      this.currentSessionFinal = '';
+      this.currentSessionInterim = '';
 
       this.recognition.onresult = (event: any) => {
         let sessionFinal = '';
         let sessionInterim = '';
 
-        for (let i = event.resultIndex || 0; i < event.results.length; ++i) {
+        // Standard W3C Web Speech API:
+        // In continuous mode, event.results is the full chronological array of results for this recognition session.
+        // We evaluate index 0..length in a single pass to cleanly separate finalized from interim tokens.
+        for (let i = 0; i < event.results.length; ++i) {
           const res = event.results[i];
+          if (!res || !res[0]) continue;
           if (res.isFinal) {
             sessionFinal += res[0].transcript + ' ';
           } else {
@@ -60,14 +70,14 @@ export class LiveSpeechRecognizer {
           }
         }
 
-        if (sessionFinal) {
-          this.accumulatedText = (this.accumulatedText + (this.accumulatedText ? ' ' : '') + sessionFinal).trim();
-        }
-        currentSessionFinal = sessionFinal;
+        this.currentSessionFinal = sessionFinal.trim();
+        this.currentSessionInterim = sessionInterim.trim();
 
-        const currentFullText = (this.accumulatedText + (this.accumulatedText && sessionInterim ? ' ' : '') + sessionInterim).trim();
-        if (currentFullText) {
-          this.onChunk(currentFullText, Boolean(sessionFinal && !sessionInterim));
+        const confirmedPart = [this.baseText, this.currentSessionFinal].filter(Boolean).join(' ');
+        const fullStreamedText = [confirmedPart, this.currentSessionInterim].filter(Boolean).join(' ');
+
+        if (fullStreamedText) {
+          this.onChunk(fullStreamedText, Boolean(this.currentSessionFinal && !this.currentSessionInterim));
         }
       };
 
@@ -83,6 +93,15 @@ export class LiveSpeechRecognizer {
 
       this.recognition.onend = () => {
         if (this.isListening) {
+          // If the recognition paused/ended (due to silence on mobile WebKit/Chrome),
+          // commit the current session's text into baseText before the new session resets event.results.
+          const sessionDone = [this.currentSessionFinal, this.currentSessionInterim].filter(Boolean).join(' ').trim();
+          if (sessionDone) {
+            this.baseText = [this.baseText, sessionDone].filter(Boolean).join(' ').trim();
+          }
+          this.currentSessionFinal = '';
+          this.currentSessionInterim = '';
+
           try {
             this.recognition.start();
           } catch {
@@ -115,7 +134,13 @@ export class LiveSpeechRecognizer {
       } catch {}
       this.recognition = null;
     }
-    return this.accumulatedText.trim();
+    const sessionDone = [this.currentSessionFinal, this.currentSessionInterim].filter(Boolean).join(' ').trim();
+    const fullText = [this.baseText, sessionDone].filter(Boolean).join(' ').trim();
+
+    this.baseText = '';
+    this.currentSessionFinal = '';
+    this.currentSessionInterim = '';
+    return fullText;
   }
 
   cancel(): void {
@@ -126,6 +151,8 @@ export class LiveSpeechRecognizer {
       } catch {}
       this.recognition = null;
     }
-    this.accumulatedText = '';
+    this.baseText = '';
+    this.currentSessionFinal = '';
+    this.currentSessionInterim = '';
   }
 }

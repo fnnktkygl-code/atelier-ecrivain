@@ -149,4 +149,151 @@ describe('Dictation Pipeline & Fallback System', () => {
     const wavBytes = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45]);
     assert.equal(detectAudioMimeType(wavBytes, ''), 'audio/wav');
   });
+
+  test('LiveSpeechRecognizer delivers streaming text with ZERO word duplication or stuttering', async () => {
+    const { LiveSpeechRecognizer } = await import('../services/audio/liveSpeechRecognizer');
+
+    let activeInstance: any = null;
+    class MockSpeechRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      maxAlternatives = 1;
+      onresult: ((event: any) => void) | null = null;
+      onerror: ((error: any) => void) | null = null;
+      onend: (() => void) | null = null;
+      isStarted = false;
+
+      constructor() {
+        activeInstance = this;
+      }
+      start() {
+        this.isStarted = true;
+      }
+      stop() {
+        this.isStarted = false;
+      }
+      abort() {
+        this.isStarted = false;
+      }
+    }
+
+    const originalWindow = (global as any).window;
+    (global as any).window = {
+      SpeechRecognition: MockSpeechRecognition,
+    };
+
+    try {
+      const chunks: string[] = [];
+      const recognizer = new LiveSpeechRecognizer((text, isFinal) => {
+        chunks.push(text);
+      });
+
+      recognizer.start();
+      assert.ok(activeInstance, 'MockSpeechRecognition should be instantiated');
+
+      // Event 1: user says "quand" (interim)
+      activeInstance.onresult({
+        resultIndex: 0,
+        results: [
+          Object.assign([{ transcript: 'quand' }], { isFinal: false }),
+        ],
+      });
+      assert.equal(chunks[chunks.length - 1], 'quand');
+
+      // Event 2: user says "je" (interim)
+      activeInstance.onresult({
+        resultIndex: 0,
+        results: [
+          Object.assign([{ transcript: 'quand je' }], { isFinal: false }),
+        ],
+      });
+      assert.equal(chunks[chunks.length - 1], 'quand je');
+
+      // Event 3: engine finalizes "quand" and adds interim "je parle"
+      activeInstance.onresult({
+        resultIndex: 0,
+        results: [
+          Object.assign([{ transcript: 'quand' }], { isFinal: true }),
+          Object.assign([{ transcript: 'je parle' }], { isFinal: false }),
+        ],
+      });
+      assert.equal(chunks[chunks.length - 1], 'quand je parle');
+
+      // Event 4: engine finalizes "je parle" and adds interim "ça ne s'affiche pas"
+      activeInstance.onresult({
+        resultIndex: 1,
+        results: [
+          Object.assign([{ transcript: 'quand' }], { isFinal: true }),
+          Object.assign([{ transcript: 'je parle' }], { isFinal: true }),
+          Object.assign([{ transcript: "ça ne s'affiche pas" }], { isFinal: false }),
+        ],
+      });
+      assert.equal(chunks[chunks.length - 1], "quand je parle ça ne s'affiche pas");
+
+      // Verify no repeated words anywhere in any chunk!
+      for (const chunk of chunks) {
+        assert.ok(!chunk.includes('quand quand'), `Chunk contained duplication: "${chunk}"`);
+        assert.ok(!chunk.includes('je quand'), `Chunk contained duplication: "${chunk}"`);
+      }
+
+      // Stop recognizer and verify final text is pristine
+      const finalRecorded = recognizer.stop();
+      assert.equal(finalRecorded, "quand je parle ça ne s'affiche pas");
+    } finally {
+      (global as any).window = originalWindow;
+    }
+  });
+
+  test('LiveSpeechRecognizer cleanly chains across onend restarts without losing or repeating text', async () => {
+    const { LiveSpeechRecognizer } = await import('../services/audio/liveSpeechRecognizer');
+
+    let activeInstance: any = null;
+    class MockSpeechRecognition {
+      onresult: ((event: any) => void) | null = null;
+      onerror: ((error: any) => void) | null = null;
+      onend: (() => void) | null = null;
+      constructor() {
+        activeInstance = this;
+      }
+      start() {}
+      stop() {}
+      abort() {}
+    }
+
+    const originalWindow = (global as any).window;
+    (global as any).window = {
+      SpeechRecognition: MockSpeechRecognition,
+    };
+
+    try {
+      const chunks: string[] = [];
+      const recognizer = new LiveSpeechRecognizer((text) => chunks.push(text));
+      recognizer.start();
+
+      // Session 1: User says "Bonjour à tous" and pauses
+      activeInstance.onresult({
+        results: [
+          Object.assign([{ transcript: 'Bonjour à tous' }], { isFinal: true }),
+        ],
+      });
+      assert.equal(chunks[chunks.length - 1], 'Bonjour à tous');
+
+      // Browser fires onend due to pause/silence on mobile
+      activeInstance.onend();
+
+      // Session 2: User resumes: "voici la suite du chapitre"
+      activeInstance.onresult({
+        results: [
+          Object.assign([{ transcript: 'voici la suite du chapitre' }], { isFinal: false }),
+        ],
+      });
+      assert.equal(chunks[chunks.length - 1], 'Bonjour à tous voici la suite du chapitre');
+
+      const completed = recognizer.stop();
+      assert.equal(completed, 'Bonjour à tous voici la suite du chapitre');
+    } finally {
+      (global as any).window = originalWindow;
+    }
+  });
 });

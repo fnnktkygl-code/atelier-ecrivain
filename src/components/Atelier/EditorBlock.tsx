@@ -73,16 +73,37 @@ export default function EditorBlock({
   useEffect(() => {
     if (isDictatingThisBlock && ref.current) {
       const base = block.content ? block.content.trim() + ' ' : '';
-      if (interimText) {
-        ref.current.innerText = base + interimText;
-      } else {
-        ref.current.innerText = base + (base ? '🎙️ …' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
+      const textToShow = interimText
+        ? base + interimText
+        : base + (base ? '🎙️ …' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
+
+      if (ref.current.innerText !== textToShow) {
+        ref.current.innerText = textToShow;
+        // Position caret at the end of the text if focused so user sees natural typing
+        if (document.activeElement === ref.current) {
+          try {
+            const sel = window.getSelection();
+            if (sel) {
+              const range = document.createRange();
+              range.selectNodeContents(ref.current);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } catch {}
+        }
       }
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else if (!isDictatingThisBlock && ref.current && ref.current.innerText !== block.content) {
       ref.current.innerText = block.content;
     }
   }, [block.content, isDictatingThisBlock, interimText]);
+
+  // Scroll into view once when dictation begins
+  useEffect(() => {
+    if (isDictatingThisBlock && ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isDictatingThisBlock]);
 
   // Focus the element if isFocused is true
   useEffect(() => {
@@ -100,7 +121,10 @@ export default function EditorBlock({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (isDictatingThisBlock) return;
+      if (isDictatingThisBlock) {
+        if (e.key === 'Enter') e.preventDefault();
+        return;
+      }
       // Enter -> Split block at cursor
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -203,7 +227,7 @@ export default function EditorBlock({
         <div
           ref={ref}
           className={`editor-block-content ${isDictatingThisBlock ? 'is-dictating' : ''}`}
-          contentEditable={!isDictatingThisBlock}
+          contentEditable={true}
           suppressContentEditableWarning
           onInput={handleInput}
           onKeyDown={handleKeyDown}
