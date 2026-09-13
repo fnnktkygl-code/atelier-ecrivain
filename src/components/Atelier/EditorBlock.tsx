@@ -10,7 +10,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type { TextBlock } from '@/types/editor';
 import { IconMic, IconStop, IconPlus, IconClose, IconDragHandle, IconSparkles } from '@/components/Shared/Icons';
-import { combineTranscripts } from '@/services/audio/liveSpeechRecognizer';
 
 interface EditorBlockProps {
   block: TextBlock;
@@ -73,9 +72,8 @@ export default function EditorBlock({
   // Sync DOM content when block.content changes externally or while streaming dictation
   useEffect(() => {
     if (isDictatingThisBlock && ref.current) {
-      const textToShow = interimText
-        ? (block.content ? combineTranscripts(block.content, interimText) : interimText)
-        : block.content;
+      const base = block.content ? block.content.trim() + ' ' : '';
+      const textToShow = interimText ? base + interimText : block.content;
 
       if (ref.current.innerText !== textToShow) {
         ref.current.innerText = textToShow;
@@ -93,8 +91,8 @@ export default function EditorBlock({
           } catch {}
         }
       }
-    } else if (!isDictatingThisBlock && ref.current && ref.current.innerText !== block.content) {
-      ref.current.innerText = block.content;
+    } else if (!isDictatingThisBlock && ref.current && ref.current.innerHTML !== block.content) {
+      ref.current.innerHTML = block.content;
     }
   }, [block.content, isDictatingThisBlock, interimText]);
 
@@ -114,8 +112,8 @@ export default function EditorBlock({
 
   const handleInput = useCallback(() => {
     if (ref.current && !isDictatingThisBlock) {
-      const text = ref.current.innerText;
-      onUpdate(block.id, text);
+      const html = ref.current.innerHTML;
+      onUpdate(block.id, html);
     }
   }, [block.id, onUpdate, isDictatingThisBlock]);
 
@@ -180,7 +178,7 @@ export default function EditorBlock({
       <div
         className={`editor-block ${isFocused ? 'focused' : ''} ${isDimmed ? 'dimmed' : ''} ${
           searchQuery && block.content.toLowerCase().includes(searchQuery.toLowerCase()) ? 'search-match' : ''
-        } ${block.source === 'dictation' ? 'from-dictation' : ''} ${isDragOver ? 'drag-over' : ''} ${
+        } ${isDragOver ? 'drag-over' : ''} ${
           isDictatingThisBlock ? 'is-dictating' : ''
         }`}
         onMouseEnter={() => setIsHovered(true)}
@@ -204,18 +202,13 @@ export default function EditorBlock({
           <IconDragHandle size={14} />
         </div>
 
-        {/* Source / Analysis badge */}
-        {isAnalyzingBlock ? (
+        {/* Analysis badge (only while user explicitly requested block analysis) */}
+        {isAnalyzingBlock && (
           <span className="editor-block-source analyzing">
             <IconSparkles size={12} strokeWidth={2} />
             <span>Analyse en cours…</span>
           </span>
-        ) : block.source === 'dictation' ? (
-          <span className="editor-block-source">
-            <IconMic size={12} strokeWidth={2} />
-            <span>Dictée</span>
-          </span>
-        ) : null}
+        )}
 
         {/* Editable content zone — live speech streams directly inside this text area */}
         <div

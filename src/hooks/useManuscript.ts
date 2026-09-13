@@ -24,7 +24,6 @@ import {
   type ChapterData,
 } from '@/services/firebase/firestore';
 import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
-import { combineTranscripts } from '@/services/audio/liveSpeechRecognizer';
 import type {
   ManuscriptState,
   ManuscriptAction,
@@ -516,18 +515,18 @@ export function manuscriptReducer(state: ManuscriptState, action: ManuscriptActi
         if (action.afterBlockIndex !== null && blocks[action.afterBlockIndex]) {
           const targetBlock = blocks[action.afterBlockIndex];
           const updatedContent = targetBlock.content
-            ? combineTranscripts(targetBlock.content, textToAppend)
-            : textToAppend;
+            ? `${targetBlock.content.trim()} ${textToAppend.trim()}`
+            : textToAppend.trim();
           blocks[action.afterBlockIndex] = { ...targetBlock, content: updatedContent };
         } else if (blocks.length > 0) {
           const lastIdx = blocks.length - 1;
           const lastBlock = blocks[lastIdx];
           const updatedContent = lastBlock.content
-            ? combineTranscripts(lastBlock.content, textToAppend)
-            : textToAppend;
+            ? `${lastBlock.content.trim()} ${textToAppend.trim()}`
+            : textToAppend.trim();
           blocks[lastIdx] = { ...lastBlock, content: updatedContent };
         } else {
-          blocks.push(makeBlock(textToAppend, 'dictation'));
+          blocks.push(makeBlock(textToAppend.trim(), 'dictation'));
         }
       }
 

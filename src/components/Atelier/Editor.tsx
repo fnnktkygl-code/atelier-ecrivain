@@ -68,7 +68,7 @@ export default function Editor({
         return;
       }
       const text = sel.toString().trim();
-      if (text.length < 3) {
+      if (text.length < 2) {
         setSelectionMenu({ position: null, text: '' });
         return;
       }
@@ -83,10 +83,16 @@ export default function Editor({
       if (sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         const rect = range.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return;
+
+        const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 800;
+        const clampedLeft = Math.max(140, Math.min(screenWidth - 140, rect.left + rect.width / 2));
+        const topPos = rect.top < 65 ? rect.bottom + 10 : rect.top;
+
         setSelectionMenu({
           position: {
-            top: rect.top,
-            left: rect.left + rect.width / 2,
+            top: topPos,
+            left: clampedLeft,
           },
           text,
         });
@@ -94,7 +100,13 @@ export default function Editor({
     };
 
     document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('mouseup', handleSelectionChange);
+    document.addEventListener('touchend', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('mouseup', handleSelectionChange);
+      document.removeEventListener('touchend', handleSelectionChange);
+    };
   }, []);
 
   const handleUpdate = useCallback(

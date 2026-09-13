@@ -223,7 +223,7 @@ export function useDictation(currentChapterIndex: number) {
               duration: rs.duration,
               level: rs.level,
               phase: rs.isPaused ? 'paused' : rs.isRecording ? 'recording' : prev.phase,
-              interimText: latestStreamedText || prev.interimText || "🎙️ Écoute en direct… Parlez, vos paroles s'inscrivent ici…",
+              interimText: latestStreamedText || prev.interimText || '',
             }));
           },
           onProgressiveAudio: async (wavBlob: Blob) => {
