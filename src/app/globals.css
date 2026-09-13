@@ -2457,6 +2457,26 @@ a:hover {
 }
 
 /* Inline live speech in the contentEditable text zone */
+.editor-block-content.is-dictating {
+  min-height: 48px;
+  border-left: 3px solid var(--japandi-terracotta);
+  padding-left: 12px;
+  background: rgba(184, 80, 66, 0.03);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: all 0.2s ease;
+}
+
+.editor-block-content.is-dictating::after {
+  content: '';
+  display: inline-block;
+  width: 2.5px;
+  height: 1.15em;
+  background: var(--japandi-terracotta);
+  vertical-align: text-bottom;
+  margin-left: 3px;
+  animation: blink-cursor 0.75s infinite ease;
+}
+
 .dictation-inline-zone {
   display: inline;
   font-family: inherit;
@@ -4086,6 +4106,52 @@ a:hover {
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 16px)) !important;
   }
 
+  /* Mobile Top Toolbar — Full Title Visibility Without Ellipsis */
+  .editor-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 14px 8px;
+    gap: 8px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .editor-toolbar-left {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .editor-toolbar-title {
+    font-size: 15.5px;
+    line-height: 1.35;
+    font-weight: 600;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .editor-toolbar-center {
+    display: none !important; /* Mobile bottom thumb bar provides Dictation & Undo */
+  }
+
+  .editor-toolbar-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-subtle);
+  }
+
   .mobile-bottom-bar {
     display: block;
     position: fixed;
@@ -4145,8 +4211,8 @@ a:hover {
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
     transition: all var(--transition-fast);
   }
 
@@ -4155,8 +4221,8 @@ a:hover {
   }
 
   .mobile-ch-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
     white-space: nowrap;
   }
 

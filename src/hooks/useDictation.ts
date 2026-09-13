@@ -205,13 +205,6 @@ export function useDictation(currentChapterIndex: number) {
 
       // Mode A: Native Web Speech API (0ms live streaming, exclusive mic access)
       if (LiveSpeechRecognizer.isSupported()) {
-        activeModeRef.current = 'live-speech';
-
-        durationTimerRef.current = setInterval(() => {
-          currentDurationRef.current += 1;
-          setState((prev) => ({ ...prev, duration: currentDurationRef.current }));
-        }, 1000);
-
         try {
           const liveRecognizer = new LiveSpeechRecognizer(
             (interimText) => {
@@ -232,12 +225,19 @@ export function useDictation(currentChapterIndex: number) {
               }));
             }
           );
-          speechRecognizerRef.current = liveRecognizer;
           liveRecognizer.start();
+          speechRecognizerRef.current = liveRecognizer;
+          activeModeRef.current = 'live-speech';
+
+          durationTimerRef.current = setInterval(() => {
+            currentDurationRef.current += 1;
+            setState((prev) => ({ ...prev, duration: currentDurationRef.current }));
+          }, 1000);
+
+          return;
         } catch (e) {
-          console.warn('[useDictation] Impossible de démarrer la reconnaissance locale:', e);
+          console.warn('[useDictation] Échec démarrage reconnaissance locale, repli AudioRecorder:', e);
         }
-        return;
       }
 
       // Mode B: AudioRecorder fallback (for browsers without native Web Speech API)
@@ -258,6 +258,7 @@ export function useDictation(currentChapterIndex: number) {
             duration: rs.duration,
             level: rs.level,
             phase: rs.isPaused ? 'paused' : rs.isRecording ? 'recording' : prev.phase,
+            interimText: prev.interimText || "🎙️ Écoute en direct… Parlez, vos paroles s'inscrivent ici",
           }));
         },
         onComplete: async (blob: Blob, duration: number) => {

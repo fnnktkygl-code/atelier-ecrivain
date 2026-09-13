@@ -173,7 +173,7 @@ export default function MobileBottomBar({
                 aria-label="Ouvrir la liste des chapitres"
               >
                 <IconFolder size={15} strokeWidth={2} />
-                <span className="mobile-ch-label">Ch. {currentChapterIndex + 1}</span>
+                <span className="mobile-ch-label">Chapitre {currentChapterIndex + 1}</span>
                 <IconChevronRight size={13} className="rotate-90 text-soft" />
               </button>
 

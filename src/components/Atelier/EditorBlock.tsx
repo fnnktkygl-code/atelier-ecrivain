@@ -69,12 +69,19 @@ export default function EditorBlock({
   const ref = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Sync DOM content when block.content changes externally (e.g., undo/redo)
+  // Sync DOM content when block.content changes externally or while streaming dictation
   useEffect(() => {
-    if (!isDictatingThisBlock && ref.current && ref.current.innerText !== block.content) {
+    if (isDictatingThisBlock && ref.current) {
+      const base = block.content ? block.content.trim() + ' ' : '';
+      if (interimText) {
+        ref.current.innerText = base + interimText;
+      } else {
+        ref.current.innerText = base + (base ? '' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
+      }
+    } else if (!isDictatingThisBlock && ref.current && ref.current.innerText !== block.content) {
       ref.current.innerText = block.content;
     }
-  }, [block.content, isDictatingThisBlock]);
+  }, [block.content, isDictatingThisBlock, interimText]);
 
   // Focus the element if isFocused is true
   useEffect(() => {
@@ -118,14 +125,12 @@ export default function EditorBlock({
   }, [block.id, onFocus]);
 
   const handleDictateClick = useCallback(() => {
-    if (isDictatingThisBlock && onStopDictation) {
-      onStopDictation();
-    } else if (onStartDictation) {
-      onStartDictation(block.id);
+    if (isDictatingThisBlock) {
+      onStopDictation?.();
+    } else {
+      onStartDictation?.(block.id);
     }
   }, [isDictatingThisBlock, onStopDictation, onStartDictation, block.id]);
-
-  const hasSearchMatch = searchQuery && block.content.toLowerCase().includes(searchQuery.toLowerCase());
 
   return (
     <>
@@ -143,10 +148,13 @@ export default function EditorBlock({
       )}
 
       <div
-        className={`editor-block ${isFocused || isDictatingThisBlock ? 'focused' : ''} ${isDictatingThisBlock ? 'is-dictating' : ''} ${isDragOver ? 'drag-over' : ''} ${block.source === 'dictation' ? 'from-dictation' : ''} ${hasSearchMatch ? 'search-match' : ''}`}
+        className={`editor-block ${isFocused ? 'focused' : ''} ${isDimmed ? 'dimmed' : ''} ${
+          searchQuery && block.content.toLowerCase().includes(searchQuery.toLowerCase()) ? 'search-match' : ''
+        } ${block.source === 'dictation' ? 'from-dictation' : ''} ${isDragOver ? 'drag-over' : ''} ${
+          isDictatingThisBlock ? 'is-dictating' : ''
+        }`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        style={isDimmed ? { opacity: 0.25, transition: 'opacity .3s ease' } : { transition: 'opacity .3s ease' }}
       >
         {/* Drag handle */}
         <div
@@ -197,24 +205,7 @@ export default function EditorBlock({
           data-placeholder="Commencez à écrire…"
           spellCheck
           lang="fr"
-        >
-          {isDictatingThisBlock && (
-            <span className="dictation-inline-zone">
-              {block.content ? <span className="dictation-existing-text">{block.content} </span> : null}
-              {interimText ? (
-                <span className="dictation-live-stream">
-                  <span className="dictation-live-words">{interimText}</span>
-                  <span className="dictation-live-caret" />
-                </span>
-              ) : (
-                <span className="dictation-live-prompt">
-                  <span className="dictation-prompt-dot" />
-                  <span>Parlez maintenant, vos paroles s&apos;écrivent ici…</span>
-                </span>
-              )}
-            </span>
-          )}
-        </div>
+        />
 
         {dictationPhase === 'processing' && isDictatingThisBlock && (
           <div className="editor-block-live-processing">

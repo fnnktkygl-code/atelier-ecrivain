@@ -38,9 +38,18 @@ export class LiveSpeechRecognizer {
       const win = window as IWindowSpeechRecognition;
       const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
       this.recognition = new SpeechRecognitionClass();
-      this.recognition.continuous = true;
+
+      // CRITICAL FOR IOS SAFARI:
+      // iOS WebKit does not support continuous = true and terminates immediately or silences interim results.
+      const isIOS =
+        typeof navigator !== 'undefined' &&
+        (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+      this.recognition.continuous = !isIOS;
       this.recognition.interimResults = true;
       this.recognition.lang = 'fr-FR';
+      this.recognition.maxAlternatives = 1;
       this.accumulatedText = '';
 
       let currentSessionFinal = '';
@@ -49,7 +58,7 @@ export class LiveSpeechRecognizer {
         let sessionFinal = '';
         let sessionInterim = '';
 
-        for (let i = 0; i < event.results.length; ++i) {
+        for (let i = event.resultIndex || 0; i < event.results.length; ++i) {
           const res = event.results[i];
           if (res.isFinal) {
             sessionFinal += res[0].transcript + ' ';
@@ -58,8 +67,12 @@ export class LiveSpeechRecognizer {
           }
         }
 
+        if (sessionFinal) {
+          this.accumulatedText = (this.accumulatedText + (this.accumulatedText ? ' ' : '') + sessionFinal).trim();
+        }
         currentSessionFinal = sessionFinal;
-        const currentFullText = (this.accumulatedText + (this.accumulatedText ? ' ' : '') + sessionFinal + sessionInterim).trim();
+
+        const currentFullText = (this.accumulatedText + (this.accumulatedText && sessionInterim ? ' ' : '') + sessionInterim).trim();
         if (currentFullText) {
           this.onChunk(currentFullText, Boolean(sessionFinal && !sessionInterim));
         }
@@ -76,15 +89,19 @@ export class LiveSpeechRecognizer {
       };
 
       this.recognition.onend = () => {
-        if (currentSessionFinal) {
-          this.accumulatedText = (this.accumulatedText + (this.accumulatedText ? ' ' : '') + currentSessionFinal).trim();
-          currentSessionFinal = '';
-        }
         if (this.isListening) {
           try {
             this.recognition.start();
           } catch {
-            this.isListening = false;
+            setTimeout(() => {
+              if (this.isListening) {
+                try {
+                  this.recognition?.start();
+                } catch {
+                  this.isListening = false;
+                }
+              }
+            }, 80);
           }
         }
       };

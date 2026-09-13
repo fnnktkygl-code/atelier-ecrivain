@@ -68,6 +68,10 @@ export default function AtelierPage() {
       if (!resolvedBlockId && activeChapter?.blocks && activeChapter.blocks.length > 0) {
         resolvedBlockId = activeChapter.blocks[activeChapter.blocks.length - 1].id;
       }
+      if (resolvedBlockId) {
+        setFocusedBlockId(resolvedBlockId);
+        lastFocusedBlockIdRef.current = resolvedBlockId;
+      }
       dictation.startRecording(resolvedBlockId || undefined);
     },
     [focusedBlockId, activeChapter, dictation]
