@@ -75,7 +75,7 @@ export default function EditorBlock({
     if (isDictatingThisBlock && ref.current) {
       const textToShow = interimText
         ? (block.content ? combineTranscripts(block.content, interimText) : interimText)
-        : (block.content ? `${block.content.trim()} 🎙️ …` : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
+        : block.content;
 
       if (ref.current.innerText !== textToShow) {
         ref.current.innerText = textToShow;
@@ -204,14 +204,8 @@ export default function EditorBlock({
           <IconDragHandle size={14} />
         </div>
 
-        {/* Source / Analysis / Dictation badge */}
-        {isDictatingThisBlock ? (
-          <span className="editor-block-source dictating-live">
-            <span className="live-mic-pulse" />
-            <IconMic size={12} strokeWidth={2} />
-            <span>Dictée en direct…</span>
-          </span>
-        ) : isAnalyzingBlock ? (
+        {/* Source / Analysis badge */}
+        {isAnalyzingBlock ? (
           <span className="editor-block-source analyzing">
             <IconSparkles size={12} strokeWidth={2} />
             <span>Analyse en cours…</span>
@@ -237,15 +231,8 @@ export default function EditorBlock({
           lang="fr"
         />
 
-        {dictationPhase === 'processing' && isDictatingThisBlock && (
-          <div className="editor-block-live-processing">
-            <span className="processing-spinner mini" />
-            <span>Perfectionnement du style par l&apos;IA…</span>
-          </div>
-        )}
-
-        {/* Actions (visible on hover or focus or while dictating) */}
-        {(isHovered || isFocused || isAnalyzingBlock || isDictatingThisBlock) && (
+        {/* Actions (visible on hover, focus, or when analyzing) */}
+        {(isHovered || isFocused || isAnalyzingBlock) && (
           <div className="editor-block-actions">
             {onAnalyzeBlock && block.content.trim().length > 3 && (
               <button

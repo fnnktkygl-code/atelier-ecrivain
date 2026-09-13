@@ -2431,50 +2431,13 @@ a:hover {
   animation: pulse-glow 1.5s infinite ease-in-out;
 }
 
-/* ── Live In-Block Dictation Streaming (WYSIWYG Inline) ── */
+/* ── Live In-Block Dictation Streaming (Japandi Minimaliste) ── */
 .editor-block.is-dictating {
-  background: rgba(184, 80, 66, 0.035);
-  border-color: var(--japandi-terracotta);
-  box-shadow: 0 0 0 1.5px var(--japandi-terracotta), 0 4px 20px rgba(184, 80, 66, 0.12);
+  border-color: var(--border);
 }
 
-.editor-block-source.dictating-live {
-  background: var(--japandi-terracotta);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  animation: pulse-subtle 1.8s infinite ease-in-out;
-}
-
-.live-mic-pulse {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #fff;
-  animation: pulse-glow 1s infinite ease-in-out;
-}
-
-/* Inline live speech in the contentEditable text zone */
 .editor-block-content.is-dictating {
-  min-height: 48px;
-  border-left: 3px solid var(--japandi-terracotta);
-  padding-left: 12px;
-  background: rgba(184, 80, 66, 0.03);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   transition: all 0.2s ease;
-}
-
-.editor-block-content.is-dictating::after {
-  content: '';
-  display: inline-block;
-  width: 2.5px;
-  height: 1.15em;
-  background: var(--japandi-terracotta);
-  vertical-align: text-bottom;
-  margin-left: 3px;
-  animation: blink-cursor 0.75s infinite ease;
 }
 
 .dictation-inline-zone {

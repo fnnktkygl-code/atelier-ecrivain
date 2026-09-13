@@ -119,7 +119,7 @@ export function useDictation(currentChapterIndex: number) {
         return;
       }
 
-      // Step 1: Immediate insertion into manuscript state
+      // Immediate insertion into manuscript state (pure transcription, no auto AI analysis)
       setState((prev) => ({
         ...prev,
         phase: 'complete',
@@ -134,43 +134,11 @@ export function useDictation(currentChapterIndex: number) {
         },
         summary: trimmed.slice(0, 100),
         usedModel: 'web-speech-native',
-        isAnalyzingInBackground: isGeminiConfigured(),
-        statusMessage: isGeminiConfigured() ? 'Perfectionnement du style & détection des ratures…' : undefined,
+        isAnalyzingInBackground: false,
+        statusMessage: undefined,
       }));
-
-      if (!isGeminiConfigured()) return;
-
-      // Step 2: Background AI structuring (non-blocking)
-      try {
-        const { result: structResult, modelUsed: structModel } = await structureTranscriptText(
-          trimmed,
-          { currentChapter: currentChapterIndex }
-        );
-
-        if (currentRequestIdRef.current !== requestId) return;
-
-        setState((prev) => ({
-          ...prev,
-          result: toAIStructuredOutput(structResult),
-          corrections: structResult.corrections,
-          summary: structResult.summary,
-          isNewChapter: structResult.isNewChapter,
-          chapterTitle: structResult.chapterTitle,
-          usedModel: `web-speech-native + ${structModel}`,
-          isAnalyzingInBackground: false,
-          statusMessage: undefined,
-        }));
-      } catch (err) {
-        console.warn('[useDictation] Erreur structuration arrière-plan:', err);
-        if (currentRequestIdRef.current !== requestId) return;
-        setState((prev) => ({
-          ...prev,
-          isAnalyzingInBackground: false,
-          statusMessage: undefined,
-        }));
-      }
     },
-    [currentChapterIndex, clearTimers]
+    [clearTimers]
   );
 
   const startRecording = useCallback(
