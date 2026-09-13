@@ -43,7 +43,21 @@ export class AudioRecorder {
 
   async start(): Promise<void> {
     try {
-      // Request microphone access with progressive fallback for mobile devices
+      // 1. SYNCHRONOUS AudioContext creation in direct user activation gesture (crucial for iOS Safari)
+      try {
+        const win = typeof window !== 'undefined' ? (window as any) : null;
+        const AudioContextClass = win?.AudioContext || win?.webkitAudioContext;
+        if (AudioContextClass) {
+          this.audioContext = new AudioContextClass();
+          if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume().catch(() => {});
+          }
+        }
+      } catch (acErr) {
+        console.warn('[AudioRecorder] AudioContext init synchrone:', acErr);
+      }
+
+      // 2. Request microphone access with progressive fallback
       try {
         this.stream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -57,33 +71,25 @@ export class AudioRecorder {
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
 
-      // Set up audio analysis for level monitoring safely (must never crash recording)
-      try {
-        const win = typeof window !== 'undefined' ? (window as any) : null;
-        const AudioContextClass = win?.AudioContext || win?.webkitAudioContext;
-        if (AudioContextClass) {
-          this.audioContext = new AudioContextClass();
-          if (this.audioContext && this.audioContext.state === 'suspended') {
-            this.audioContext.resume().catch(() => {});
-          }
-          if (this.stream && this.audioContext) {
-            const source = this.audioContext.createMediaStreamSource(this.stream);
-            this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 256;
-            source.connect(this.analyser);
-          }
-        }
-      } catch (acErr) {
-        console.warn('[AudioRecorder] Visualiseur AudioContext non initialisé (non bloquant):', acErr);
+      // Ensure AudioContext is running after getUserMedia
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        await this.audioContext.resume().catch(() => {});
       }
 
-      // Initialize real-time PCM WAV streaming for live speech-to-text
-      try {
-        if (this.stream) {
-          this.pcmStreamer.start(this.stream, this.audioContext);
+      // 3. Connect SINGLE MediaStreamAudioSourceNode to both analyser and pcmStreamer
+      if (this.stream && this.audioContext) {
+        try {
+          const sourceNode = this.audioContext.createMediaStreamSource(this.stream);
+
+          this.analyser = this.audioContext.createAnalyser();
+          this.analyser.fftSize = 256;
+          sourceNode.connect(this.analyser);
+
+          // Connect pcmStreamer to the SAME sourceNode (prevents WebKit InvalidStateError)
+          this.pcmStreamer.startWithSource(sourceNode, this.audioContext);
+        } catch (sourceErr) {
+          console.warn('[AudioRecorder] Erreur source audio (non bloquant):', sourceErr);
         }
-      } catch (pcmErr) {
-        console.warn('[AudioRecorder] PcmWavStreamer non initialisé (non bloquant):', pcmErr);
       }
 
       // Determine best supported MIME type

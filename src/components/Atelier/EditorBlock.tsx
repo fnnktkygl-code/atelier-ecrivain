@@ -75,10 +75,10 @@ export default function EditorBlock({
       const base = block.content ? block.content.trim() + ' ' : '';
       if (interimText) {
         ref.current.innerText = base + interimText;
-        ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
-        ref.current.innerText = base + (base ? '' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
+        ref.current.innerText = base + (base ? '🎙️ …' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
       }
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else if (!isDictatingThisBlock && ref.current && ref.current.innerText !== block.content) {
       ref.current.innerText = block.content;
     }

@@ -14,6 +14,39 @@ export class PcmWavStreamer {
   private totalSamples = 0;
   private isStreaming = false;
 
+  startWithSource(source: MediaStreamAudioSourceNode, audioContext: AudioContext): void {
+    try {
+      this.audioContext = audioContext;
+      this.source = source;
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
+      }
+
+      // Use standard 4096 buffer size for broad mobile WebKit / Android support
+      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+      this.pcmChunks = [];
+      this.totalSamples = 0;
+      this.isStreaming = true;
+
+      this.processor.onaudioprocess = (e) => {
+        if (!this.isStreaming) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        const copy = new Float32Array(inputData.length);
+        copy.set(inputData);
+        this.pcmChunks.push(copy);
+        this.totalSamples += copy.length;
+      };
+
+      this.source.connect(this.processor);
+      const muteGain = this.audioContext.createGain();
+      muteGain.gain.value = 0;
+      this.processor.connect(muteGain);
+      muteGain.connect(this.audioContext.destination);
+    } catch (err) {
+      console.warn('[PcmWavStreamer] startWithSource échoué:', err);
+    }
+  }
+
   start(stream: MediaStream, audioContext?: AudioContext | null): void {
     try {
       const win = typeof window !== 'undefined' ? (window as any) : null;
@@ -27,29 +60,7 @@ export class PcmWavStreamer {
       }
 
       this.source = this.audioContext.createMediaStreamSource(stream);
-      // Use standard 4096 buffer size for broad mobile WebKit / Android support
-      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-
-      this.pcmChunks = [];
-      this.totalSamples = 0;
-      this.isStreaming = true;
-
-      this.processor.onaudioprocess = (e) => {
-        if (!this.isStreaming) return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        // Clone samples to avoid buffer mutation
-        const copy = new Float32Array(inputData.length);
-        copy.set(inputData);
-        this.pcmChunks.push(copy);
-        this.totalSamples += copy.length;
-      };
-
-      this.source.connect(this.processor);
-      // Connect to destination (silent) to keep onaudioprocess firing on mobile WebKit
-      const muteGain = this.audioContext.createGain();
-      muteGain.gain.value = 0;
-      this.processor.connect(muteGain);
-      muteGain.connect(this.audioContext.destination);
+      this.startWithSource(this.source, this.audioContext);
     } catch (err) {
       console.warn('[PcmWavStreamer] Initialisation échouée:', err);
     }

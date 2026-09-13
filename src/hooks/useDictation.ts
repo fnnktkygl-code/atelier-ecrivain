@@ -203,31 +203,19 @@ export function useDictation(currentChapterIndex: number) {
         statusMessage: undefined,
       }));
 
-      const isMobileDevice =
-        typeof navigator !== 'undefined' &&
-        (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-
-      // Mode A: Native Web Speech API on Desktop Chrome/Edge (continuous mode & 0ms local)
-      if (!isMobileDevice && LiveSpeechRecognizer.isSupported()) {
+      // Mode A: Native Web Speech API (0ms instant streaming wherever supported, including Android & Safari)
+      if (LiveSpeechRecognizer.isSupported()) {
         try {
           const liveRecognizer = new LiveSpeechRecognizer(
             (interimText) => {
               setState((prev) => ({
                 ...prev,
                 interimText,
-                level: 0.7,
+                level: 0.8,
               }));
             },
             (errMsg) => {
-              clearTimers();
-              setState((prev) => ({
-                ...prev,
-                phase: 'error',
-                error: errMsg,
-                statusMessage: undefined,
-                isAnalyzingInBackground: false,
-              }));
+              console.warn('[useDictation] Info reconnaissance vocale locale:', errMsg);
             }
           );
           liveRecognizer.start();

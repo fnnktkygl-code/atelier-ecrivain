@@ -39,14 +39,7 @@ export class LiveSpeechRecognizer {
       const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
       this.recognition = new SpeechRecognitionClass();
 
-      // CRITICAL FOR IOS SAFARI:
-      // iOS WebKit does not support continuous = true and terminates immediately or silences interim results.
-      const isIOS =
-        typeof navigator !== 'undefined' &&
-        (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-
-      this.recognition.continuous = !isIOS;
+      this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = 'fr-FR';
       this.recognition.maxAlternatives = 1;
