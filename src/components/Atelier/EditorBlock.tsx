@@ -10,6 +10,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type { TextBlock } from '@/types/editor';
 import { IconMic, IconStop, IconPlus, IconClose, IconDragHandle, IconSparkles } from '@/components/Shared/Icons';
+import { combineTranscripts } from '@/services/audio/liveSpeechRecognizer';
 
 interface EditorBlockProps {
   block: TextBlock;
@@ -72,10 +73,9 @@ export default function EditorBlock({
   // Sync DOM content when block.content changes externally or while streaming dictation
   useEffect(() => {
     if (isDictatingThisBlock && ref.current) {
-      const base = block.content ? block.content.trim() + ' ' : '';
       const textToShow = interimText
-        ? base + interimText
-        : base + (base ? '🎙️ …' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
+        ? (block.content ? combineTranscripts(block.content, interimText) : interimText)
+        : (block.content ? `${block.content.trim()} 🎙️ …` : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
 
       if (ref.current.innerText !== textToShow) {
         ref.current.innerText = textToShow;

@@ -296,4 +296,83 @@ describe('Dictation Pipeline & Fallback System', () => {
       (global as any).window = originalWindow;
     }
   });
+
+  test('combineTranscripts collapses exact duplicates, extensions, word overlaps, and revisions', async () => {
+    const { combineTranscripts } = await import('../services/audio/liveSpeechRecognizer');
+
+    // 1. Exact duplicate
+    assert.equal(combineTranscripts('quand', 'quand'), 'quand');
+
+    // 2. Cumulative expansion (Android Web Speech)
+    assert.equal(combineTranscripts('quand', 'quand je'), 'quand je');
+    assert.equal(combineTranscripts('quand je', 'quand je parle'), 'quand je parle');
+    assert.equal(combineTranscripts('quand je parle', "quand je parle ça ne s'affiche pas"), "quand je parle ça ne s'affiche pas");
+
+    // 3. Subsets
+    assert.equal(combineTranscripts('quand je parle', 'quand je'), 'quand je parle');
+
+    // 4. Overlapping words across boundary
+    assert.equal(combineTranscripts('quand je parle ça', "ça ne s'affiche pas"), "quand je parle ça ne s'affiche pas");
+    assert.equal(combineTranscripts('le roi et la reine', 'la reine et les princes'), 'le roi et la reine et les princes');
+
+    // 5. Phonetic revision from word 0
+    assert.equal(combineTranscripts('quand je par', 'quand je parle'), 'quand je parle');
+    assert.equal(combineTranscripts('il avait un saut', 'il avait un seau de fleurs'), 'il avait un seau de fleurs');
+
+    // 6. Distinct phrases
+    assert.equal(combineTranscripts('Chapitre premier.', 'Voici le texte.'), 'Chapitre premier. Voici le texte.');
+  });
+
+  test('LiveSpeechRecognizer completely collapses Android cumulative multi-result frames', async () => {
+    const { LiveSpeechRecognizer } = await import('../services/audio/liveSpeechRecognizer');
+
+    let activeInstance: any = null;
+    class MockSpeechRecognition {
+      onresult: ((event: any) => void) | null = null;
+      onerror: ((error: any) => void) | null = null;
+      onend: (() => void) | null = null;
+      constructor() {
+        activeInstance = this;
+      }
+      start() {}
+      stop() {}
+      abort() {}
+    }
+
+    const originalWindow = (global as any).window;
+    (global as any).window = {
+      SpeechRecognition: MockSpeechRecognition,
+    };
+
+    try {
+      let lastChunk = '';
+      const recognizer = new LiveSpeechRecognizer((text) => {
+        lastChunk = text;
+      });
+      recognizer.start();
+
+      // Simulate Android Chrome cumulative results list where every result has the full utterance
+      activeInstance.onresult({
+        results: [
+          Object.assign([{ transcript: 'quand' }], { isFinal: true }),
+          Object.assign([{ transcript: 'quand' }], { isFinal: true }),
+          Object.assign([{ transcript: 'quand je' }], { isFinal: true }),
+          Object.assign([{ transcript: 'quand je' }], { isFinal: true }),
+          Object.assign([{ transcript: 'quand je parle' }], { isFinal: true }),
+          Object.assign([{ transcript: 'quand je parle' }], { isFinal: true }),
+          Object.assign([{ transcript: 'quand je parle ça' }], { isFinal: true }),
+          Object.assign([{ transcript: "quand je parle ça ne" }], { isFinal: true }),
+          Object.assign([{ transcript: "quand je parle ça ne s'affiche pas" }], { isFinal: false }),
+        ],
+      });
+
+      // Must be cleanly collapsed to single sentence with zero stutter
+      assert.equal(lastChunk, "quand je parle ça ne s'affiche pas");
+
+      const finalText = recognizer.stop();
+      assert.equal(finalText, "quand je parle ça ne s'affiche pas");
+    } finally {
+      (global as any).window = originalWindow;
+    }
+  });
 });
