@@ -65,8 +65,58 @@ export default function MobileBottomBar({
   const isProcessing = ds.phase === 'processing';
   const isActiveAudio = isRecording || isPaused || isProcessing;
 
+  const [keyboardOffset, setKeyboardOffset] = React.useState(0);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const vv = window.visualViewport;
+        // On mobile browsers, the virtual keyboard pushes the visual viewport up.
+        // Offset is the difference between innerHeight and visualViewport bottom.
+        const offset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
+        setKeyboardOffset(offset);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+    }
+    window.addEventListener('resize', handleVisualViewportChange);
+
+    const handleFocusIn = () => {
+      setTimeout(handleVisualViewportChange, 50);
+      setTimeout(handleVisualViewportChange, 200);
+      setTimeout(handleVisualViewportChange, 400);
+    };
+
+    const handleFocusOut = () => {
+      setTimeout(handleVisualViewportChange, 50);
+      setTimeout(handleVisualViewportChange, 200);
+    };
+
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+      window.removeEventListener('resize', handleVisualViewportChange);
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   return (
-    <nav className={`mobile-bottom-bar ${isActiveAudio ? 'audio-active' : ''}`} aria-label="Commandes rapides mobile">
+    <nav
+      className={`mobile-bottom-bar ${isActiveAudio ? 'audio-active' : ''} ${keyboardOffset > 50 ? 'keyboard-open' : ''}`}
+      style={keyboardOffset > 0 ? { transform: `translateY(-${keyboardOffset}px)`, transition: 'transform 0.12s ease-out' } : undefined}
+      aria-label="Commandes rapides mobile"
+    >
       <div className="mobile-bottom-bar-inner">
         {/* ── MODE AUDIO ACTIF : Contrôles d'enregistrement prioritaires ── */}
         {isActiveAudio ? (
@@ -118,6 +168,7 @@ export default function MobileBottomBar({
               {isRecording && (
                 <button
                   className="mobile-btn-audio pause"
+                  onPointerDown={(e) => e.preventDefault()}
                   onClick={onPauseDictation}
                   title="Mettre en pause"
                   aria-label="Pause"
@@ -129,6 +180,7 @@ export default function MobileBottomBar({
               {isPaused && (
                 <button
                   className="mobile-btn-audio resume"
+                  onPointerDown={(e) => e.preventDefault()}
                   onClick={onResumeDictation}
                   title="Reprendre"
                   aria-label="Reprendre"
@@ -141,6 +193,7 @@ export default function MobileBottomBar({
                 <>
                   <button
                     className="mobile-btn-audio stop-primary"
+                    onPointerDown={(e) => e.preventDefault()}
                     onClick={onStopDictation}
                     title="Terminer et insérer dans le texte"
                     aria-label="Terminer la dictée"
@@ -151,6 +204,7 @@ export default function MobileBottomBar({
 
                   <button
                     className="mobile-btn-audio cancel"
+                    onPointerDown={(e) => e.preventDefault()}
                     onClick={onCancelDictation}
                     title="Annuler l'enregistrement"
                     aria-label="Annuler"
@@ -168,6 +222,7 @@ export default function MobileBottomBar({
             <div className="mobile-chapter-group">
               <button
                 className="mobile-btn-chapter"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={onOpenChapters}
                 title={`Chapitres (${chapterCount})`}
                 aria-label="Ouvrir la liste des chapitres"
@@ -179,6 +234,7 @@ export default function MobileBottomBar({
 
               <button
                 className="mobile-btn-add-ch"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={onAddChapter}
                 title="Ajouter un nouveau chapitre"
                 aria-label="Nouveau chapitre"
@@ -192,9 +248,8 @@ export default function MobileBottomBar({
               <button
                 type="button"
                 className="mobile-fab-dictation"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                }}
+                onPointerDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={onStartDictation}
                 title="Dicter une pensée (Dictée vocale par IA)"
                 aria-label="Lancer la dictée vocale"
@@ -209,6 +264,7 @@ export default function MobileBottomBar({
             <div className="mobile-actions-group">
               <button
                 className="mobile-btn-add-paragraph"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={onAddParagraph}
                 title="Insérer un nouveau paragraphe"
                 aria-label="Nouveau paragraphe"
@@ -219,6 +275,7 @@ export default function MobileBottomBar({
 
               <button
                 className="mobile-btn-undo"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={onUndo}
                 disabled={!canUndo}
                 title="Annuler la dernière modification"

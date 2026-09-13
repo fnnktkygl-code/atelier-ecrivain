@@ -4175,6 +4175,15 @@ a:hover {
     box-shadow: 0 -12px 32px -4px rgba(0, 0, 0, 0.16);
   }
 
+  .mobile-bottom-bar.keyboard-open {
+    padding-bottom: 8px !important;
+    padding-top: 6px !important;
+    background: var(--surface) !important;
+    border-top-color: var(--border-hover) !important;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.28) !important;
+    z-index: 1000 !important;
+  }
+
   .mobile-bottom-bar-inner {
     max-width: 540px;
     margin: 0 auto;

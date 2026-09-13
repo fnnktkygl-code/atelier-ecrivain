@@ -203,8 +203,13 @@ export function useDictation(currentChapterIndex: number) {
         statusMessage: undefined,
       }));
 
-      // Mode A: Native Web Speech API (0ms live streaming, exclusive mic access)
-      if (LiveSpeechRecognizer.isSupported()) {
+      const isMobileDevice =
+        typeof navigator !== 'undefined' &&
+        (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+      // Mode A: Native Web Speech API on Desktop Chrome/Edge (continuous mode & 0ms local)
+      if (!isMobileDevice && LiveSpeechRecognizer.isSupported()) {
         try {
           const liveRecognizer = new LiveSpeechRecognizer(
             (interimText) => {
@@ -240,7 +245,7 @@ export function useDictation(currentChapterIndex: number) {
         }
       }
 
-      // Mode B: AudioRecorder fallback (for browsers without native Web Speech API)
+      // Mode B: AudioRecorder with real-time PCM WAV streaming (Mobile & Universal)
       if (!AudioRecorder.isSupported()) {
         setState((prev) => ({
           ...prev,
@@ -251,59 +256,102 @@ export function useDictation(currentChapterIndex: number) {
       }
 
       activeModeRef.current = 'media-recorder';
-      const recorder = new AudioRecorder({
-        onStateChange: (rs: RecorderState) => {
-          setState((prev) => ({
-            ...prev,
-            duration: rs.duration,
-            level: rs.level,
-            phase: rs.isPaused ? 'paused' : rs.isRecording ? 'recording' : prev.phase,
-            interimText: prev.interimText || "🎙️ Écoute en direct… Parlez, vos paroles s'inscrivent ici",
-          }));
-        },
-        onComplete: async (blob: Blob, duration: number) => {
-          if (!blob || blob.size === 0 || duration < 0.5) {
+      let isProgressiveTranscribing = false;
+      let latestStreamedText = '';
+
+      const recorder = new AudioRecorder(
+        {
+          onStateChange: (rs: RecorderState) => {
+            setState((prev) => ({
+              ...prev,
+              duration: rs.duration,
+              level: rs.level,
+              phase: rs.isPaused ? 'paused' : rs.isRecording ? 'recording' : prev.phase,
+              interimText: latestStreamedText || prev.interimText || "🎙️ Écoute en direct… Parlez, vos paroles s'inscrivent ici…",
+            }));
+          },
+          onProgressiveAudio: async (wavBlob: Blob) => {
+            if (isProgressiveTranscribing) return;
+            if (currentRequestIdRef.current !== requestId) return;
+
+            isProgressiveTranscribing = true;
+            try {
+              const audioBase64 = await blobToBase64(wavBlob);
+              const sttRes = await transcribeAudioToRawText(audioBase64, 'audio/wav');
+              if (currentRequestIdRef.current === requestId && sttRes.text) {
+                const clean = sttRes.text.trim();
+                if (clean) {
+                  latestStreamedText = clean;
+                  setState((prev) => ({
+                    ...prev,
+                    interimText: clean,
+                    level: 0.85,
+                  }));
+                }
+              }
+            } catch (err) {
+              console.warn('[useDictation] Transcription progressive en direct (non bloquante):', err);
+            } finally {
+              isProgressiveTranscribing = false;
+            }
+          },
+          onComplete: async (blob: Blob, duration: number, finalWavBlob?: Blob | null) => {
+            if ((!blob || blob.size === 0) && (!finalWavBlob || finalWavBlob.size === 0)) {
+              setState((prev) => ({
+                ...prev,
+                phase: 'error',
+                error: "L'enregistrement audio est trop court ou vide. Veuillez autoriser le microphone et parler distinctement.",
+                statusMessage: undefined,
+                isAnalyzingInBackground: false,
+              }));
+              return;
+            }
+
+            let finalText = latestStreamedText;
+
+            // If no progressive text yet (e.g. short audio < 2s), transcribe full audio
+            if (!finalText || finalText.length < 3) {
+              setState((prev) => ({
+                ...prev,
+                phase: 'processing',
+                statusMessage: 'Transcription audio finale…',
+              }));
+
+              try {
+                const targetBlob = finalWavBlob && finalWavBlob.size > 0 ? finalWavBlob : blob;
+                const audioBase64 = await blobToBase64(targetBlob);
+                const cleanMimeType =
+                  finalWavBlob && finalWavBlob.size > 0 ? 'audio/wav' : await detectAudioMimeTypeFromBlob(blob);
+                const sttRes = await transcribeAudioToRawText(audioBase64, cleanMimeType);
+                finalText = sttRes.text;
+              } catch (err) {
+                if (!finalText) {
+                  setState((prev) => ({
+                    ...prev,
+                    phase: 'error',
+                    error: err instanceof Error ? err.message : 'Erreur pendant la transcription.',
+                    statusMessage: undefined,
+                    isAnalyzingInBackground: false,
+                  }));
+                  return;
+                }
+              }
+            }
+
+            await handleLiveCompletion(finalText, duration, requestId);
+          },
+          onError: (error: string) => {
             setState((prev) => ({
               ...prev,
               phase: 'error',
-              error: "L'enregistrement audio est trop court ou vide. Veuillez autoriser le microphone et parler distinctement.",
+              error,
               statusMessage: undefined,
               isAnalyzingInBackground: false,
             }));
-            return;
-          }
-
-          setState((prev) => ({
-            ...prev,
-            phase: 'processing',
-            statusMessage: 'Transcription audio par Gemini…',
-          }));
-
-          try {
-            const audioBase64 = await blobToBase64(blob);
-            const cleanMimeType = await detectAudioMimeTypeFromBlob(blob);
-            const sttRes = await transcribeAudioToRawText(audioBase64, cleanMimeType);
-            await handleLiveCompletion(sttRes.text, duration, requestId);
-          } catch (err) {
-            setState((prev) => ({
-              ...prev,
-              phase: 'error',
-              error: err instanceof Error ? err.message : 'Erreur pendant la transcription.',
-              statusMessage: undefined,
-              isAnalyzingInBackground: false,
-            }));
-          }
+          },
         },
-        onError: (error: string) => {
-          setState((prev) => ({
-            ...prev,
-            phase: 'error',
-            error,
-            statusMessage: undefined,
-            isAnalyzingInBackground: false,
-          }));
-        },
-      }, 150);
+        150
+      );
 
       recorderRef.current = recorder;
       await recorder.start();

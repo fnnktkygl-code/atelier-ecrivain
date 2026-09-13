@@ -1,7 +1,4 @@
-/**
- * Audio Recorder Service
- * Capture audio via MediaRecorder API with level monitoring.
- */
+import { PcmWavStreamer } from './pcmWavStreamer';
 
 export interface RecorderState {
   isRecording: boolean;
@@ -13,8 +10,9 @@ export interface RecorderState {
 
 export interface RecorderCallbacks {
   onStateChange: (state: RecorderState) => void;
-  onComplete: (blob: Blob, duration: number) => void;
+  onComplete: (blob: Blob, duration: number, finalWavBlob?: Blob | null) => void;
   onError: (error: string) => void;
+  onProgressiveAudio?: (blob: Blob, duration: number) => void;
 }
 
 export class AudioRecorder {
@@ -22,6 +20,7 @@ export class AudioRecorder {
   private stream: MediaStream | null = null;
   private analyser: AnalyserNode | null = null;
   private audioContext: AudioContext | null = null;
+  private pcmStreamer = new PcmWavStreamer();
   private chunks: Blob[] = [];
   private startTime = 0;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -78,6 +77,15 @@ export class AudioRecorder {
         console.warn('[AudioRecorder] Visualiseur AudioContext non initialisé (non bloquant):', acErr);
       }
 
+      // Initialize real-time PCM WAV streaming for live speech-to-text
+      try {
+        if (this.stream) {
+          this.pcmStreamer.start(this.stream, this.audioContext);
+        }
+      } catch (pcmErr) {
+        console.warn('[AudioRecorder] PcmWavStreamer non initialisé (non bloquant):', pcmErr);
+      }
+
       // Determine best supported MIME type
       const mimeType = this.getBestMimeType();
 
@@ -106,12 +114,15 @@ export class AudioRecorder {
       };
 
       this.mediaRecorder.onstop = () => {
+        const finalWav = this.pcmStreamer.stop();
         const actualMime = this.mediaRecorder?.mimeType || mimeType || 'audio/webm';
         const blob = new Blob(this.chunks, { type: actualMime });
-        if (blob.size === 0) {
+        if (blob.size === 0 && (!finalWav || finalWav.size === 0)) {
           this.callbacks.onError('Enregistrement audio vide. Veuillez vérifier les autorisations de votre micro.');
         } else {
-          this.callbacks.onComplete(blob, this.state.duration);
+          // If mediaRecorder produced an empty blob (can happen on some iOS WebViews), fallback to finalWav
+          const reliableBlob = blob.size > 0 ? blob : finalWav!;
+          this.callbacks.onComplete(reliableBlob, this.state.duration, finalWav);
         }
         this.cleanup();
       };
@@ -144,6 +155,18 @@ export class AudioRecorder {
           const currentDuration = Math.floor((Date.now() - this.startTime) / 1000);
           this.state.duration = currentDuration;
           this.emitState();
+
+          // Progressive audio slice for live streaming STT every 2 seconds
+          if (currentDuration >= 2 && currentDuration % 2 === 0) {
+            try {
+              const wavBlob = this.pcmStreamer.getCurrentWavBlob();
+              if (wavBlob && wavBlob.size > 8000) {
+                this.callbacks.onProgressiveAudio?.(wavBlob, currentDuration);
+              }
+            } catch (err) {
+              console.warn('[AudioRecorder] Erreur extraction WAV progressif:', err);
+            }
+          }
 
           if (currentDuration >= this.maxDuration) {
             console.log('[AudioRecorder] Durée maximale atteinte (150s), finalisation automatique...');
@@ -205,6 +228,7 @@ export class AudioRecorder {
   }
 
   cancel(): void {
+    this.pcmStreamer.stop();
     if (this.mediaRecorder) {
       this.mediaRecorder.onstop = null; // Do not trigger onComplete callback
       if (this.mediaRecorder.state !== 'inactive') {
@@ -215,6 +239,7 @@ export class AudioRecorder {
   }
 
   private cleanup(): void {
+    this.pcmStreamer.stop();
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.levelInterval) clearInterval(this.levelInterval);
     if (this.stream) {

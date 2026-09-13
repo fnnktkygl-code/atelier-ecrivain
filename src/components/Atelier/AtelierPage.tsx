@@ -68,13 +68,22 @@ export default function AtelierPage() {
       if (!resolvedBlockId && activeChapter?.blocks && activeChapter.blocks.length > 0) {
         resolvedBlockId = activeChapter.blocks[activeChapter.blocks.length - 1].id;
       }
+      if (!resolvedBlockId && activeChapter && activeChapter.blocks.length === 0) {
+        dispatch({
+          type: 'ADD_BLOCK',
+          chapterIndex: ms.activeChapterIndex,
+          afterBlockId: null,
+          content: '',
+          blockType: 'paragraph',
+        });
+      }
       if (resolvedBlockId) {
         setFocusedBlockId(resolvedBlockId);
         lastFocusedBlockIdRef.current = resolvedBlockId;
       }
       dictation.startRecording(resolvedBlockId || undefined);
     },
-    [focusedBlockId, activeChapter, dictation]
+    [focusedBlockId, activeChapter, dictation, ms.activeChapterIndex, dispatch]
   );
 
   const showFeedback = (msg: string) => {
@@ -675,7 +684,12 @@ export default function AtelierPage() {
                 focusMode={isFocusMode}
                 onStartDictation={handleStartDictation}
                 onStopDictation={dictation.stopRecording}
-                dictatingBlockId={ds.targetBlockId || (ds.phase === 'recording' ? focusedBlockId : null)}
+                dictatingBlockId={
+                  ds.targetBlockId ||
+                  ((ds.phase === 'recording' || ds.phase === 'processing')
+                    ? (focusedBlockId || lastFocusedBlockIdRef.current)
+                    : null)
+                }
                 interimText={ds.interimText || ''}
                 dictationPhase={ds.phase}
                 onFocusedBlockChange={handleFocusedBlockChange}

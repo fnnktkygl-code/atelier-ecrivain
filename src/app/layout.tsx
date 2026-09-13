@@ -1,8 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import ThemeProvider from "@/components/Shared/ThemeProvider";
 import Navbar from "@/components/Shared/Navbar";
 import AuthProvider from "@/components/Auth/AuthProvider";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  interactiveWidget: "resizes-content",
+};
 
 export const metadata: Metadata = {
   title: "L'Atelier de l'Écrivain",

@@ -75,6 +75,7 @@ export default function EditorBlock({
       const base = block.content ? block.content.trim() + ' ' : '';
       if (interimText) {
         ref.current.innerText = base + interimText;
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         ref.current.innerText = base + (base ? '' : '🎙️ Parlez maintenant, vos paroles s’écrivent ici…');
       }
@@ -122,6 +123,11 @@ export default function EditorBlock({
 
   const handleFocus = useCallback(() => {
     onFocus(block.id);
+    if (typeof window !== 'undefined' && window.innerWidth <= 900 && ref.current) {
+      setTimeout(() => {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 280);
+    }
   }, [block.id, onFocus]);
 
   const handleDictateClick = useCallback(() => {
