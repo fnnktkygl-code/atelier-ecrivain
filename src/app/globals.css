@@ -2431,6 +2431,117 @@ a:hover {
   animation: pulse-glow 1.5s infinite ease-in-out;
 }
 
+/* ── Live In-Block Dictation Streaming (WYSIWYG Inline) ── */
+.editor-block.is-dictating {
+  background: rgba(184, 80, 66, 0.035);
+  border-color: var(--japandi-terracotta);
+  box-shadow: 0 0 0 1.5px var(--japandi-terracotta), 0 4px 20px rgba(184, 80, 66, 0.12);
+}
+
+.editor-block-source.dictating-live {
+  background: var(--japandi-terracotta);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  animation: pulse-subtle 1.8s infinite ease-in-out;
+}
+
+.live-mic-pulse {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: pulse-glow 1s infinite ease-in-out;
+}
+
+/* Inline live speech in the contentEditable text zone */
+.dictation-inline-zone {
+  display: inline;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.dictation-existing-text {
+  color: var(--text);
+}
+
+.dictation-live-stream {
+  display: inline;
+  background: rgba(184, 80, 66, 0.08);
+  border-radius: 3px;
+  padding: 1px 3px;
+  color: var(--japandi-terracotta);
+  font-weight: 500;
+}
+
+.dictation-live-words {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.dictation-live-caret {
+  display: inline-block;
+  width: 2.5px;
+  height: 1.15em;
+  background: var(--japandi-terracotta);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink-cursor 0.75s infinite ease;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.dictation-live-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--japandi-terracotta);
+  font-size: 14px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.dictation-prompt-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--japandi-terracotta);
+  animation: pulse-glow 1.2s infinite ease-in-out;
+}
+
+.editor-block-live-processing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: rgba(184, 80, 66, 0.06);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--japandi-terracotta);
+}
+
+.editor-block-action-btn.dictation-block-btn.recording {
+  background: var(--japandi-terracotta);
+  color: #fff;
+  border-color: var(--japandi-terracotta);
+  animation: pulse-subtle 1.5s infinite;
+}
+
+.editor-block-action-btn.dictation-block-btn.recording:hover {
+  background: #a33f32;
+  color: #fff;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    FLOATING SELECTION MENU (Notion / Medium Style)
    ═══════════════════════════════════════════════════════════════ */
@@ -3925,5 +4036,423 @@ a:hover {
   border: 1px solid var(--border);
   margin-left: auto;
   margin-right: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   12. MOBILE BOTTOM BAR & THUMB ERGONOMICS (Japandi)
+   ═══════════════════════════════════════════════════════════════ */
+.mobile-bottom-bar {
+  display: none;
+}
+
+.editor-append-bar {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  margin-bottom: 32px;
+}
+
+.btn-append-paragraph {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  border: 1px dashed var(--border-hover);
+  color: var(--text-soft);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-append-paragraph:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 900px) {
+  /* Hide desktop floating audio dock on mobile since mobile-bottom-bar handles audio */
+  .unified-audio-dock {
+    display: none !important;
+  }
+
+  /* Ensure content is never obscured by mobile bottom bar */
+  .atelier-main,
+  .atelier-editor-container {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 16px)) !important;
+  }
+
+  .mobile-bottom-bar {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 85;
+    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px -4px rgba(0, 0, 0, 0.08);
+    padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 12px));
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mobile-bottom-bar.audio-active {
+    background: var(--surface);
+    border-top-color: var(--border-hover);
+    box-shadow: 0 -12px 32px -4px rgba(0, 0, 0, 0.16);
+  }
+
+  .mobile-bottom-bar-inner {
+    max-width: 540px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .mobile-nav-dock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .mobile-chapter-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-btn-chapter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 42px;
+    padding: 0 12px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all var(--transition-fast);
+  }
+
+  .mobile-btn-chapter:active {
+    transform: scale(0.96);
+  }
+
+  .mobile-ch-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-btn-add-ch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+  }
+
+  .mobile-btn-add-ch:active {
+    background: var(--accent-glow);
+    color: var(--accent);
+    transform: scale(0.94);
+  }
+
+  .mobile-fab-dictation-wrap {
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+    margin: 0 4px;
+    transform: translateY(-8px);
+  }
+
+  .mobile-fab-dictation {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover, #435b4c) 100%);
+    color: #fff;
+    border: 3px solid var(--surface);
+    box-shadow: 0 8px 20px -2px rgba(94, 122, 104, 0.42);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    cursor: pointer;
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+  }
+
+  .mobile-fab-dictation:active {
+    transform: scale(0.92);
+    box-shadow: 0 4px 10px rgba(94, 122, 104, 0.3);
+  }
+
+  .mobile-fab-icon {
+    margin-top: 1px;
+  }
+
+  .mobile-fab-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.95;
+  }
+
+  .mobile-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .mobile-btn-add-paragraph {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .mobile-btn-add-paragraph:active {
+    background: var(--surface);
+    border-color: var(--accent);
+    transform: scale(0.96);
+  }
+
+  .mobile-btn-undo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+  }
+
+  .mobile-btn-undo:disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .mobile-btn-undo:not(:disabled):active {
+    transform: scale(0.94);
+  }
+
+  /* Audio Active Dock */
+  .mobile-audio-active-dock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+    padding: 4px 0;
+  }
+
+  .mobile-audio-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .mobile-audio-pulse {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--japandi-terracotta);
+    animation: pulse-glow 1.2s infinite ease-in-out;
+    flex-shrink: 0;
+  }
+
+  .mobile-audio-time-group {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .mobile-audio-timer {
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--japandi-terracotta);
+  }
+
+  .mobile-audio-timer.muted {
+    color: var(--text-soft);
+  }
+
+  .mobile-audio-limit {
+    font-size: 11.5px;
+    color: var(--text-soft);
+  }
+
+  .mobile-audio-badge-paused {
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    color: var(--text-soft);
+  }
+
+  .mobile-audio-processing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-audio-proc-text {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .mobile-audio-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-btn-audio {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .mobile-btn-audio:active {
+    transform: scale(0.94);
+  }
+
+  .mobile-btn-audio.pause,
+  .mobile-btn-audio.resume {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .mobile-btn-audio.stop-primary {
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 4px 14px rgba(46, 125, 50, 0.35);
+  }
+
+  .mobile-btn-audio.cancel {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(229, 62, 62, 0.1);
+    color: var(--japandi-terracotta);
+    border: 1px solid rgba(229, 62, 62, 0.2);
+  }
+
+  /* Live voice preview in mobile bottom bar */
+  .mobile-audio-live-preview {
+    flex: 1;
+    min-width: 0;
+    max-height: 42px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin: 0 4px;
+    display: flex;
+    align-items: center;
+  }
+
+  .mobile-audio-live-text {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text);
+    font-weight: 500;
+    font-style: italic;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-audio-live-placeholder {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .live-quote {
+    color: var(--japandi-terracotta);
+    font-weight: 700;
+  }
+
+  /* Touch-friendly editor block actions on mobile */
+  .editor-block-actions {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    padding-top: 4px;
+  }
+
+  .editor-block-action-btn {
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
 }
 

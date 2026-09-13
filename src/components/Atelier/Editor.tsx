@@ -10,7 +10,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { EditableChapter, ManuscriptAction } from '@/types/editor';
 import EditorBlock from './EditorBlock';
 import FloatingSelectionMenu from './FloatingSelectionMenu';
-import { IconFeather, IconMic } from '@/components/Shared/Icons';
+import { IconFeather, IconMic, IconPlus } from '@/components/Shared/Icons';
 
 interface EditorProps {
   chapter: EditableChapter;
@@ -19,8 +19,12 @@ interface EditorProps {
   dispatch: React.Dispatch<ManuscriptAction>;
   searchQuery?: string;
   focusMode?: boolean;
-  onStartDictation?: () => void;
+  onStartDictation?: (targetBlockId?: string) => void;
+  onStopDictation?: () => void;
+  dictatingBlockId?: string | null;
+  interimText?: string;
   dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
+  onFocusedBlockChange?: (blockId: string | null) => void;
   onAnalyzeBlock?: (blockId: string, content: string) => void;
   analyzingBlockId?: string | null;
   onAnalyzeSelection?: (text: string) => void;
@@ -36,7 +40,11 @@ export default function Editor({
   searchQuery = '',
   focusMode = false,
   onStartDictation,
+  onStopDictation,
+  dictatingBlockId = null,
+  interimText = '',
   dictationPhase = 'idle',
+  onFocusedBlockChange,
   onAnalyzeBlock,
   analyzingBlockId = null,
   onAnalyzeSelection,
@@ -134,9 +142,13 @@ export default function Editor({
     [dispatch]
   );
 
-  const handleFocus = useCallback((blockId: string) => {
-    setFocusedBlockId(blockId);
-  }, []);
+  const handleFocus = useCallback(
+    (blockId: string) => {
+      setFocusedBlockId(blockId);
+      onFocusedBlockChange?.(blockId);
+    },
+    [onFocusedBlockChange]
+  );
 
   // Drag & drop
   const handleDragStart = useCallback((index: number) => {
@@ -182,7 +194,7 @@ export default function Editor({
             {onStartDictation && (
               <button
                 className="btn btn-secondary"
-                onClick={onStartDictation}
+                onClick={() => onStartDictation()}
                 disabled={dictationPhase !== 'idle' && dictationPhase !== 'complete' && dictationPhase !== 'error'}
               >
                 <IconMic size={16} strokeWidth={2} />
@@ -226,6 +238,10 @@ export default function Editor({
           onInsertAfter={handleInsertAfter}
           onSetInsertionPoint={handleSetInsertionPoint}
           onStartDictation={onStartDictation}
+          onStopDictation={onStopDictation}
+          isDictatingThisBlock={dictatingBlockId === block.id && (dictationPhase === 'recording' || dictationPhase === 'processing')}
+          dictationPhase={dictationPhase}
+          interimText={dictatingBlockId === block.id ? interimText : ''}
           onAnalyzeBlock={onAnalyzeBlock}
           isAnalyzingBlock={analyzingBlockId === block.id}
           onFocus={handleFocus}
@@ -236,6 +252,22 @@ export default function Editor({
           totalBlocks={chapter.blocks.length}
         />
       ))}
+
+      {/* Bar d'ajout rapide de paragraphe en bas de chapitre */}
+      <div className="editor-append-bar">
+        <button
+          type="button"
+          className="btn-append-paragraph"
+          onClick={() => {
+            const lastBlock = chapter.blocks[chapter.blocks.length - 1];
+            dispatch({ type: 'ADD_BLOCK', chapterIndex, afterBlockId: lastBlock?.id || null });
+          }}
+          title="Ajouter un paragraphe à la suite"
+        >
+          <IconPlus size={15} strokeWidth={2.2} />
+          <span>Ajouter un paragraphe</span>
+        </button>
+      </div>
     </div>
   );
 }

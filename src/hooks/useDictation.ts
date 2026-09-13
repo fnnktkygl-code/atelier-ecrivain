@@ -17,6 +17,7 @@ import {
   structureTranscriptText,
   blobToBase64,
   normalizeAudioMimeType,
+  detectAudioMimeTypeFromBlob,
   toAIStructuredOutput,
 } from '@/services/ai/transcription';
 import { isFirebaseConfigured } from '@/services/firebase/config';
@@ -46,6 +47,7 @@ export interface DictationState {
   activeModelName?: string;
   usedModel?: string | null;
   interimText?: string;
+  targetBlockId?: string | null;
   isAnalyzingInBackground?: boolean;
 }
 
@@ -65,12 +67,16 @@ export function useDictation(currentChapterIndex: number) {
     activeModelName: undefined,
     usedModel: null,
     interimText: undefined,
+    targetBlockId: null,
     isAnalyzingInBackground: false,
   });
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const speechRecognizerRef = useRef<LiveSpeechRecognizer | null>(null);
   const watchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentDurationRef = useRef<number>(0);
+  const activeModeRef = useRef<'live-speech' | 'media-recorder' | null>(null);
   const currentRequestIdRef = useRef<number>(0);
 
   // Check Firebase config on mount
@@ -78,270 +84,275 @@ export function useDictation(currentChapterIndex: number) {
     setState((prev) => ({ ...prev, firebaseConfigured: isFirebaseConfigured() }));
   }, []);
 
-  // Clean up watchdog timer on unmount
-  useEffect(() => {
-    return () => {
-      if (watchdogTimerRef.current) {
-        clearTimeout(watchdogTimerRef.current);
-        watchdogTimerRef.current = null;
-      }
-      speechRecognizerRef.current?.cancel();
-    };
+  const clearTimers = useCallback(() => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
   }, []);
 
-  const startRecording = useCallback(async () => {
-    if (!AudioRecorder.isSupported()) {
-      setState((prev) => ({
-        ...prev,
-        phase: 'error',
-        error: 'Votre navigateur ne supporte pas l\'enregistrement audio.',
-      }));
-      return;
-    }
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      clearTimers();
+      speechRecognizerRef.current?.cancel();
+    };
+  }, [clearTimers]);
 
-    // Reset interim text
-    setState((prev) => ({
-      ...prev,
-      interimText: '',
-      isAnalyzingInBackground: false,
-      error: null,
-    }));
+  const handleLiveCompletion = useCallback(
+    async (rawText: string, durationSec: number, requestId: number) => {
+      clearTimers();
+      const trimmed = rawText.trim();
 
-    // Start native browser live speech recognition for 0ms streaming display
-    if (LiveSpeechRecognizer.isSupported()) {
-      try {
-        const liveRecognizer = new LiveSpeechRecognizer((interimText) => {
-          setState((prev) => ({
-            ...prev,
-            interimText,
-          }));
-        });
-        speechRecognizerRef.current = liveRecognizer;
-        liveRecognizer.start();
-      } catch (e) {
-        console.warn('[useDictation] Impossible de démarrer la reconnaissance locale:', e);
-      }
-    }
-
-    const recorder = new AudioRecorder({
-      onStateChange: (rs: RecorderState) => {
-        setState((prev) => ({
-          ...prev,
-          duration: rs.duration,
-          level: rs.level,
-          phase: rs.isPaused ? 'paused' : rs.isRecording ? 'recording' : prev.phase,
-        }));
-      },
-      onComplete: async (blob: Blob, duration: number) => {
-        const requestId = ++currentRequestIdRef.current;
-        const liveCapturedText = speechRecognizerRef.current?.stop() || '';
-
-        // Optimistic Immediate Insertion: if live stream has captured text, display immediately!
-        if (liveCapturedText.trim().length > 10) {
-          setState((prev) => ({
-            ...prev,
-            phase: 'complete',
-            result: {
-              jetBrut: liveCapturedText.trim().split('\n\n').filter(Boolean),
-              ratures: [],
-              corrections: [],
-              notes: {},
-              floatingNotes: [],
-            },
-            summary: liveCapturedText.trim().slice(0, 100),
-            isAnalyzingInBackground: true,
-            statusMessage: 'Perfectionnement du style & détection des ratures…',
-            error: null,
-            duration,
-          }));
-        } else {
-          setState((prev) => ({
-            ...prev,
-            phase: 'processing',
-            statusMessage: 'Transcription vocale instantanée…',
-            error: null,
-            duration,
-          }));
-        }
-
-        if (!isGeminiConfigured() && !isFirebaseConfigured()) {
-          // Demo mode
-          setTimeout(() => {
-            if (currentRequestIdRef.current !== requestId) return;
-            setState((prev) => ({
-              ...prev,
-              phase: 'complete',
-              error: null,
-              result: {
-                jetBrut: [
-                  liveCapturedText.trim() || 'Ceci est une démonstration. Configurez votre clé Google AI Studio dans Profil pour activer la transcription IA.',
-                  `Durée de l'enregistrement : ${Math.floor(duration / 60)}min ${duration % 60}s.`,
-                ],
-                ratures: [],
-                corrections: [],
-                notes: {},
-                floatingNotes: [],
-              },
-              summary: 'Mode démonstration — Clé Gemini non configurée',
-              usedModel: 'demo',
-              statusMessage: undefined,
-              isAnalyzingInBackground: false,
-            }));
-          }, 600);
-          return;
-        }
-
-        // Safety watchdog timer (45s max)
-        if (watchdogTimerRef.current) {
-          clearTimeout(watchdogTimerRef.current);
-        }
-        watchdogTimerRef.current = setTimeout(() => {
-          if (currentRequestIdRef.current !== requestId) return;
-          setState((prev) => {
-            if (prev.phase === 'processing') {
-              return {
-                ...prev,
-                phase: 'error',
-                error: 'Le délai d’attente pour la transcription a été dépassé.',
-                statusMessage: undefined,
-                isAnalyzingInBackground: false,
-              };
-            }
-            return {
-              ...prev,
-              isAnalyzingInBackground: false,
-              statusMessage: undefined,
-            };
-          });
-        }, 45000);
-
-        try {
-          // Step 1: Fast STT transcription (< 1.5s)
-          let rawTranscript = liveCapturedText.trim();
-          let sttModelUsed = 'web-speech-native';
-
-          if (!rawTranscript || rawTranscript.length < 10) {
-            const audioBase64 = await blobToBase64(blob);
-            const cleanMimeType = normalizeAudioMimeType(blob.type || 'audio/webm');
-            const sttRes = await transcribeAudioToRawText(audioBase64, cleanMimeType);
-            rawTranscript = sttRes.text;
-            sttModelUsed = sttRes.modelUsed;
-          }
-
-          if (currentRequestIdRef.current !== requestId) return;
-
-          if (!rawTranscript || rawTranscript.trim().length === 0) {
-            throw new Error('Aucune voix détectée dans l’enregistrement audio.');
-          }
-
-          // Step 1.5: Immediately update state with raw text so user sees it right now!
-          setState((prev) => ({
-            ...prev,
-            phase: 'complete',
-            error: null,
-            result: {
-              jetBrut: rawTranscript.split('\n\n').filter(Boolean),
-              ratures: prev.result?.ratures || [],
-              corrections: prev.result?.corrections || [],
-              notes: prev.result?.notes || {},
-              floatingNotes: prev.result?.floatingNotes || [],
-            },
-            summary: rawTranscript.slice(0, 100),
-            usedModel: sttModelUsed,
-            isAnalyzingInBackground: true,
-            statusMessage: 'Perfectionnement du style & détection des ratures…',
-          }));
-
-          // Step 2: Background literary structuring & ratures (non-blocking)
-          try {
-            const { result: structResult, modelUsed: structModel } = await structureTranscriptText(
-              rawTranscript,
-              { currentChapter: currentChapterIndex }
-            );
-
-            if (currentRequestIdRef.current !== requestId) return;
-
-            if (watchdogTimerRef.current) {
-              clearTimeout(watchdogTimerRef.current);
-              watchdogTimerRef.current = null;
-            }
-
-            setState((prev) => ({
-              ...prev,
-              phase: 'complete',
-              error: null,
-              result: toAIStructuredOutput(structResult),
-              corrections: structResult.corrections,
-              summary: structResult.summary,
-              isNewChapter: structResult.isNewChapter,
-              chapterTitle: structResult.chapterTitle,
-              usedModel: `${sttModelUsed} + ${structModel}`,
-              isAnalyzingInBackground: false,
-              statusMessage: undefined,
-            }));
-          } catch (structErr) {
-            console.warn('[useDictation] Erreur structuration arrière-plan:', structErr);
-            if (currentRequestIdRef.current !== requestId) return;
-            setState((prev) => ({
-              ...prev,
-              isAnalyzingInBackground: false,
-              statusMessage: undefined,
-            }));
-          }
-        } catch (err) {
-          if (currentRequestIdRef.current !== requestId) return;
-
-          if (watchdogTimerRef.current) {
-            clearTimeout(watchdogTimerRef.current);
-            watchdogTimerRef.current = null;
-          }
-
-          setState((prev) => ({
-            ...prev,
-            phase: 'error',
-            error: err instanceof Error ? err.message : 'Erreur pendant la transcription.',
-            statusMessage: undefined,
-            isAnalyzingInBackground: false,
-          }));
-        }
-      },
-      onError: (error: string) => {
-        speechRecognizerRef.current?.cancel();
+      if (!trimmed || trimmed.length === 0) {
         setState((prev) => ({
           ...prev,
           phase: 'error',
-          error,
+          error: "Aucune parole détectée. Veuillez autoriser le microphone et parler distinctement.",
           statusMessage: undefined,
           isAnalyzingInBackground: false,
         }));
-      },
-    }, 150); // 150 seconds max duration
+        return;
+      }
 
-    recorderRef.current = recorder;
-    await recorder.start();
-  }, [currentChapterIndex]);
+      // Step 1: Immediate insertion into manuscript state
+      setState((prev) => ({
+        ...prev,
+        phase: 'complete',
+        duration: durationSec,
+        error: null,
+        result: {
+          jetBrut: trimmed.split('\n\n').filter(Boolean),
+          ratures: [],
+          corrections: [],
+          notes: {},
+          floatingNotes: [],
+        },
+        summary: trimmed.slice(0, 100),
+        usedModel: 'web-speech-native',
+        isAnalyzingInBackground: isGeminiConfigured(),
+        statusMessage: isGeminiConfigured() ? 'Perfectionnement du style & détection des ratures…' : undefined,
+      }));
+
+      if (!isGeminiConfigured()) return;
+
+      // Step 2: Background AI structuring (non-blocking)
+      try {
+        const { result: structResult, modelUsed: structModel } = await structureTranscriptText(
+          trimmed,
+          { currentChapter: currentChapterIndex }
+        );
+
+        if (currentRequestIdRef.current !== requestId) return;
+
+        setState((prev) => ({
+          ...prev,
+          result: toAIStructuredOutput(structResult),
+          corrections: structResult.corrections,
+          summary: structResult.summary,
+          isNewChapter: structResult.isNewChapter,
+          chapterTitle: structResult.chapterTitle,
+          usedModel: `web-speech-native + ${structModel}`,
+          isAnalyzingInBackground: false,
+          statusMessage: undefined,
+        }));
+      } catch (err) {
+        console.warn('[useDictation] Erreur structuration arrière-plan:', err);
+        if (currentRequestIdRef.current !== requestId) return;
+        setState((prev) => ({
+          ...prev,
+          isAnalyzingInBackground: false,
+          statusMessage: undefined,
+        }));
+      }
+    },
+    [currentChapterIndex, clearTimers]
+  );
+
+  const startRecording = useCallback(
+    async (targetBlockId?: string) => {
+      // 1. Security origin verification (HTTPS or localhost required for mobile speech APIs)
+      if (typeof window !== 'undefined' && window.isSecureContext === false) {
+        setState((prev) => ({
+          ...prev,
+          phase: 'error',
+          error: 'La dictée vocale requiert une connexion sécurisée (HTTPS ou localhost). Veuillez ouvrir l’application via HTTPS.',
+        }));
+        return;
+      }
+
+      clearTimers();
+      currentRequestIdRef.current++;
+      const requestId = currentRequestIdRef.current;
+      currentDurationRef.current = 0;
+
+      // Reset state for new dictation
+      setState((prev) => ({
+        ...prev,
+        phase: 'recording',
+        duration: 0,
+        level: 0.2,
+        interimText: '',
+        targetBlockId: targetBlockId || null,
+        isAnalyzingInBackground: false,
+        error: null,
+        statusMessage: undefined,
+      }));
+
+      // Mode A: Native Web Speech API (0ms live streaming, exclusive mic access)
+      if (LiveSpeechRecognizer.isSupported()) {
+        activeModeRef.current = 'live-speech';
+
+        durationTimerRef.current = setInterval(() => {
+          currentDurationRef.current += 1;
+          setState((prev) => ({ ...prev, duration: currentDurationRef.current }));
+        }, 1000);
+
+        try {
+          const liveRecognizer = new LiveSpeechRecognizer(
+            (interimText) => {
+              setState((prev) => ({
+                ...prev,
+                interimText,
+                level: 0.7,
+              }));
+            },
+            (errMsg) => {
+              clearTimers();
+              setState((prev) => ({
+                ...prev,
+                phase: 'error',
+                error: errMsg,
+                statusMessage: undefined,
+                isAnalyzingInBackground: false,
+              }));
+            }
+          );
+          speechRecognizerRef.current = liveRecognizer;
+          liveRecognizer.start();
+        } catch (e) {
+          console.warn('[useDictation] Impossible de démarrer la reconnaissance locale:', e);
+        }
+        return;
+      }
+
+      // Mode B: AudioRecorder fallback (for browsers without native Web Speech API)
+      if (!AudioRecorder.isSupported()) {
+        setState((prev) => ({
+          ...prev,
+          phase: 'error',
+          error: 'Votre navigateur ne supporte pas l\'enregistrement audio.',
+        }));
+        return;
+      }
+
+      activeModeRef.current = 'media-recorder';
+      const recorder = new AudioRecorder({
+        onStateChange: (rs: RecorderState) => {
+          setState((prev) => ({
+            ...prev,
+            duration: rs.duration,
+            level: rs.level,
+            phase: rs.isPaused ? 'paused' : rs.isRecording ? 'recording' : prev.phase,
+          }));
+        },
+        onComplete: async (blob: Blob, duration: number) => {
+          if (!blob || blob.size === 0 || duration < 0.5) {
+            setState((prev) => ({
+              ...prev,
+              phase: 'error',
+              error: "L'enregistrement audio est trop court ou vide. Veuillez autoriser le microphone et parler distinctement.",
+              statusMessage: undefined,
+              isAnalyzingInBackground: false,
+            }));
+            return;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            phase: 'processing',
+            statusMessage: 'Transcription audio par Gemini…',
+          }));
+
+          try {
+            const audioBase64 = await blobToBase64(blob);
+            const cleanMimeType = await detectAudioMimeTypeFromBlob(blob);
+            const sttRes = await transcribeAudioToRawText(audioBase64, cleanMimeType);
+            await handleLiveCompletion(sttRes.text, duration, requestId);
+          } catch (err) {
+            setState((prev) => ({
+              ...prev,
+              phase: 'error',
+              error: err instanceof Error ? err.message : 'Erreur pendant la transcription.',
+              statusMessage: undefined,
+              isAnalyzingInBackground: false,
+            }));
+          }
+        },
+        onError: (error: string) => {
+          setState((prev) => ({
+            ...prev,
+            phase: 'error',
+            error,
+            statusMessage: undefined,
+            isAnalyzingInBackground: false,
+          }));
+        },
+      }, 150);
+
+      recorderRef.current = recorder;
+      await recorder.start();
+    },
+    [clearTimers, handleLiveCompletion]
+  );
 
   const pauseRecording = useCallback(() => {
-    recorderRef.current?.pause();
+    if (activeModeRef.current === 'live-speech') {
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
+      }
+      speechRecognizerRef.current?.stop();
+      setState((prev) => ({ ...prev, phase: 'paused' }));
+    } else {
+      recorderRef.current?.pause();
+    }
   }, []);
 
   const resumeRecording = useCallback(() => {
-    recorderRef.current?.resume();
+    if (activeModeRef.current === 'live-speech') {
+      durationTimerRef.current = setInterval(() => {
+        currentDurationRef.current += 1;
+        setState((prev) => ({ ...prev, duration: currentDurationRef.current }));
+      }, 1000);
+      speechRecognizerRef.current?.start();
+      setState((prev) => ({ ...prev, phase: 'recording' }));
+    } else {
+      recorderRef.current?.resume();
+    }
   }, []);
 
   const stopRecording = useCallback(() => {
-    speechRecognizerRef.current?.stop();
-    recorderRef.current?.stop();
-  }, []);
+    const requestId = currentRequestIdRef.current;
+    if (activeModeRef.current === 'live-speech') {
+      const text = speechRecognizerRef.current?.stop() || '';
+      const dur = currentDurationRef.current;
+      handleLiveCompletion(text, dur, requestId);
+    } else if (activeModeRef.current === 'media-recorder') {
+      recorderRef.current?.stop();
+    }
+  }, [handleLiveCompletion]);
 
   const cancelRecording = useCallback(() => {
     currentRequestIdRef.current++;
-    if (watchdogTimerRef.current) {
-      clearTimeout(watchdogTimerRef.current);
-      watchdogTimerRef.current = null;
-    }
+    clearTimers();
     speechRecognizerRef.current?.cancel();
     recorderRef.current?.cancel();
+    activeModeRef.current = null;
     setState({
       phase: 'idle',
       duration: 0,
@@ -357,17 +368,17 @@ export function useDictation(currentChapterIndex: number) {
       activeModelName: undefined,
       usedModel: null,
       interimText: undefined,
+      targetBlockId: null,
       isAnalyzingInBackground: false,
     });
-  }, []);
+  }, [clearTimers]);
 
   const reset = useCallback(() => {
     currentRequestIdRef.current++;
-    if (watchdogTimerRef.current) {
-      clearTimeout(watchdogTimerRef.current);
-      watchdogTimerRef.current = null;
-    }
+    clearTimers();
     speechRecognizerRef.current?.cancel();
+    recorderRef.current?.cancel();
+    activeModeRef.current = null;
     setState({
       phase: 'idle',
       duration: 0,
@@ -383,9 +394,10 @@ export function useDictation(currentChapterIndex: number) {
       activeModelName: undefined,
       usedModel: null,
       interimText: undefined,
+      targetBlockId: null,
       isAnalyzingInBackground: false,
     });
-  }, []);
+  }, [clearTimers]);
 
   const formatTime = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60);

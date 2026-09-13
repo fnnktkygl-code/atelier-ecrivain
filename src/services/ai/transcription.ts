@@ -75,6 +75,99 @@ export function normalizeAudioMimeType(mimeType: string): string {
 }
 
 /**
+ * Detect real audio MIME type from binary magic bytes.
+ * Crucial for mobile Safari which may report empty MIME types or video/mp4 for pure audio.
+ */
+export function detectAudioMimeType(bytes: Uint8Array, fallbackMime?: string): string {
+  if (bytes && bytes.length >= 4) {
+    // WebM: 1A 45 DF A3
+    if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+      return 'audio/webm';
+    }
+    // WAV: 'RIFF'....'WAVE'
+    if (
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes.length >= 12 &&
+      bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45
+    ) {
+      return 'audio/wav';
+    }
+    // OGG: 'OggS'
+    if (bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+      return 'audio/ogg';
+    }
+    // MP4 / M4A / AAC container: check 'ftyp' at offset 4
+    if (
+      bytes.length >= 8 &&
+      bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70
+    ) {
+      return 'audio/mp4';
+    }
+    // MP3: ID3 or frame sync FF FB / FF F3 / FF F2
+    if (
+      (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
+      (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)
+    ) {
+      return 'audio/mp3';
+    }
+  }
+
+  return normalizeAudioMimeType(fallbackMime || '');
+}
+
+/**
+ * Detect real audio MIME type from a Blob
+ */
+export async function detectAudioMimeTypeFromBlob(blob: Blob): Promise<string> {
+  try {
+    const slice = blob.slice(0, 16);
+    const buffer = await slice.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    return detectAudioMimeType(bytes, blob.type);
+  } catch {
+    return normalizeAudioMimeType(blob.type || '');
+  }
+}
+
+/**
+ * Extract transcript text from Gemini API response.
+ * Handles both:
+ * 1. Dedicated transcription models (gemini-3.5-transcribe) where output is in:
+ *    part.audioTranscription.text (while response.text() returns empty "")
+ * 2. Multimodal text models (gemini-3.6-flash, gemini-3.7-flash) where output is in:
+ *    part.text
+ */
+export function extractTranscriptText(response: any): string {
+  if (!response) return '';
+
+  const candidate = response.candidates?.[0];
+  if (candidate?.content?.parts && Array.isArray(candidate.content.parts)) {
+    for (const part of candidate.content.parts) {
+      if (part?.audioTranscription?.text) {
+        return part.audioTranscription.text.trim();
+      }
+      if (typeof part?.text === 'string' && part.text.trim().length > 0) {
+        const clean = part.text
+          .replace(/<thought>[\s\S]*?<\/thought>/g, '')
+          .replace(/^thought\s+/i, '')
+          .trim();
+        if (clean.length > 0) return clean;
+      }
+    }
+  }
+
+  try {
+    const fallbackText = typeof response.text === 'function' ? response.text() : '';
+    return (fallbackText || '')
+      .replace(/<thought>[\s\S]*?<\/thought>/g, '')
+      .replace(/^thought\s+/i, '')
+      .trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Convert an audio Blob to base64 for Gemini
  */
 export async function blobToBase64(blob: Blob): Promise<string> {
@@ -240,7 +333,7 @@ function checkRateLimit() {
 }
 
 /**
- * Stage 1: Speech-To-Text transcription using dedicated transcribe model (gemini-3.5-transcribe / gemini-2.5-flash)
+ * Stage 1: Speech-To-Text transcription using dedicated transcribe model (gemini-3.5-transcribe / gemini-3.6-flash)
  */
 export async function transcribeAudioToRawText(
   audioBase64: string,
@@ -273,7 +366,10 @@ export async function transcribeAudioToRawText(
           },
         },
       ]);
-      const text = apiResult.response.text();
+      const text = extractTranscriptText(apiResult.response);
+      if (!text || text.trim().length === 0) {
+        throw new Error(`Le modèle ${modelName} n'a retourné aucun texte transcrit.`);
+      }
       return text.trim();
     }
   );
@@ -337,7 +433,7 @@ export async function transcribeAudio(
   recordApiRequest();
 
   const audioBase64 = await blobToBase64(audioBlob);
-  const cleanMimeType = normalizeAudioMimeType(audioBlob.type || 'audio/webm');
+  const cleanMimeType = await detectAudioMimeTypeFromBlob(audioBlob);
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {
@@ -487,7 +583,7 @@ export async function transcribeAudioStream(
   }
 
   const audioBase64 = await blobToBase64(audioBlob);
-  const cleanMimeType = normalizeAudioMimeType(audioBlob.type || 'audio/webm');
+  const cleanMimeType = await detectAudioMimeTypeFromBlob(audioBlob);
 
   let contextPrompt = 'Transcris et structure cette dictée vocale.';
   if (context?.currentChapter !== undefined) {

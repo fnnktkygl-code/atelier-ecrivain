@@ -9,7 +9,7 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type { TextBlock } from '@/types/editor';
-import { IconMic, IconPlus, IconClose, IconDragHandle, IconSparkles } from '@/components/Shared/Icons';
+import { IconMic, IconStop, IconPlus, IconClose, IconDragHandle, IconSparkles } from '@/components/Shared/Icons';
 
 interface EditorBlockProps {
   block: TextBlock;
@@ -24,7 +24,11 @@ interface EditorBlockProps {
   onMergeWithPrevious: (blockId: string) => void;
   onInsertAfter: (blockId: string) => void;
   onSetInsertionPoint: (blockIndex: number | null) => void;
-  onStartDictation?: () => void;
+  onStartDictation?: (targetBlockId?: string) => void;
+  onStopDictation?: () => void;
+  isDictatingThisBlock?: boolean;
+  dictationPhase?: 'idle' | 'recording' | 'paused' | 'processing' | 'complete' | 'error';
+  interimText?: string;
   onAnalyzeBlock?: (blockId: string, content: string) => void;
   isAnalyzingBlock?: boolean;
   onFocus: (blockId: string) => void;
@@ -49,6 +53,10 @@ export default function EditorBlock({
   onInsertAfter,
   onSetInsertionPoint,
   onStartDictation,
+  onStopDictation,
+  isDictatingThisBlock = false,
+  dictationPhase = 'idle',
+  interimText = '',
   onAnalyzeBlock,
   isAnalyzingBlock = false,
   onFocus,
@@ -63,10 +71,10 @@ export default function EditorBlock({
 
   // Sync DOM content when block.content changes externally (e.g., undo/redo)
   useEffect(() => {
-    if (ref.current && ref.current.innerText !== block.content) {
+    if (!isDictatingThisBlock && ref.current && ref.current.innerText !== block.content) {
       ref.current.innerText = block.content;
     }
-  }, [block.content]);
+  }, [block.content, isDictatingThisBlock]);
 
   // Focus the element if isFocused is true
   useEffect(() => {
@@ -76,14 +84,15 @@ export default function EditorBlock({
   }, [isFocused]);
 
   const handleInput = useCallback(() => {
-    if (ref.current) {
+    if (ref.current && !isDictatingThisBlock) {
       const text = ref.current.innerText;
       onUpdate(block.id, text);
     }
-  }, [block.id, onUpdate]);
+  }, [block.id, onUpdate, isDictatingThisBlock]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (isDictatingThisBlock) return;
       // Enter -> Split block at cursor
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -101,19 +110,20 @@ export default function EditorBlock({
         }
       }
     },
-    [block.id, block.content.length, index, onSplit, onMergeWithPrevious]
+    [block.id, block.content.length, index, onSplit, onMergeWithPrevious, isDictatingThisBlock]
   );
 
   const handleFocus = useCallback(() => {
     onFocus(block.id);
   }, [block.id, onFocus]);
 
-  const handleInsertionClick = useCallback(() => {
-    onSetInsertionPoint(isInsertionPoint ? null : index);
-    if (!isInsertionPoint && onStartDictation) {
-      onStartDictation();
+  const handleDictateClick = useCallback(() => {
+    if (isDictatingThisBlock && onStopDictation) {
+      onStopDictation();
+    } else if (onStartDictation) {
+      onStartDictation(block.id);
     }
-  }, [isInsertionPoint, index, onSetInsertionPoint, onStartDictation]);
+  }, [isDictatingThisBlock, onStopDictation, onStartDictation, block.id]);
 
   const hasSearchMatch = searchQuery && block.content.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -133,7 +143,7 @@ export default function EditorBlock({
       )}
 
       <div
-        className={`editor-block ${isFocused ? 'focused' : ''} ${isDragOver ? 'drag-over' : ''} ${block.source === 'dictation' ? 'from-dictation' : ''} ${hasSearchMatch ? 'search-match' : ''}`}
+        className={`editor-block ${isFocused || isDictatingThisBlock ? 'focused' : ''} ${isDictatingThisBlock ? 'is-dictating' : ''} ${isDragOver ? 'drag-over' : ''} ${block.source === 'dictation' ? 'from-dictation' : ''} ${hasSearchMatch ? 'search-match' : ''}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={isDimmed ? { opacity: 0.25, transition: 'opacity .3s ease' } : { transition: 'opacity .3s ease' }}
@@ -156,8 +166,14 @@ export default function EditorBlock({
           <IconDragHandle size={14} />
         </div>
 
-        {/* Source / Analysis badge */}
-        {isAnalyzingBlock ? (
+        {/* Source / Analysis / Dictation badge */}
+        {isDictatingThisBlock ? (
+          <span className="editor-block-source dictating-live">
+            <span className="live-mic-pulse" />
+            <IconMic size={12} strokeWidth={2} />
+            <span>Dictée en direct…</span>
+          </span>
+        ) : isAnalyzingBlock ? (
           <span className="editor-block-source analyzing">
             <IconSparkles size={12} strokeWidth={2} />
             <span>Analyse en cours…</span>
@@ -169,11 +185,11 @@ export default function EditorBlock({
           </span>
         ) : null}
 
-        {/* Editable content */}
+        {/* Editable content zone — live speech streams directly inside this text area */}
         <div
           ref={ref}
-          className="editor-block-content"
-          contentEditable
+          className={`editor-block-content ${isDictatingThisBlock ? 'is-dictating' : ''}`}
+          contentEditable={!isDictatingThisBlock}
           suppressContentEditableWarning
           onInput={handleInput}
           onKeyDown={handleKeyDown}
@@ -181,13 +197,38 @@ export default function EditorBlock({
           data-placeholder="Commencez à écrire…"
           spellCheck
           lang="fr"
-        />
+        >
+          {isDictatingThisBlock && (
+            <span className="dictation-inline-zone">
+              {block.content ? <span className="dictation-existing-text">{block.content} </span> : null}
+              {interimText ? (
+                <span className="dictation-live-stream">
+                  <span className="dictation-live-words">{interimText}</span>
+                  <span className="dictation-live-caret" />
+                </span>
+              ) : (
+                <span className="dictation-live-prompt">
+                  <span className="dictation-prompt-dot" />
+                  <span>Parlez maintenant, vos paroles s&apos;écrivent ici…</span>
+                </span>
+              )}
+            </span>
+          )}
+        </div>
 
-        {/* Actions (visible on hover or focus) */}
-        {(isHovered || isFocused || isAnalyzingBlock) && (
+        {dictationPhase === 'processing' && isDictatingThisBlock && (
+          <div className="editor-block-live-processing">
+            <span className="processing-spinner mini" />
+            <span>Perfectionnement du style par l&apos;IA…</span>
+          </div>
+        )}
+
+        {/* Actions (visible on hover or focus or while dictating) */}
+        {(isHovered || isFocused || isAnalyzingBlock || isDictatingThisBlock) && (
           <div className="editor-block-actions">
             {onAnalyzeBlock && block.content.trim().length > 3 && (
               <button
+                type="button"
                 className={`editor-block-action-btn analyze-block-btn ${isAnalyzingBlock ? 'loading' : ''}`}
                 onClick={() => onAnalyzeBlock(block.id, block.content)}
                 disabled={isAnalyzingBlock}
@@ -199,16 +240,35 @@ export default function EditorBlock({
             )}
             {onStartDictation && (
               <button
-                className="editor-block-action-btn dictation-block-btn"
-                onClick={handleInsertionClick}
-                title="Dicter après ce paragraphe"
+                type="button"
+                className={`editor-block-action-btn dictation-block-btn ${isDictatingThisBlock ? 'recording' : ''}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDictateClick();
+                }}
+                title={isDictatingThisBlock ? "Terminer la dictée pour ce paragraphe" : "Dicter dans ce paragraphe"}
+                aria-label={isDictatingThisBlock ? "Terminer la dictée" : "Dicter"}
               >
-                <IconMic size={13} strokeWidth={2} />
-                <span>Dicter</span>
+                {isDictatingThisBlock ? (
+                  <>
+                    <IconStop size={13} strokeWidth={2.5} />
+                    <span>Terminer</span>
+                  </>
+                ) : (
+                  <>
+                    <IconMic size={13} strokeWidth={2} />
+                    <span>Dicter</span>
+                  </>
+                )}
               </button>
             )}
-            {totalBlocks > 1 && (
+            {totalBlocks > 1 && !isDictatingThisBlock && (
               <button
+                type="button"
                 className="editor-block-action-btn delete"
                 onClick={() => onDelete(block.id)}
                 title="Supprimer ce bloc"
@@ -222,10 +282,20 @@ export default function EditorBlock({
       </div>
 
       {/* Subtle insertion indicator when dragging or active */}
-      {isInsertionPoint && (
+      {isInsertionPoint ? (
         <div className="editor-insert-indicator active">
           <span className="editor-insert-dot" />
           <span className="editor-insert-text">Point d&apos;insertion de dictée</span>
+        </div>
+      ) : (
+        <div
+          className="editor-insert-line"
+          onClick={() => onSetInsertionPoint(index)}
+          title="Insérer un paragraphe ici"
+        >
+          <span className="editor-insert-line-btn">
+            <IconPlus size={12} strokeWidth={2.5} />
+          </span>
         </div>
       )}
     </>

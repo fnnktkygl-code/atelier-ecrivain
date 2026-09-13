@@ -44,43 +44,75 @@ export class AudioRecorder {
 
   async start(): Promise<void> {
     try {
-      // Request microphone access
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          channelCount: 1,
-          sampleRate: 16000, // Optimal for speech recognition
-        },
-      });
+      // Request microphone access with progressive fallback for mobile devices
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+      } catch (constraintErr) {
+        console.warn('[AudioRecorder] Contraintes audio avancées refusées, repli basique:', constraintErr);
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
 
-      // Set up audio analysis for level monitoring
-      this.audioContext = new AudioContext();
-      const source = this.audioContext.createMediaStreamSource(this.stream);
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 256;
-      source.connect(this.analyser);
+      // Set up audio analysis for level monitoring safely (must never crash recording)
+      try {
+        const win = typeof window !== 'undefined' ? (window as any) : null;
+        const AudioContextClass = win?.AudioContext || win?.webkitAudioContext;
+        if (AudioContextClass) {
+          this.audioContext = new AudioContextClass();
+          if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume().catch(() => {});
+          }
+          if (this.stream && this.audioContext) {
+            const source = this.audioContext.createMediaStreamSource(this.stream);
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            source.connect(this.analyser);
+          }
+        }
+      } catch (acErr) {
+        console.warn('[AudioRecorder] Visualiseur AudioContext non initialisé (non bloquant):', acErr);
+      }
 
       // Determine best supported MIME type
       const mimeType = this.getBestMimeType();
 
-      // Create recorder
-      this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType,
-        audioBitsPerSecond: 128000,
-      });
+      // Create recorder defensively (iOS Safari can reject audioBitsPerSecond)
+      try {
+        this.mediaRecorder = new MediaRecorder(this.stream, {
+          ...(mimeType ? { mimeType } : {}),
+          audioBitsPerSecond: 128000,
+        });
+      } catch {
+        try {
+          this.mediaRecorder = new MediaRecorder(this.stream, {
+            ...(mimeType ? { mimeType } : {}),
+          });
+        } catch {
+          this.mediaRecorder = new MediaRecorder(this.stream);
+        }
+      }
 
       this.chunks = [];
 
       this.mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
+        if (e.data && e.data.size > 0) {
           this.chunks.push(e.data);
         }
       };
 
       this.mediaRecorder.onstop = () => {
-        const blob = new Blob(this.chunks, { type: mimeType });
-        this.callbacks.onComplete(blob, this.state.duration);
+        const actualMime = this.mediaRecorder?.mimeType || mimeType || 'audio/webm';
+        const blob = new Blob(this.chunks, { type: actualMime });
+        if (blob.size === 0) {
+          this.callbacks.onError('Enregistrement audio vide. Veuillez vérifier les autorisations de votre micro.');
+        } else {
+          this.callbacks.onComplete(blob, this.state.duration);
+        }
         this.cleanup();
       };
 
@@ -90,7 +122,20 @@ export class AudioRecorder {
       };
 
       // Start recording
-      this.mediaRecorder.start(1000); // collect data every second
+      // CRITICAL FOR SAFARI / MP4:
+      // Passing timeslice (e.g. 1000) causes WebKit on iOS/macOS to chop MP4 into corrupt chunks.
+      // Starting without timeslice produces one clean, well-formed container upon stop.
+      const actualType = this.mediaRecorder.mimeType || mimeType || '';
+      const isSafariOrMp4 =
+        actualType.includes('mp4') ||
+        actualType.includes('aac') ||
+        (typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent));
+
+      if (isSafariOrMp4) {
+        this.mediaRecorder.start();
+      } else {
+        this.mediaRecorder.start(1000); // collect data every second on Chrome/Firefox
+      }
       this.startTime = Date.now();
 
       // Timer
@@ -147,6 +192,11 @@ export class AudioRecorder {
 
   stop(): void {
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try {
+        if (typeof this.mediaRecorder.requestData === 'function') {
+          this.mediaRecorder.requestData();
+        }
+      } catch {}
       this.mediaRecorder.stop();
     }
     this.state.isRecording = false;
@@ -171,7 +221,7 @@ export class AudioRecorder {
       this.stream.getTracks().forEach((t) => t.stop());
     }
     if (this.audioContext) {
-      this.audioContext.close();
+      this.audioContext.close().catch(() => {});
     }
     this.mediaRecorder = null;
     this.stream = null;
@@ -185,11 +235,20 @@ export class AudioRecorder {
   }
 
   private getBestMimeType(): string {
-    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
-    for (const type of types) {
-      if (MediaRecorder.isTypeSupported(type)) return type;
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg;codecs=opus',
+      'audio/wav',
+    ];
+    if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
+      for (const type of types) {
+        if (MediaRecorder.isTypeSupported(type)) return type;
+      }
     }
-    return 'audio/webm'; // fallback
+    return '';
   }
 
   static isSupported(): boolean {

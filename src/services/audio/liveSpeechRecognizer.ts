@@ -17,10 +17,12 @@ export class LiveSpeechRecognizer {
   private recognition: any = null;
   private isListening = false;
   private onChunk: LiveSpeechChunkCallback;
+  private onError?: (error: string) => void;
   private accumulatedText = '';
 
-  constructor(onChunk: LiveSpeechChunkCallback) {
+  constructor(onChunk: LiveSpeechChunkCallback, onError?: (error: string) => void) {
     this.onChunk = onChunk;
+    this.onError = onError;
   }
 
   static isSupported(): boolean {
@@ -41,37 +43,43 @@ export class LiveSpeechRecognizer {
       this.recognition.lang = 'fr-FR';
       this.accumulatedText = '';
 
-      this.recognition.onresult = (event: any) => {
-        let interim = '';
-        let finalChunk = '';
+      let currentSessionFinal = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalChunk += transcript + ' ';
+      this.recognition.onresult = (event: any) => {
+        let sessionFinal = '';
+        let sessionInterim = '';
+
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            sessionFinal += res[0].transcript + ' ';
           } else {
-            interim += transcript;
+            sessionInterim += res[0].transcript;
           }
         }
 
-        if (finalChunk) {
-          this.accumulatedText += finalChunk;
-        }
-
-        const currentFullText = (this.accumulatedText + interim).trim();
+        currentSessionFinal = sessionFinal;
+        const currentFullText = (this.accumulatedText + (this.accumulatedText ? ' ' : '') + sessionFinal + sessionInterim).trim();
         if (currentFullText) {
-          this.onChunk(currentFullText, Boolean(finalChunk && !interim));
+          this.onChunk(currentFullText, Boolean(sessionFinal && !sessionInterim));
         }
       };
 
       this.recognition.onerror = (e: any) => {
-        // Silently ignore non-fatal speech recognition errors (e.g. no-speech or aborted)
-        if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        if (e.error === 'not-allowed') {
+          this.onError?.('Permission d’accès au microphone refusée.');
+        } else if (e.error === 'service-not-allowed') {
+          this.onError?.('Service de reconnaissance vocale non autorisé ou indisponible.');
+        } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
           console.warn('[LiveSpeechRecognizer] Info:', e.error);
         }
       };
 
       this.recognition.onend = () => {
+        if (currentSessionFinal) {
+          this.accumulatedText = (this.accumulatedText + (this.accumulatedText ? ' ' : '') + currentSessionFinal).trim();
+          currentSessionFinal = '';
+        }
         if (this.isListening) {
           try {
             this.recognition.start();

@@ -21,6 +21,7 @@ import ReviewPanel from './ReviewPanel';
 import NotesPanel from './NotesPanel';
 import RecordButton from './RecordButton';
 import UnifiedAudioDock from './UnifiedAudioDock';
+import MobileBottomBar from './MobileBottomBar';
 import {
   IconFeather,
   IconClose,
@@ -51,6 +52,26 @@ export default function AtelierPage() {
   const [isAnalyzingText, setIsAnalyzingText] = useState(false);
   const [analyzingBlockId, setAnalyzingBlockId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+  const lastFocusedBlockIdRef = useRef<string | null>(null);
+
+  const handleFocusedBlockChange = useCallback((blockId: string | null) => {
+    setFocusedBlockId(blockId);
+    if (blockId) {
+      lastFocusedBlockIdRef.current = blockId;
+    }
+  }, []);
+
+  const handleStartDictation = useCallback(
+    (targetBlockId?: string) => {
+      let resolvedBlockId = targetBlockId || focusedBlockId || lastFocusedBlockIdRef.current;
+      if (!resolvedBlockId && activeChapter?.blocks && activeChapter.blocks.length > 0) {
+        resolvedBlockId = activeChapter.blocks[activeChapter.blocks.length - 1].id;
+      }
+      dictation.startRecording(resolvedBlockId || undefined);
+    },
+    [focusedBlockId, activeChapter, dictation]
+  );
 
   const showFeedback = (msg: string) => {
     setFeedbackMessage(msg);
@@ -311,6 +332,27 @@ export default function AtelierPage() {
     }
   }, [activeChapter, ms.activeChapterIndex, dispatch]);
 
+  // Mobile rapid additions
+  const handleAddParagraph = useCallback(() => {
+    const lastBlock = activeChapter?.blocks[activeChapter.blocks.length - 1];
+    dispatch({ type: 'ADD_BLOCK', chapterIndex: ms.activeChapterIndex, afterBlockId: lastBlock?.id || null });
+    showFeedback('Nouveau paragraphe ajouté.');
+    setTimeout(() => {
+      const blocks = document.querySelectorAll('.editor-block-content');
+      const last = blocks[blocks.length - 1] as HTMLElement;
+      if (last) {
+        last.focus();
+        last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 80);
+  }, [activeChapter, ms.activeChapterIndex, dispatch]);
+
+  const handleAddChapter = useCallback(() => {
+    const nextNum = ms.chapters.length + 1;
+    dispatch({ type: 'ADD_CHAPTER', title: `Chapitre ${nextNum} — Nouveau chapitre` });
+    showFeedback(`Chapitre ${nextNum} créé.`);
+  }, [ms.chapters.length, dispatch]);
+
   // Deep-link support: Auto-arm dictation if requested via ?action=dictate
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -355,10 +397,20 @@ export default function AtelierPage() {
           createdAt: Date.now(),
         }));
 
+        // Determine target block index for dictation insertion:
+        let targetBlockIndex: number | null = null;
+        if (ds.targetBlockId && activeChapter) {
+          const idx = activeChapter.blocks.findIndex((b) => b.id === ds.targetBlockId);
+          if (idx !== -1) targetBlockIndex = idx;
+        }
+        if (targetBlockIndex === null) {
+          targetBlockIndex = ms.insertionPoint;
+        }
+
         dispatch({
           type: 'INSERT_DICTATION',
           chapterIndex: ms.activeChapterIndex,
-          afterBlockIndex: ms.insertionPoint,
+          afterBlockIndex: targetBlockIndex,
           blocks: newBlocks,
         });
         showFeedback('Texte dicté intégré immédiatement dans le manuscrit.');
@@ -540,7 +592,7 @@ export default function AtelierPage() {
             onToggleReview={handleToggleReview}
             onToggleNotes={handleToggleNotes}
             onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-            onStartDictation={dictation.startRecording}
+            onStartDictation={handleStartDictation}
             onAnalyzeText={handleAnalyzeWrittenText}
             isAnalyzingText={isAnalyzingText}
             dictationPhase={ds.phase}
@@ -552,7 +604,7 @@ export default function AtelierPage() {
             onExportPdf={() => setIsPdfWizardOpen(true)}
           />
 
-          {/* Unified Floating Audio Dock (Zero Layout Shift) */}
+          {/* Unified Floating Audio Dock (Desktop) */}
           <UnifiedAudioDock
             phase={ds.phase}
             duration={ds.duration}
@@ -562,6 +614,25 @@ export default function AtelierPage() {
             onResume={dictation.resumeRecording}
             onStop={dictation.stopRecording}
             onCancel={dictation.cancelRecording}
+          />
+
+          {/* Mobile Bottom Thumb Bar (Touch Sanctuary 1-Hand) */}
+          <MobileBottomBar
+            currentChapterIndex={ms.activeChapterIndex}
+            chapterCount={ms.chapters.length}
+            chapterTitle={activeChapter?.title || 'Sans titre'}
+            onOpenChapters={() => setShowMobileSidebar(true)}
+            onAddChapter={handleAddChapter}
+            onAddParagraph={handleAddParagraph}
+            onUndo={manuscript.undo}
+            canUndo={manuscript.canUndo}
+            dictationState={ds}
+            onStartDictation={handleStartDictation}
+            onStopDictation={dictation.stopRecording}
+            onPauseDictation={dictation.pauseRecording}
+            onResumeDictation={dictation.resumeRecording}
+            onCancelDictation={dictation.cancelRecording}
+            formatTime={dictation.formatTime}
           />
 
           {/* Search bar */}
@@ -598,8 +669,12 @@ export default function AtelierPage() {
                 dispatch={dispatch}
                 searchQuery={searchQuery}
                 focusMode={isFocusMode}
-                onStartDictation={dictation.startRecording}
+                onStartDictation={handleStartDictation}
+                onStopDictation={dictation.stopRecording}
+                dictatingBlockId={ds.targetBlockId || (ds.phase === 'recording' ? focusedBlockId : null)}
+                interimText={ds.interimText || ''}
                 dictationPhase={ds.phase}
+                onFocusedBlockChange={handleFocusedBlockChange}
                 onAnalyzeBlock={handleAnalyzeBlock}
                 analyzingBlockId={analyzingBlockId}
                 onAnalyzeSelection={handleAnalyzeSelection}
