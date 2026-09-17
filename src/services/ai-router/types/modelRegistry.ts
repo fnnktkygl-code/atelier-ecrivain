@@ -74,6 +74,33 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       generation: { rpm: 60, rpd: null, tpm: null },
     },
   },
+  {
+    id: 'chirp-3',
+    name: 'Google Speech Chirp 3 (Diarisation & Réduction de Bruit)',
+    family: 'speech',
+    capabilities: ['transcribe', 'live-audio'],
+    quotas: {
+      generation: { rpm: 60, rpd: null, tpm: null },
+    },
+  },
+  {
+    id: 'gemini-2.0-flash',
+    name: 'Gemini 2.0 Flash (Audio Multimodal Rapide)',
+    family: 'gemini-2',
+    capabilities: ['transcribe', 'transcribe-live', 'text', 'live-audio'],
+    quotas: {
+      generation: { rpm: 15, rpd: 1500, tpm: 1000000 },
+    },
+  },
+  {
+    id: 'gemini-2.0-flash-lite',
+    name: 'Gemini 2.0 Flash-Lite (Audio Haute Cadence)',
+    family: 'gemini-2',
+    capabilities: ['transcribe', 'text'],
+    quotas: {
+      generation: { rpm: 30, rpd: 1500, tpm: 1000000 },
+    },
+  },
 
   // ── 2. MODÈLES TEXTE, DICTÉE & RATURES LITTÉRAIRES ──
   {

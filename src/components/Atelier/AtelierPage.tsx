@@ -65,6 +65,9 @@ export default function AtelierPage() {
   const handleStartDictation = useCallback(
     (targetBlockId?: string) => {
       let resolvedBlockId = targetBlockId || focusedBlockId || lastFocusedBlockIdRef.current;
+      if (!resolvedBlockId && ms.insertionPoint !== null && activeChapter?.blocks[ms.insertionPoint]) {
+        resolvedBlockId = activeChapter.blocks[ms.insertionPoint].id;
+      }
       if (!resolvedBlockId && activeChapter?.blocks && activeChapter.blocks.length > 0) {
         resolvedBlockId = activeChapter.blocks[activeChapter.blocks.length - 1].id;
       }
@@ -83,7 +86,7 @@ export default function AtelierPage() {
       }
       dictation.startRecording(resolvedBlockId || undefined);
     },
-    [focusedBlockId, activeChapter, dictation, ms.activeChapterIndex, dispatch]
+    [focusedBlockId, activeChapter, dictation, ms.activeChapterIndex, ms.insertionPoint, dispatch]
   );
 
   const showFeedback = (msg: string) => {
@@ -418,6 +421,9 @@ export default function AtelierPage() {
         }
         if (targetBlockIndex === null) {
           targetBlockIndex = ms.insertionPoint;
+        }
+        if (targetBlockIndex === null && activeChapter && activeChapter.blocks.length > 0) {
+          targetBlockIndex = activeChapter.blocks.length - 1;
         }
 
         dispatch({

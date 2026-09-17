@@ -26,6 +26,8 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     degradeInsteadOfFallback: false,
     chain: [
       'gemini-3.5-transcribe', // Modèle dédié ultra-précis pour fichiers audio (avec support audioTranscription)
+      'gemini-2.0-flash', // Google Gemini 2.0 Flash (Audio Multimodal natif ultra-rapide)
+      'gemini-2.0-flash-lite',
       'gemini-3.6-flash', // Modèle Flash de pointe, ultra-rapide et multimodal
       'gemini-3.5-flash',
       'gemini-3.7-flash',
@@ -40,6 +42,7 @@ export const FEATURE_CHAINS: Record<FeatureId, FeatureRequirement> = {
     degradeInsteadOfFallback: false,
     chain: [
       'gemini-3.5-transcribe-live',
+      'gemini-2.0-flash',
       'gemini-3.6-flash',
       'gemini-3.7-flash',
       'gemini-2.5-flash',

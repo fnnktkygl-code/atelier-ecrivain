@@ -234,36 +234,47 @@ export default function Editor({
         />
       )}
 
-      {chapter.blocks.map((block, i) => (
-        <EditorBlock
-          key={block.id}
-          block={block}
-          index={i}
-          isInsertionPoint={insertionPoint === i}
-          isFocused={focusedBlockId === block.id}
-          isDimmed={focusMode && focusedBlockId !== null && focusedBlockId !== block.id}
-          searchQuery={searchQuery}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-          onSplit={handleSplit}
-          onMergeWithPrevious={handleMergeWithPrevious}
-          onInsertAfter={handleInsertAfter}
-          onSetInsertionPoint={handleSetInsertionPoint}
-          onStartDictation={onStartDictation}
-          onStopDictation={onStopDictation}
-          isDictatingThisBlock={dictatingBlockId === block.id && (dictationPhase === 'recording' || dictationPhase === 'processing')}
-          dictationPhase={dictationPhase}
-          interimText={dictatingBlockId === block.id ? interimText : ''}
-          onAnalyzeBlock={onAnalyzeBlock}
-          isAnalyzingBlock={analyzingBlockId === block.id}
-          onFocus={handleFocus}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          isDragOver={dragOverIndex === i}
-          totalBlocks={chapter.blocks.length}
-        />
-      ))}
+      {(() => {
+        const effectiveDictatingBlockId =
+          dictatingBlockId ||
+          focusedBlockId ||
+          (insertionPoint !== null && chapter.blocks[insertionPoint] ? chapter.blocks[insertionPoint].id : null) ||
+          (chapter.blocks.length > 0 ? chapter.blocks[chapter.blocks.length - 1].id : null);
+
+        return chapter.blocks.map((block, i) => (
+          <EditorBlock
+            key={block.id}
+            block={block}
+            index={i}
+            isInsertionPoint={insertionPoint === i}
+            isFocused={focusedBlockId === block.id}
+            isDimmed={focusMode && focusedBlockId !== null && focusedBlockId !== block.id}
+            searchQuery={searchQuery}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+            onSplit={handleSplit}
+            onMergeWithPrevious={handleMergeWithPrevious}
+            onInsertAfter={handleInsertAfter}
+            onSetInsertionPoint={handleSetInsertionPoint}
+            onStartDictation={onStartDictation}
+            onStopDictation={onStopDictation}
+            isDictatingThisBlock={
+              effectiveDictatingBlockId === block.id &&
+              (dictationPhase === 'recording' || dictationPhase === 'processing')
+            }
+            dictationPhase={dictationPhase}
+            interimText={effectiveDictatingBlockId === block.id ? interimText : ''}
+            onAnalyzeBlock={onAnalyzeBlock}
+            isAnalyzingBlock={analyzingBlockId === block.id}
+            onFocus={handleFocus}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            isDragOver={dragOverIndex === i}
+            totalBlocks={chapter.blocks.length}
+          />
+        ));
+      })()}
 
       {/* Bar d'ajout rapide de paragraphe en bas de chapitre */}
       <div className="editor-append-bar">

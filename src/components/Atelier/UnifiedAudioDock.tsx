@@ -64,12 +64,6 @@ export default function UnifiedAudioDock({
           )}
         </div>
 
-        {/* Live Interim Speech Preview */}
-        {interimText && phase === 'recording' && (
-          <div className="audio-dock-interim" title={interimText}>
-            « {interimText.length > 55 ? '…' + interimText.slice(-55) : interimText} »
-          </div>
-        )}
 
         {/* Controls */}
         <div className="audio-dock-controls">

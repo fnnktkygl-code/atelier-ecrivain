@@ -77,29 +77,38 @@ export default function EditorBlock({
 
       if (ref.current.innerText !== textToShow) {
         ref.current.innerText = textToShow;
-        // Position caret at the end of the text if focused so user sees natural typing
-        if (document.activeElement === ref.current) {
-          try {
-            const sel = window.getSelection();
-            if (sel) {
-              const range = document.createRange();
-              range.selectNodeContents(ref.current);
-              range.collapse(false);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          } catch {}
-        }
+        // Position caret at the end of the text so author sees natural typing flow
+        try {
+          const sel = window.getSelection();
+          if (sel) {
+            const range = document.createRange();
+            range.selectNodeContents(ref.current);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        } catch {}
       }
     } else if (!isDictatingThisBlock && ref.current && ref.current.innerHTML !== block.content) {
       ref.current.innerHTML = block.content;
     }
   }, [block.content, isDictatingThisBlock, interimText]);
 
-  // Scroll into view once when dictation begins
+  // Scroll into view & center smoothly when dictation begins
   useEffect(() => {
     if (isDictatingThisBlock && ref.current) {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      try {
+        ref.current.focus({ preventScroll: true });
+        const sel = window.getSelection();
+        if (sel) {
+          const range = document.createRange();
+          range.selectNodeContents(ref.current);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      } catch {}
     }
   }, [isDictatingThisBlock]);
 
@@ -215,6 +224,7 @@ export default function EditorBlock({
           ref={ref}
           className={`editor-block-content ${isDictatingThisBlock ? 'is-dictating' : ''}`}
           contentEditable={true}
+          inputMode={isDictatingThisBlock ? 'none' : 'text'}
           suppressContentEditableWarning
           onInput={handleInput}
           onKeyDown={handleKeyDown}

@@ -146,22 +146,6 @@ export default function MobileBottomBar({
               )}
             </div>
 
-            {/* Aperçu en direct des paroles prononcées */}
-            {isRecording && (
-              <div className="mobile-audio-live-preview">
-                {ds.interimText ? (
-                  <p className="mobile-audio-live-text">
-                    <span className="live-quote">« </span>
-                    {ds.interimText}
-                    <span className="live-quote"> »</span>
-                  </p>
-                ) : (
-                  <p className="mobile-audio-live-placeholder">
-                    Parlez maintenant, votre voix s&apos;écrit en direct…
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* Boutons d'action audio adaptés au pouce */}
             <div className="mobile-audio-actions">
