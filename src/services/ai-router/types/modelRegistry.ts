@@ -10,13 +10,13 @@ export interface ModelEntry {
   id: string; // ex. 'gemini-3.5-transcribe', 'gemini-3.7-flash', 'nano-banana-pro'
   name: string; // Nom lisible
   family:
+    | 'gemini-3.8'
     | 'gemini-3.7'
     | 'gemini-3.6'
     | 'gemini-3.5'
     | 'gemini-3.1'
     | 'gemini-3'
     | 'gemini-2.5'
-    | 'gemini-2'
     | 'nano-banana'
     | 'imagen-3'
     | 'speech'
@@ -37,7 +37,36 @@ export interface ModelEntry {
  * - Traduction : Gemini 3.5 Live Translate
  */
 export const MODEL_REGISTRY: ModelEntry[] = [
-  // ── 1. TRANSCRIPTION & SPEECH-TO-TEXT SPÉCIALISÉS ──
+  // ── 1. TRANSCRIPTION & SPEECH-TO-TEXT SPÉCIALISÉS (GEMINI 3.8 LIVE & 3.5) ──
+  {
+    id: 'gemini-3.8-live',
+    name: 'Gemini 3.8 Live (Voix & Audio Temps Réel 2026)',
+    family: 'gemini-3.8',
+    capabilities: ['transcribe-live', 'live-audio', 'transcribe', 'text'],
+    quotas: {
+      generation: { rpm: 60, rpd: null, tpm: 1000000 },
+    },
+  },
+  {
+    id: 'gemini-3.8-live-extended-thinking',
+    name: 'Gemini 3.8 Live Extended Thinking (Raisonnement Vocal Approfondi)',
+    family: 'gemini-3.8',
+    capabilities: ['transcribe-live', 'live-audio', 'transcribe', 'text'],
+    quotas: {
+      generation: { rpm: 30, rpd: null, tpm: 1000000 },
+    },
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash (Multimodal & Raisonnement Supérieur 2026)',
+    family: 'gemini-3.8',
+    capabilities: ['text', 'transcribe', 'live-audio', 'translate', 'research'],
+    quotas: {
+      generation: { rpm: 30, rpd: 1500, tpm: 1000000 },
+      groundingSearch: { rpm: 15, rpd: 1500, tpm: 500000 },
+      groundingMaps: { rpm: 10, rpd: 500, tpm: 250000 },
+    },
+  },
   {
     id: 'gemini-3.5-transcribe',
     name: 'Gemini 3.5 Transcribe',
@@ -74,33 +103,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       generation: { rpm: 60, rpd: null, tpm: null },
     },
   },
-  {
-    id: 'chirp-3',
-    name: 'Google Speech Chirp 3 (Diarisation & Réduction de Bruit)',
-    family: 'speech',
-    capabilities: ['transcribe', 'live-audio'],
-    quotas: {
-      generation: { rpm: 60, rpd: null, tpm: null },
-    },
-  },
-  {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash (Audio Multimodal Rapide)',
-    family: 'gemini-2',
-    capabilities: ['transcribe', 'transcribe-live', 'text', 'live-audio'],
-    quotas: {
-      generation: { rpm: 15, rpd: 1500, tpm: 1000000 },
-    },
-  },
-  {
-    id: 'gemini-2.0-flash-lite',
-    name: 'Gemini 2.0 Flash-Lite (Audio Haute Cadence)',
-    family: 'gemini-2',
-    capabilities: ['transcribe', 'text'],
-    quotas: {
-      generation: { rpm: 30, rpd: 1500, tpm: 1000000 },
-    },
-  },
+
 
   // ── 2. MODÈLES TEXTE, DICTÉE & RATURES LITTÉRAIRES ──
   {
@@ -175,24 +178,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     id: 'gemini-2.5-flash-lite',
     name: 'Gemini 2.5 Flash Lite',
     family: 'gemini-2.5',
-    capabilities: ['text'],
-    quotas: {
-      generation: { rpm: 30, rpd: 1500, tpm: 1000000 },
-    },
-  },
-  {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    family: 'gemini-2',
-    capabilities: ['text'],
-    quotas: {
-      generation: { rpm: 15, rpd: 1500, tpm: 1000000 },
-    },
-  },
-  {
-    id: 'gemini-2.0-flash-lite',
-    name: 'Gemini 2.0 Flash Lite',
-    family: 'gemini-2',
     capabilities: ['text'],
     quotas: {
       generation: { rpm: 30, rpd: 1500, tpm: 1000000 },
